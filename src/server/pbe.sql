@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS answers;
-DROP TABLE IF EXISTS question_info;
+DROP TABLE IF EXISTS questions_info;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS languages;
@@ -31,10 +31,8 @@ CREATE TABLE sessions (
 CREATE TABLE events (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
-  code TEXT NOT NULL,
   created_at NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE (code)
+  PRIMARY KEY (id)
 );
 
 CREATE TABLE roles (
@@ -86,7 +84,7 @@ CREATE TABLE questions (
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 );
 
-CREATE TABLE question_info (
+CREATE TABLE questions_info (
   id TEXT NOT NULL,
   body TEXT NOT NULL,
   answer TEXT NOT NULL,
