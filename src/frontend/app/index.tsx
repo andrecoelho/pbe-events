@@ -1,15 +1,10 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/frontend/app/App';
 
 function start() {
   const rootEl = createRoot(document.getElementById('root')!);
 
-  rootEl.render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  );
+  rootEl.render(<App />);
 }
 
 if (document.readyState === 'loading') {
