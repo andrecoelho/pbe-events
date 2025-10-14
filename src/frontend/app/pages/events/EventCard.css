@@ -3,7 +3,9 @@
 .Events__card {
   @apply card flex-wrap place-items-center justify-center bg-base-100 hover:bg-base-200 shadow-md w-80 h-48 p-10;
 
-  .tooltip > svg {
-    @apply size-6 cursor-pointer;
+  .tooltip {
+    > svg {
+      @apply size-6 cursor-pointer;
+    }
   }
 }

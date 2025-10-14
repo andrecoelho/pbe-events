@@ -57,6 +57,30 @@ export const EventCard = memo((props: Props) => {
           <Icon name='trash' className='text-error hover:brightness-75' />
         </a>
       </div>
+
+      <div className='absolute top-2 right-2 flex flex-col gap-2'>
+        <a className='tooltip tooltip-neutral' data-tip='Questions'>
+          <Icon name='light-bulb' className='text-yellow-500 hover:brightness-75' />
+        </a>
+        <a className='tooltip tooltip-neutral' data-tip='Teams'>
+          <Icon name='user-group' className='text-purple-500 hover:brightness-75' />
+        </a>
+        <a className='tooltip tooltip-neutral' data-tip='Intro Slides'>
+          <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
+        </a>
+      </div>
+
+      <div className='absolute bottom-2 left-2 flex gap-2'>
+        <a className='tooltip tooltip-neutral' data-tip='Run'>
+          <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
+        </a>
+        <a className='tooltip tooltip-neutral' data-tip='Grade'>
+          <Icon name='scale' className='text-amber-600 hover:brightness-75' />
+        </a>
+        <a className='tooltip tooltip-neutral' data-tip='Results'>
+          <Icon name='chart-bar' className='text-cyan-600 hover:brightness-75' />
+        </a>
+      </div>
     </div>
   );
 });
