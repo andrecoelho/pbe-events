@@ -1,6 +1,7 @@
 import '../base.css';
 
 import logo from 'src/assets/favicon.svg';
+import { alertModal } from '../components/AlertModal';
 
 export function Login() {
   const handleSubmit = async (event: React.FormEvent) => {
@@ -25,10 +26,10 @@ export function Login() {
       if (response.ok) {
         location.reload();
       } else {
-        alert(response.error || 'Login failed');
+        alertModal.open(response.error || 'Login failed');
       }
     } catch {
-      alert('Login failed');
+      alertModal.open('Login failed');
     }
   };
 
