@@ -65,3 +65,5 @@ export const Events = memo(() => {
     </EventsValtContext.Provider>
   );
 });
+
+Events.displayName = 'Events';

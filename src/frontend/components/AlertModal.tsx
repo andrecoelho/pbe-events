@@ -16,6 +16,8 @@ function AlertModal(props: { message: string }) {
   );
 }
 
+AlertModal.displayName = 'AlertModal';
+
 class AlertModalManager {
   async open(message: string) {
     return await modal.open<string>(<AlertModal message={message} />);

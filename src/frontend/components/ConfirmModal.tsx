@@ -20,6 +20,8 @@ function ConfirmModal(props: { message: string }) {
   );
 }
 
+ConfirmModal.displayName = 'ConfirmModal';
+
 class ConfirmModalManager {
   async open(message: string) {
     return await modal.open<boolean>(<ConfirmModal message={message} />);

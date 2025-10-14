@@ -63,3 +63,5 @@ export function Login() {
     </div>
   );
 }
+
+Login.displayName = 'Login';

@@ -47,7 +47,7 @@ export const EventCard = memo((props: Props) => {
       </h2>
 
       <div className='absolute top-2 left-2 flex gap-2'>
-        <a className='tooltip tooltip-neutral' data-tip='Permissions'>
+        <a className='tooltip tooltip-neutral' data-tip='Permissions' href={`/permissions/${props.event.id}`}>
           <Icon name='key' className='text-stone-500 hover:brightness-0' />
         </a>
         <a className='tooltip tooltip-neutral' data-tip='Duplicate'>
@@ -84,3 +84,5 @@ export const EventCard = memo((props: Props) => {
     </div>
   );
 });
+
+EventCard.displayName = 'EventCard';
