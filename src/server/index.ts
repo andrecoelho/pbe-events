@@ -1,31 +1,31 @@
+import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import { authRoutes } from '@/server/routes/auth';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
 
+const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
 
 const server = Bun.serve({
   async fetch(req): Promise<Response> {
     const url = new URL(req.url);
 
-    console.log('URL', url);
-
     if (url.pathname in authRoutes) {
-      console.log('HANDLING AUTH ROUTE', url.pathname, req.method);
       return authRoutes[url.pathname]![req.method]!(req as BunRequest);
     }
 
     const session = getSession(req);
 
     if (!session) {
-      return await fetch(`${server.url}/${loginNounce}`);
+      return await fetch(`${server.url}${loginNounce}`);
     }
 
-    return new Response('Hello, World!');
+    return await fetch(`${server.url}${appNounce}`);
   },
   routes: {
     [`/${loginNounce}`]: login,
+    [`/${appNounce}`]: app,
     ...authRoutes
   },
   development: process.env.NODE_ENV !== 'production',
