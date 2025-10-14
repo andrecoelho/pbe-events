@@ -7,7 +7,10 @@ const selectUserQuery = db.query<User, { $email: string }>('SELECT * FROM users 
 export const authRoutes: Routes = {
   '/api/login': {
     POST: async (req) => {
-      const invalidResponse = new Response(JSON.stringify({ error: 'Invalid Credentials' }), { status: 401 });
+      const invalidResponse = new Response(JSON.stringify({ error: 'Invalid Credentials' }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 401
+      });
       const { email, password } = await req.json();
 
       if (!email || !password) {
@@ -31,8 +34,8 @@ export const authRoutes: Routes = {
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: {
-          'Set-Cookie': `sessionId=${sessionId}; HttpOnly; Secure; Path=/;`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sessionId=${sessionId}; HttpOnly; Secure; Path=/;`
         }
       });
     }
@@ -44,8 +47,8 @@ export const authRoutes: Routes = {
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: {
-          'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0`
         }
       });
     }

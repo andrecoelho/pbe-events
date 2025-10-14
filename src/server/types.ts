@@ -4,8 +4,8 @@ export type Routes = Record<string, Record<string, (req: BunRequest) => Promise<
 
 export interface Session {
   id: string;
-  userId: string;
-  createdAt: string;
+  user_id: string;
+  created_at: string;
 }
 
 export interface User {
