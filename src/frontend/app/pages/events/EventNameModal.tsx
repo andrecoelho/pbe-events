@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { modal } from '@/frontend/components/Modal';
 
 interface Props {
