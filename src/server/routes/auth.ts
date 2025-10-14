@@ -1,0 +1,53 @@
+import { db } from '@/server/db';
+import { createSession, deleteSession, getSession } from '@/server/session';
+import type { Routes, User } from '@/server/types';
+
+const selectUserQuery = db.query<User, { $email: string }>('SELECT * FROM users WHERE email = $email');
+
+export const authRoutes: Routes = {
+  '/api/login': {
+    POST: async (req) => {
+      const invalidResponse = new Response(JSON.stringify({ error: 'Invalid Credentials' }), { status: 401 });
+      const { email, password } = await req.json();
+
+      if (!email || !password) {
+        return invalidResponse;
+      }
+
+      const user = selectUserQuery.get({ $email: email.toLowerCase() });
+
+      if (!user) {
+        return invalidResponse;
+      }
+
+      const isMatch = await Bun.password.verify(password, user.password);
+
+      if (!isMatch) {
+        return invalidResponse;
+      }
+
+      const sessionId = createSession(user.id);
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'Set-Cookie': `sessionId=${sessionId}; HttpOnly; Secure; Path=/;`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+  },
+  '/api/logout': {
+    POST: (req) => {
+      deleteSession(req);
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+  }
+};
