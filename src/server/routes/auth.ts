@@ -2,7 +2,7 @@ import { db } from '@/server/db';
 import { createSession, deleteSession, getSession } from '@/server/session';
 import type { Routes, User } from '@/server/types';
 
-const selectUserQuery = db.query<User, { $email: string }>('SELECT * FROM users WHERE email = $email');
+const querySelectUser = db.query<User, { $email: string }>('SELECT * FROM users WHERE email = $email');
 
 export const authRoutes: Routes = {
   '/api/login': {
@@ -17,7 +17,7 @@ export const authRoutes: Routes = {
         return invalidResponse;
       }
 
-      const user = selectUserQuery.get({ $email: email.toLowerCase() });
+      const user = querySelectUser.get({ $email: email.toLowerCase() });
 
       if (!user) {
         return invalidResponse;

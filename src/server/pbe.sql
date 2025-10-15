@@ -3,7 +3,7 @@ DROP TABLE IF EXISTS questions_info;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS languages;
-DROP TABLE IF EXISTS user_events;
+DROP TABLE IF EXISTS permissions;
 DROP TABLE IF EXISTS roles;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS sessions;
@@ -15,6 +15,7 @@ CREATE TABLE users (
   password TEXT NOT NULL,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
+  avatar BLOB,
   created_at NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE (email)
@@ -42,7 +43,7 @@ CREATE TABLE roles (
   PRIMARY KEY (id)
 );
 
-CREATE TABLE user_events (
+CREATE TABLE permissions (
   user_id TEXT NOT NULL,
   event_id TEXT NOT NULL,
   role_id TEXT NOT NULL,

@@ -2,12 +2,12 @@ import { db } from '@/server/db';
 import type { Session } from '@/server/types';
 import type { BunRequest } from 'bun';
 
-const insertSessionQuery = db.query<{}, { $sessionId: string; $userId: string }>(
+const queryInsertSession = db.query<{}, { $sessionId: string; $userId: string }>(
   'INSERT INTO sessions (id, user_id) VALUES ($sessionId, $userId)'
 );
 
-const selectSessionQuery = db.query<Session, { $sessionId: string }>('SELECT * FROM sessions WHERE id = $sessionId');
-const deleteSessionQuery = db.query<{}, { $sessionId: string }>('DELETE FROM sessions WHERE id = $sessionId');
+const querySelectSession = db.query<Session, { $sessionId: string }>('SELECT * FROM sessions WHERE id = $sessionId');
+const queryDeleteSession = db.query<{}, { $sessionId: string }>('DELETE FROM sessions WHERE id = $sessionId');
 
 export function getSessionIdFromCookies(req: Request) {
   const cookies = req.headers.get('Cookie');
@@ -27,7 +27,7 @@ export function getSessionIdFromCookies(req: Request) {
 export function createSession(userId: string) {
   const sessionId = Bun.randomUUIDv7();
 
-  insertSessionQuery.run({ $sessionId: sessionId, $userId: userId });
+  queryInsertSession.run({ $sessionId: sessionId, $userId: userId });
 
   return sessionId;
 }
@@ -39,7 +39,7 @@ export function getSession(req: Request) {
     return null;
   }
 
-  return selectSessionQuery.get({ $sessionId: sessionId });
+  return querySelectSession.get({ $sessionId: sessionId });
 }
 
 export function deleteSession(req: BunRequest) {
@@ -49,5 +49,5 @@ export function deleteSession(req: BunRequest) {
     return;
   }
 
-  deleteSessionQuery.run({ $sessionId: sessionId });
+  queryDeleteSession.run({ $sessionId: sessionId });
 }

@@ -14,6 +14,7 @@ export interface User {
   password: string;
   first_name: string;
   last_name: string;
+  avatar: Blob;
   created_at: string;
 }
 
@@ -23,7 +24,7 @@ export interface Event {
   created_at: string;
 }
 
-export interface UserEvent {
+export interface Permission {
   user_id: string;
   event_id: string;
   role_id: 'owner' | 'admin' | 'judge';
