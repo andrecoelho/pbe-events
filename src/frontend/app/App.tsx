@@ -5,10 +5,12 @@ import type { ElementType } from 'react';
 import { NavBar } from '@/frontend/app/NavBar';
 import { Events } from '@/frontend/app/pages/events/Events';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
+import { Teams } from '@/frontend/app/pages/teams/Teams';
 import { useRouter, type Routes } from '@/frontend/utils/useRouter';
 
 const routes: Routes = new Map([
   [/^\/permissions/, Permissions],
+  [/^\/teams/, Teams],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 
