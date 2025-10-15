@@ -14,6 +14,6 @@
   }
 
   td.col-actions > a > svg {
-    @apply size-4 cursor-pointer hover:brightness-75;
+    @apply size-6 cursor-pointer hover:brightness-75;
   }
 }
