@@ -37,7 +37,7 @@ const server = Bun.serve({
       const userId = url.pathname.split('/')[2];
 
       if (typeof userId === 'string' && userId.length > 0) {
-        const path = join(import.meta.dir, '../../data/', `${session.userId}.png`);
+        const path = join(import.meta.dir, '../../data/', `${userId}.png`);
         const file = Bun.file(path);
 
         if (await file.exists()) {
