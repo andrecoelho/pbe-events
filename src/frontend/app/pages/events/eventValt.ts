@@ -86,7 +86,4 @@ export class EventsValt {
 }
 
 export const EventsValtContext = createContext<EventsValt>(new EventsValt());
-
-export const useEventsValt = () => {
-  return useContext(EventsValtContext);
-};
+export const useEventsValt = () => useContext(EventsValtContext);

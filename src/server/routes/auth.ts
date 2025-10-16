@@ -1,5 +1,5 @@
 import { db } from '@/server/db';
-import { createSession, deleteSession, getSession } from '@/server/session';
+import { createSession, deleteSession } from '@/server/session';
 import type { Routes, User } from '@/server/types';
 import { apiData, apiUnauthorized } from '@/server/utils/responses';
 
