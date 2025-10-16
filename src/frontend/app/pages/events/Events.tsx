@@ -56,6 +56,11 @@ export const Events = memo(() => {
             </div>
           )}
         </div>
+        {snap.initialized && snap.events.length > 0 && (
+          <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
+            <button className='btn btn-secondary' onClick={handleCreateEvent}>Add Event</button>
+          </footer>
+        )}
       </div>
     </EventsValtContext.Provider>
   );
