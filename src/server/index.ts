@@ -15,10 +15,6 @@ const server = Bun.serve({
   async fetch(req): Promise<Response> {
     const url = new URL(req.url);
 
-    if (url.pathname in authRoutes) {
-      return authRoutes[url.pathname]![req.method]!(req as BunRequest);
-    }
-
     const session = getSession(req);
 
     if (!session) {
