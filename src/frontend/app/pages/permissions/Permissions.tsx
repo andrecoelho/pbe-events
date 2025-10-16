@@ -1,3 +1,4 @@
+import { permissionsModal } from '@/frontend/app/pages/permissions/PermissionsModal';
 import { PermissionsValt } from '@/frontend/app/pages/permissions/permissionsValt';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
@@ -21,6 +22,10 @@ const init = () => {
 export function Permissions() {
   const permissionsValt = useMemo(init, []);
   const snap = useSnapshot(permissionsValt.store);
+
+  const handleAddUser = () => {
+    permissionsModal.open();
+  };
 
   if (!snap.initialized) {
     return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
@@ -78,7 +83,7 @@ export function Permissions() {
         </div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button className='btn btn-primary'>Add User</button>
+        <button className='btn btn-primary' onClick={handleAddUser}>Add User</button>
       </footer>
     </div>
   );
