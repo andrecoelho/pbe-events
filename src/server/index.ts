@@ -4,6 +4,7 @@ import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
+import { permissionRoutes } from '@/server/routes/permissions';
 import { sessionRoutes } from '@/server/routes/session';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
@@ -17,7 +18,8 @@ const server = Bun.serve({
     [`/${appNounce}`]: app,
     ...authRoutes,
     ...sessionRoutes,
-    ...eventsRoutes
+    ...eventsRoutes,
+    ...permissionRoutes
   },
   async fetch(req): Promise<Response> {
     const url = new URL(req.url);
@@ -35,7 +37,7 @@ const server = Bun.serve({
       const userId = url.pathname.split('/')[2];
 
       if (typeof userId === 'string' && userId.length > 0) {
-        const path = join(import.meta.dir, '../../data/', `${session.user_id}.png`);
+        const path = join(import.meta.dir, '../../data/', `${session.userId}.png`);
         const file = Bun.file(path);
 
         if (await file.exists()) {
@@ -48,7 +50,7 @@ const server = Bun.serve({
 
     return await fetch(`${server.url}${appNounce}`);
   },
-  development: process.env.NODE_ENV !== 'production',
+  development: process.env.NODE_ENV !== 'production'
 });
 
 console.log(`🚀 Server running at ${server.url}`);

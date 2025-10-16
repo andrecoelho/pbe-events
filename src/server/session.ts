@@ -3,7 +3,7 @@ import type { Session } from '@/server/types';
 import type { BunRequest } from 'bun';
 
 const queryInsertSession = db.query<{}, { $sessionId: string; $userId: string }>(
-  'INSERT INTO sessions (id, user_id) VALUES ($sessionId, $userId)'
+  'INSERT INTO sessions (id, userId) VALUES ($sessionId, $userId)'
 );
 
 const querySelectSession = db.query<Session, { $sessionId: string }>('SELECT * FROM sessions WHERE id = $sessionId');

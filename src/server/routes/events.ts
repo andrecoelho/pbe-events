@@ -14,15 +14,15 @@ import {
 const querySelectEventsByUserId = db.query<PBEEvent[], { $userId: string }>(
   `SELECT events.*
    FROM events
-   JOIN permissions ON events.id = permissions.event_id
-   WHERE permissions.user_id = $userId`
+   JOIN permissions ON events.id = permissions.eventId
+   WHERE permissions.userId = $userId`
 );
 
 const querySelectEvent = db.query<PBEEvent, { $eventId: string; $userId: string }>(
   `SELECT events.*
    FROM events
-   JOIN permissions ON events.id = permissions.event_id
-   WHERE permissions.user_id = $userId AND events.id = $eventId`
+   JOIN permissions ON events.id = permissions.eventId
+   WHERE permissions.userId = $userId AND events.id = $eventId AND permissions.roleId IN ('owner', 'admin')`
 );
 
 const queryInsertEvent = db.query<{}, { $id: string; $name: string }>(
@@ -36,11 +36,11 @@ const queryUpdateEventName = db.query<{}, { $eventId: string; $name: string }>(
 );
 
 const queryInsertPermission = db.query<{}, { $userId: string; $eventId: string; $roleId: string }>(
-  `INSERT INTO permissions (user_id, event_id, role_id) VALUES ($userId, $eventId, $roleId)`
+  `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
 );
 
 const querySelectPermissions = db.query<Permission, { $userId: string; $eventId: string }>(
-  `SELECT * FROM permissions WHERE user_id = $userId AND event_id = $eventId`
+  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId`
 );
 
 export const eventsRoutes: Routes = {
@@ -52,7 +52,7 @@ export const eventsRoutes: Routes = {
         return apiUnauthorized();
       }
 
-      const events = querySelectEventsByUserId.all({ $userId: session.user_id });
+      const events = querySelectEventsByUserId.all({ $userId: session.userId });
 
       return apiData({ events });
     },
@@ -74,7 +74,7 @@ export const eventsRoutes: Routes = {
       try {
         queryInsertEvent.run({ $id: id, $name: name.trim() });
 
-        queryInsertPermission.run({ $userId: session.user_id, $eventId: id, $roleId: 'owner' });
+        queryInsertPermission.run({ $userId: session.userId, $eventId: id, $roleId: 'owner' });
       } catch (error) {
         console.error('Error creating event:', error);
 
@@ -85,22 +85,6 @@ export const eventsRoutes: Routes = {
     }
   },
   '/api/events/:id': {
-    GET: async (req: BunRequest<'/api/events/:id'>) => {
-      const session = getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const id = req.params.id;
-      const event = querySelectEvent.get({ $eventId: id, $userId: session.user_id });
-
-      if (!event) {
-        return apiNotFound('Event Not Found');
-      }
-
-      return apiData({ event });
-    },
     PATCH: async (req: BunRequest<'/api/events/:id'>) => {
       const session = getSession(req);
 
@@ -115,13 +99,13 @@ export const eventsRoutes: Routes = {
       }
 
       const id = req.params.id;
-      const userEvent = querySelectPermissions.get({ $userId: session.user_id, $eventId: id });
+      const userEvent = querySelectPermissions.get({ $userId: session.userId, $eventId: id });
 
       if (!userEvent) {
         return apiNotFound('Event not found');
       }
 
-      if (userEvent.role_id !== 'owner' && userEvent.role_id !== 'admin') {
+      if (userEvent.roleId !== 'owner' && userEvent.roleId !== 'admin') {
         return apiForbidden();
       }
 
@@ -137,13 +121,13 @@ export const eventsRoutes: Routes = {
       }
 
       const id = req.params.id;
-      const userEvent = querySelectPermissions.get({ $userId: session.user_id, $eventId: id });
+      const userEvent = querySelectPermissions.get({ $userId: session.userId, $eventId: id });
 
       if (!userEvent) {
         return apiNotFound('Event not found');
       }
 
-      if (userEvent.role_id !== 'owner') {
+      if (userEvent.roleId !== 'owner') {
         return apiForbidden();
       }
 

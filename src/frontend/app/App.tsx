@@ -5,6 +5,7 @@ import { NavBar } from '@/frontend/app/NavBar';
 import { Events } from '@/frontend/app/pages/events/Events';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
 import { Teams } from '@/frontend/app/pages/teams/Teams';
+import { Loading } from '@/frontend/components/Loading';
 import { useRouter, type Routes } from '@/frontend/utils/useRouter';
 import { useMemo, type ElementType } from 'react';
 import { useSnapshot } from 'valtio';
@@ -29,11 +30,7 @@ export function App() {
   const Page = useRouter(routes);
 
   if (!snap.init) {
-    return (
-      <div className='absolute inset-0 flex flex-col items-center justify-center'>
-        <span className='loading loading-ring loading-xl bg-accent' />
-      </div>
-    );
+    return <Loading />;
   }
 
   return (

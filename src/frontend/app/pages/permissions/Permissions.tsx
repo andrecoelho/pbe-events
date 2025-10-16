@@ -1,13 +1,36 @@
-import './Permissions.css';
-
+import { PermissionsValt } from '@/frontend/app/pages/permissions/permissionsValt';
 import { Icon } from '@/frontend/components/Icon';
+import { useMemo } from 'react';
+import { useSnapshot } from 'valtio';
+import './Permissions.css';
+import { Loading } from '@/frontend/components/Loading';
+
+const init = () => {
+  const permissionsValt = new PermissionsValt();
+  const url = new URL(window.location.href);
+  const match = url.pathname.match(/^\/permissions\/([^/]+)$/);
+  const eventId = match ? match[1] : undefined;
+
+  if (eventId) {
+    permissionsValt.init(eventId);
+  }
+
+  return permissionsValt;
+};
 
 export function Permissions() {
+  const permissionsValt = useMemo(init, []);
+  const snap = useSnapshot(permissionsValt.store);
+
+  if (!snap.initialized) {
+    return <Loading />;
+  }
+
   return (
     <div className='Permissions bg-base-100 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Permissions</h1>
-        <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>PBE 2026 (Sparks)</h2>
+        <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
         <div className='overflow-x-auto'>
           <table className='table'>
             <thead>
@@ -20,28 +43,32 @@ export function Permissions() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className='col-avatar'>
-                  <div className='avatar'>
-                    <div className='w-8 rounded-full'>
-                      <img src='/user-image/01998476-de65-7000-b1d3-b830d85c9078' />
+              {snap.permissions.map((permission) => (
+                <tr key={permission.userId}>
+                  <td className='col-avatar'>
+                    <div className='avatar'>
+                      <div className='w-8 rounded-full'>
+                        <img src={`/user-image/${permission.userId}`} />
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className='col-email'>andrecoelho@gmail.com</td>
-                <td className='col-name'>Andre Coelho</td>
-                <td className='col-role'>
-                  <span className='badge badge-success'>Owner</span>
-                </td>
-                <td className='col-actions'>
-                  <a className='tooltip tooltip-neutral' data-tip='Edit'>
-                    <Icon name='pencil-square' className='text-accent' />
-                  </a>
-                  <a className='tooltip tooltip-neutral' data-tip='Delete'>
-                    <Icon name='trash' className='text-error' />
-                  </a>
-                </td>
-              </tr>
+                  </td>
+                  <td className='col-email'>{permission.email}</td>
+                  <td className='col-name'>
+                    {permission.firstName} {permission.lastName}
+                  </td>
+                  <td className='col-role'>
+                    <span className='badge badge-success'>{permission.roleId}</span>
+                  </td>
+                  <td className='col-actions'>
+                    <a className='tooltip tooltip-neutral' data-tip='Edit'>
+                      <Icon name='pencil-square' className='text-accent' />
+                    </a>
+                    <a className='tooltip tooltip-neutral' data-tip='Delete'>
+                      <Icon name='trash' className='text-error' />
+                    </a>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

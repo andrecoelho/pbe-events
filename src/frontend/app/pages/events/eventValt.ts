@@ -7,7 +7,7 @@ export interface PBEEvent {
 }
 
 export interface EventsStore {
-  didInit: boolean;
+  initialized: boolean;
   events: PBEEvent[];
 }
 
@@ -16,7 +16,7 @@ export class EventsValt {
 
   constructor() {
     this.store = proxy<EventsStore>({
-      didInit: false,
+      initialized: false,
       events: []
     });
   }
@@ -28,7 +28,7 @@ export class EventsValt {
       const response = (await result.json()) as { events: PBEEvent[] };
 
       this.store.events = response.events;
-      this.store.didInit = true;
+      this.store.initialized = true;
     }
   }
 

@@ -4,29 +4,29 @@ export type Routes = Record<string, Record<string, (req: BunRequest) => Promise<
 
 export interface Session {
   id: string;
-  user_id: string;
-  created_at: string;
+  userId: string;
+  createdAt: string;
 }
 
 export interface User {
   id: string;
   email: string;
   password: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   avatar: Blob;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface PBEEvent {
   id: string;
   name: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface Permission {
-  user_id: string;
-  event_id: string;
-  role_id: 'owner' | 'admin' | 'judge';
-  created_at: string;
+  userId: string;
+  eventId: string;
+  roleId: 'owner' | 'admin' | 'judge';
+  createdAt: string;
 }

@@ -1,10 +1,9 @@
 import './Events.css';
 
+import { alertModal } from '@/frontend/components/AlertModal';
+import { Loading } from '@/frontend/components/Loading';
 import { memo, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
-
-import { alertModal } from '@/frontend/components/AlertModal';
-
 import { EventCard } from './EventCard';
 import { eventNameModal } from './EventNameModal';
 import { EventsValt, EventsValtContext } from './eventValt';
@@ -37,13 +36,9 @@ export const Events = memo(() => {
     <EventsValtContext.Provider value={valt}>
       <div className='Events'>
         <div className='Events__content'>
-          {!snap.didInit && (
-            <div className='absolute inset-0 flex flex-col items-center justify-center'>
-              <span className='loading loading-ring loading-xl bg-accent' />
-            </div>
-          )}
+          {!snap.initialized && <Loading />}
 
-          {snap.didInit && snap.events.length === 0 && (
+          {snap.initialized && snap.events.length === 0 && (
             <div className='absolute inset-0 flex flex-col items-center justify-center'>
               <button className='btn btn-secondary btn-lg' onClick={handleCreateEvent}>
                 Add your first event
@@ -51,7 +46,7 @@ export const Events = memo(() => {
             </div>
           )}
 
-          {snap.didInit && snap.events.length > 0 && (
+          {snap.initialized && snap.events.length > 0 && (
             <div className='Events__grid'>
               {snap.events.map((event) => (
                 <div key={event.id} className='relative'>
