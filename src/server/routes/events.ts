@@ -1,13 +1,28 @@
 import { db } from '@/server/db';
-import type { Permission, Routes } from '@/server/types';
+import type { PBEEvent, Permission, Routes } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
+import {
+  apiBadRequest,
+  apiData,
+  apiForbidden,
+  apiNotFound,
+  apiServerError,
+  apiUnauthorized
+} from '@/server/utils/responses';
 
-const querySelectEventsByUserId = db.query<Event[], { $userId: string }>(
+const querySelectEventsByUserId = db.query<PBEEvent[], { $userId: string }>(
   `SELECT events.*
    FROM events
    JOIN permissions ON events.id = permissions.event_id
    WHERE permissions.user_id = $userId`
+);
+
+const querySelectEvent = db.query<PBEEvent, { $eventId: string; $userId: string }>(
+  `SELECT events.*
+   FROM events
+   JOIN permissions ON events.id = permissions.event_id
+   WHERE permissions.user_id = $userId AND events.id = $eventId`
 );
 
 const queryInsertEvent = db.query<{}, { $id: string; $name: string }>(
@@ -34,39 +49,27 @@ export const eventsRoutes: Routes = {
       const session = getSession(req);
 
       if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 401
-        });
+        return apiUnauthorized();
       }
 
       const events = querySelectEventsByUserId.all({ $userId: session.user_id });
 
-      return new Response(JSON.stringify(events), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return apiData({ events });
     },
     POST: async (req) => {
       const session = getSession(req);
 
       if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 401
-        });
+        return apiUnauthorized();
       }
 
       const { name } = await req.json();
 
       if (!name || typeof name !== 'string' || name.trim() === '') {
-        return new Response(JSON.stringify({ error: 'Invalid event name' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 400
-        });
+        return apiBadRequest('Invalid event name');
       }
 
       const id = Bun.randomUUIDv7();
-      console.log('SESSION', session);
 
       try {
         queryInsertEvent.run({ $id: id, $name: name.trim() });
@@ -75,92 +78,78 @@ export const eventsRoutes: Routes = {
       } catch (error) {
         console.error('Error creating event:', error);
 
-        return new Response(JSON.stringify({ error: 'Failed to create event' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 500
-        });
+        return apiServerError('Failed to create event');
       }
 
-      return new Response(JSON.stringify({ ok: true, id, name: name.trim() }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return apiData({ id, name: name.trim() });
     }
   },
   '/api/events/:id': {
+    GET: async (req: BunRequest<'/api/events/:id'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const id = req.params.id;
+      const event = querySelectEvent.get({ $eventId: id, $userId: session.user_id });
+
+      if (!event) {
+        return apiNotFound('Event Not Found');
+      }
+
+      return apiData({ event });
+    },
     PATCH: async (req: BunRequest<'/api/events/:id'>) => {
       const session = getSession(req);
 
       if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 401
-        });
+        return apiUnauthorized();
       }
 
       const { name } = await req.json();
 
       if (!name || typeof name !== 'string' || name.trim() === '') {
-        return new Response(JSON.stringify({ error: 'Invalid event name' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 400
-        });
+        return apiBadRequest('Invalid event name');
       }
 
       const id = req.params.id;
       const userEvent = querySelectPermissions.get({ $userId: session.user_id, $eventId: id });
 
       if (!userEvent) {
-        return new Response(JSON.stringify({ error: 'Event not found' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 404
-        });
+        return apiNotFound('Event not found');
       }
 
       if (userEvent.role_id !== 'owner' && userEvent.role_id !== 'admin') {
-        return new Response(JSON.stringify({ error: 'Forbidden' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 403
-        });
+        return apiForbidden();
       }
 
       queryUpdateEventName.run({ $eventId: id, $name: name.trim() });
 
-      return new Response(JSON.stringify({ ok: true, id, name: name.trim() }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return apiData({ id, name: name.trim() });
     },
     DELETE: (req: BunRequest<'/api/events/:id'>) => {
       const session = getSession(req);
 
       if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 401
-        });
+        return apiUnauthorized();
       }
 
       const id = req.params.id;
       const userEvent = querySelectPermissions.get({ $userId: session.user_id, $eventId: id });
 
       if (!userEvent) {
-        return new Response(JSON.stringify({ error: 'Event not found' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 404
-        });
+        return apiNotFound('Event not found');
       }
 
       if (userEvent.role_id !== 'owner') {
-        return new Response(JSON.stringify({ error: 'Forbidden' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 403
-        });
+        return apiForbidden();
       }
 
       queryDeleteEvent.run({ $eventId: id });
 
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return apiData();
     }
   }
 };

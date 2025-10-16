@@ -25,7 +25,9 @@ export class EventsValt {
     const result = await fetch('/api/events');
 
     if (result.status === 200) {
-      this.store.events = await result.json();
+      const response = (await result.json()) as { events: PBEEvent[] };
+
+      this.store.events = response.events;
       this.store.didInit = true;
     }
   }

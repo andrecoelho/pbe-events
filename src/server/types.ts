@@ -18,7 +18,7 @@ export interface User {
   created_at: string;
 }
 
-export interface Event {
+export interface PBEEvent {
   id: string;
   name: string;
   created_at: string;
