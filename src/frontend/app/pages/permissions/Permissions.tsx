@@ -60,12 +60,16 @@ export function Permissions() {
                     <span className='badge badge-success'>{permission.roleId}</span>
                   </td>
                   <td className='col-actions'>
-                    <a className='tooltip tooltip-neutral' data-tip='Edit'>
-                      <Icon name='pencil-square' className='text-accent' />
-                    </a>
-                    <a className='tooltip tooltip-neutral' data-tip='Delete'>
-                      <Icon name='trash' className='text-error' />
-                    </a>
+                    {permission.roleId !== 'owner' && (
+                      <>
+                        <a className='tooltip tooltip-neutral' data-tip='Edit'>
+                          <Icon name='pencil-square' className='text-accent' />
+                        </a>
+                        <a className='tooltip tooltip-neutral' data-tip='Delete'>
+                          <Icon name='trash' className='text-error' />
+                        </a>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
