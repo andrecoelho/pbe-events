@@ -9,21 +9,22 @@ export const authRoutes: Routes = {
   '/api/login': {
     POST: async (req) => {
       const { email, password } = await req.json();
+      const invalidMessage = 'Invalid credentials';
 
       if (!email || !password) {
-        return apiUnauthorized('Invalid credentials');
+        return apiUnauthorized(invalidMessage);
       }
 
       const user = querySelectUser.get({ $email: email.toLowerCase() });
 
       if (!user) {
-        return apiUnauthorized('Invalid credentials');
+        return apiUnauthorized(invalidMessage);
       }
 
       const isMatch = await Bun.password.verify(password, user.password);
 
       if (!isMatch) {
-        return apiUnauthorized('Invalid credentials');
+        return apiUnauthorized(invalidMessage);
       }
 
       const sessionId = createSession(user.id);
