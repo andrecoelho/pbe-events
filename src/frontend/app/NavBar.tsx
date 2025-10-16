@@ -1,5 +1,4 @@
 import { memo, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
-import andre from '@/assets/andre.png';
 import logo from '@/assets/favicon.svg';
 import { alertModal } from '@/frontend/components/AlertModal';
 
@@ -39,7 +38,7 @@ export const NavBar = memo(() => {
           style={{ anchorName: '--profile-menu-anchor' } as CSSProperties}
         >
           <div className="w-10 rounded-full">
-            <img src={andre} />
+            <img src='/user-image/01998476-de65-7000-b1d3-b830d85c9078' />
           </div>
         </button>
         <ul

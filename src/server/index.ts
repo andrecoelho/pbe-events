@@ -1,9 +1,12 @@
+import type { BunRequest } from 'bun';
+import { join } from 'path';
+
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { getSession } from '@/server/session';
-import type { BunRequest } from 'bun';
+import { apiNotFound, textNotFound } from '@/server/utils/responses';
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
@@ -23,10 +26,22 @@ const server = Bun.serve({
     }
 
     if (url.pathname.startsWith('/api')) {
-      return new Response(JSON.stringify({ error: 'Not Found' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 404
-      });
+      return apiNotFound();
+    }
+
+    if (url.pathname.startsWith('/user-image')) {
+      const userId = url.pathname.split('/')[2];
+
+      if (typeof userId === 'string' && userId.length > 0) {
+        const path = join(import.meta.dir, '../../data/', `${session.user_id}.png`);
+        const file = Bun.file(path);
+
+        if (await file.exists()) {
+          return new Response(file);
+        }
+      }
+
+      return textNotFound();
     }
 
     return await fetch(`${server.url}${appNounce}`);

@@ -1,6 +1,5 @@
 import './Permissions.css';
 
-import andre from '@/assets/andre.png';
 import { Icon } from '@/frontend/components/Icon';
 
 export function Permissions() {
@@ -25,7 +24,7 @@ export function Permissions() {
                 <td className='col-avatar'>
                   <div className='avatar'>
                     <div className='w-8 rounded-full'>
-                      <img src={andre} />
+                      <img src='/user-image/01998476-de65-7000-b1d3-b830d85c9078' />
                     </div>
                   </div>
                 </td>
