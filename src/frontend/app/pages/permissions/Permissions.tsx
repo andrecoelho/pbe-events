@@ -1,9 +1,9 @@
 import { PermissionsValt } from '@/frontend/app/pages/permissions/permissionsValt';
 import { Icon } from '@/frontend/components/Icon';
+import { Loading } from '@/frontend/components/Loading';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Permissions.css';
-import { Loading } from '@/frontend/components/Loading';
 
 const init = () => {
   const permissionsValt = new PermissionsValt();
@@ -23,7 +23,7 @@ export function Permissions() {
   const snap = useSnapshot(permissionsValt.store);
 
   if (!snap.initialized) {
-    return <Loading />;
+    return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
   }
 
   return (
