@@ -6,6 +6,12 @@ import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Permissions.css';
 
+const badgeColors = {
+  owner: 'badge-success',
+  admin: 'badge-info',
+  judge: 'badge-accent'
+};
+
 const init = () => {
   const permissionsValt = new PermissionsValt();
   const url = new URL(window.location.href);
@@ -62,7 +68,7 @@ export function Permissions() {
                     {permission.firstName} {permission.lastName}
                   </td>
                   <td className='col-role'>
-                    <span className='badge badge-success'>{permission.roleId}</span>
+                    <span className={`badge ${badgeColors[permission.roleId]}`}>{permission.roleId}</span>
                   </td>
                   <td className='col-actions'>
                     {permission.roleId !== 'owner' && (
@@ -83,7 +89,10 @@ export function Permissions() {
         </div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button className='btn btn-primary' onClick={handleAddUser}>Add User</button>
+        <button className='btn btn-primary' onClick={handleAddUser}>
+          <Icon name='plus' className='size-4' />
+          Add User
+        </button>
       </footer>
     </div>
   );

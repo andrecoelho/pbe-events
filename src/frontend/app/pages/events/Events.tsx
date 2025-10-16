@@ -1,6 +1,7 @@
 import './Events.css';
 
 import { alertModal } from '@/frontend/components/AlertModal';
+import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
 import { memo, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
@@ -58,7 +59,9 @@ export const Events = memo(() => {
         </div>
         {snap.initialized && snap.events.length > 0 && (
           <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-            <button className='btn btn-secondary' onClick={handleCreateEvent}>Add Event</button>
+            <button className='btn btn-secondary' onClick={handleCreateEvent}>
+              <Icon name='plus' className='size-4' /> Add Event
+            </button>
           </footer>
         )}
       </div>
