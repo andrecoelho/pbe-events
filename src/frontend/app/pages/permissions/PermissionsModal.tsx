@@ -15,32 +15,31 @@ interface Store {
     lastName: string;
   };
   emailToSearch: string;
-  foundUser: boolean;
-  searchDone: boolean;
-  isSearching: boolean;
+  searchStatus: 'idle' | 'searching' | 'done';
 }
 
 const init = () => {
-  const store = proxy<Store>({ emailToSearch: '', foundUser: false, searchDone: false, isSearching: false });
+  const store = proxy<Store>({ emailToSearch: '', searchStatus: 'idle' });
 
   const searchUserByEmail = async (email: string) => {
-    store.isSearching = true;
+    store.searchStatus = 'searching';
+
     const result = await fetch(`/api/users?email=${encodeURIComponent(email)}`);
-    store.isSearching = false;
+
+    store.searchStatus = 'done';
 
     if (result.status === 200) {
       const response = (await result.json()) as { user: Store['user'] };
+
       store.user = response.user;
       store.user!.email = email;
-      store.foundUser = true;
-      store.searchDone = true;
 
       return true;
     } else if (result.status === 404) {
       store.user = undefined;
-      store.foundUser = false;
-      store.searchDone = true;
     }
+
+    store.searchStatus = 'done';
 
     return false;
   };
@@ -55,41 +54,62 @@ function PermissionsModal(props: Props) {
 
   const handleCancel = () => permissionsModal.close();
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    store.searchStatus = 'idle';
+    store.emailToSearch = e.target.value;
+  };
+
   const handleSearch = () => {
     searchUserByEmail(searchRef.current?.value ?? '');
   };
 
+  const handleRemoveUser = () => {
+    store.user = undefined;
+    store.emailToSearch = '';
+    store.searchStatus = 'idle';
+  };
+
   return (
-    <div className='modal-box'>
+    <div className='modal-box w-[600px] max-w-[600px]'>
       <h3 className='font-bold text-lg mb-4'>{props.name ? 'Edit User' : 'Add User'}</h3>
-      <div className='flex gap-2 items-center'>
-        {(!snap.searchDone || !snap.foundUser) && (
-          <>
-            <label className='input flex-1'>
-              <Icon name='magnifying-glass' className='size-4 text-stone-400' />
-              <input
-                type='search'
-                name='email'
-                autoComplete='off'
-                className='placeholder:text-stone-400'
-                placeholder='Search by email address ...'
-                ref={searchRef}
-                value={snap.emailToSearch}
-                onChange={(e) => (store.emailToSearch = e.target.value)}
-              />
-            </label>
+      <div className='flex flex-col gap-2 items-center'>
+        {(snap.searchStatus !== 'done' || (snap.searchStatus === 'done' && !snap.user)) && (
+          <div className='join w-full'>
+            <div className='w-full'>
+              <label className='input validator join-item w-full'>
+                <Icon name='magnifying-glass' className='size-4 text-stone-400' />
+                <input
+                  type='search'
+                  name='email'
+                  autoComplete='off'
+                  className='placeholder:text-stone-400'
+                  placeholder='Search by email address ...'
+                  pattern='^\w+@\w+\.\w+$'
+                  required
+                  aria-invalid={snap.searchStatus === 'done' && !snap.user ? 'true' : 'false'}
+                  ref={searchRef}
+                  value={snap.emailToSearch}
+                  onChange={handleChange}
+                />
+              </label>
+              {snap.searchStatus === 'done' && !snap.user && (
+                <p className='validator-hint'>
+                  <span>Could not find a user with that email address.</span>
+                </p>
+              )}
+            </div>
             <button
-              className='btn btn-accent ml-2'
+              className='btn btn-accent join-item w-32'
               onClick={handleSearch}
-              disabled={snap.isSearching || snap.emailToSearch.length === 0}
+              disabled={snap.searchStatus === 'searching' || snap.emailToSearch.length === 0}
             >
-              {snap.isSearching ? 'Searching...' : 'Search'}
+              {snap.searchStatus === 'searching' ? 'Searching...' : 'Search'}
             </button>
-          </>
+          </div>
         )}
 
-        {snap.searchDone && snap.user && (
-          <>
+        {snap.searchStatus === 'done' && snap.user && (
+          <div className='flex gap-4 w-full items-center'>
             <div className='avatar'>
               <div className='w-8 rounded-full'>
                 <img src={`/user-image/${snap.user.id}`} />
@@ -98,7 +118,12 @@ function PermissionsModal(props: Props) {
             <div className='flex-1'>
               {snap.user.firstName} {snap.user.lastName} ({snap.user.email})
             </div>
-          </>
+            <div>
+              <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={handleRemoveUser}>
+                <Icon name='trash' className='text-error size-6 cursor-pointer hover:brightness-75' />
+              </a>
+            </div>
+          </div>
         )}
       </div>
       <div className='modal-action flex justify-between'>
