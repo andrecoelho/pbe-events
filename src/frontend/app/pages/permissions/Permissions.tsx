@@ -1,5 +1,6 @@
 import { permissionsModal } from '@/frontend/app/pages/permissions/PermissionsModal';
 import { PermissionsValt } from '@/frontend/app/pages/permissions/permissionsValt';
+import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
 import { useMemo } from 'react';
@@ -31,6 +32,14 @@ export function Permissions() {
 
   const handleAddUser = () => {
     permissionsModal.open(permissionsValt);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    const confirmation = await confirmModal.open('Are you sure you want to delete this user permission?');
+
+    if (confirmation) {
+      permissionsValt.deletePermission(userId);
+    }
   };
 
   if (!snap.initialized) {
@@ -76,7 +85,11 @@ export function Permissions() {
                         <a className='tooltip tooltip-neutral' data-tip='Edit'>
                           <Icon name='pencil-square' className='text-accent' />
                         </a>
-                        <a className='tooltip tooltip-neutral' data-tip='Delete'>
+                        <a
+                          className='tooltip tooltip-neutral'
+                          data-tip='Delete'
+                          onClick={() => handleDeleteUser(permission.userId)}
+                        >
                           <Icon name='trash' className='text-error' />
                         </a>
                       </>

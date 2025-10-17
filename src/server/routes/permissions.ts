@@ -30,6 +30,10 @@ const queryInsertPermission = db.query<void, { $userId: string; $eventId: string
   `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
 );
 
+const queryDeletePermission = db.query<void, { $userId: string; $eventId: string }>(
+  `DELETE FROM permissions WHERE userId = $userId AND eventId = $eventId`
+);
+
 export const permissionRoutes: Routes = {
   '/api/events/:id/permissions': {
     GET: (req: BunRequest<'/api/events/:id/permissions'>) => {
@@ -71,6 +75,30 @@ export const permissionRoutes: Routes = {
       }
 
       queryInsertPermission.run({ $userId: userId, $eventId: eventId, $roleId: roleId });
+
+      return apiData({ ok: true });
+    },
+    DELETE: async (req: BunRequest<'/api/events/:id/permissions'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const eventId = req.params.id;
+      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+
+      if (!event) {
+        return apiForbidden();
+      }
+
+      const { userId } = await req.json();
+
+      if (!userId) {
+        return apiBadRequest('userId is required');
+      }
+
+      queryDeletePermission.run({ $userId: userId, $eventId: eventId });
 
       return apiData({ ok: true });
     }

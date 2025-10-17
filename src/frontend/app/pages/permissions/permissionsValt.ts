@@ -39,4 +39,14 @@ export class PermissionsValt {
 
     this.store.permissions.push({ userId, roleId, email, firstName, lastName });
   }
+
+  async deletePermission(userId: string) {
+    await fetch(`/api/events/${this.store.eventId}/permissions`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+
+    this.store.permissions = this.store.permissions.filter((p) => p.userId !== userId);
+  }
 }
