@@ -30,6 +30,10 @@ const queryInsertPermission = db.query<void, { $userId: string; $eventId: string
   `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
 );
 
+const queryUpdatePermission = db.query<void, { $userId: string; $eventId: string; $roleId: string }>(
+  `UPDATE permissions SET roleId = $roleId WHERE userId = $userId AND eventId = $eventId`
+);
+
 const queryDeletePermission = db.query<void, { $userId: string; $eventId: string }>(
   `DELETE FROM permissions WHERE userId = $userId AND eventId = $eventId`
 );
@@ -78,6 +82,36 @@ export const permissionRoutes: Routes = {
 
       return apiData({ ok: true });
     },
+
+    PATCH: async (req: BunRequest<'/api/events/:id/permissions'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const eventId = req.params.id;
+      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+
+      if (!event) {
+        return apiForbidden();
+      }
+
+      const { userId, roleId } = await req.json();
+
+      if (!userId || !roleId) {
+        return apiBadRequest('userId and roleId are required');
+      }
+
+      if (roleId === 'owner') {
+        return apiBadRequest('Cannot assign owner role');
+      }
+
+      queryUpdatePermission.run({ $userId: userId, $eventId: eventId, $roleId: roleId });
+
+      return apiData({ ok: true });
+    },
+
     DELETE: async (req: BunRequest<'/api/events/:id/permissions'>) => {
       const session = getSession(req);
 

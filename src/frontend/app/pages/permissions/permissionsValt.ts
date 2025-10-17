@@ -40,6 +40,19 @@ export class PermissionsValt {
     this.store.permissions.push({ userId, roleId, email, firstName, lastName });
   }
 
+  async updatePermission(userId: string, roleId: 'admin' | 'judge') {
+    await fetch(`/api/events/${this.store.eventId}/permissions`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, roleId })
+    });
+
+    const permission = this.store.permissions.find((p) => p.userId === userId);
+    if (permission) {
+      permission.roleId = roleId;
+    }
+  }
+
   async deletePermission(userId: string) {
     await fetch(`/api/events/${this.store.eventId}/permissions`, {
       method: 'DELETE',

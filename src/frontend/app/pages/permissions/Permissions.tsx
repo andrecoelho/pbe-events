@@ -34,6 +34,16 @@ export function Permissions() {
     permissionsModal.open(permissionsValt);
   };
 
+  const handleEditUser = (permission: typeof snap.permissions[0]) => {
+    permissionsModal.open(permissionsValt, {
+      userId: permission.userId,
+      email: permission.email,
+      firstName: permission.firstName,
+      lastName: permission.lastName,
+      roleId: permission.roleId as 'admin' | 'judge'
+    });
+  };
+
   const handleDeleteUser = async (userId: string) => {
     const confirmation = await confirmModal.open('Are you sure you want to delete this user permission?');
 
@@ -82,7 +92,7 @@ export function Permissions() {
                   <td className='col-actions'>
                     {permission.roleId !== 'owner' && (
                       <>
-                        <a className='tooltip tooltip-neutral' data-tip='Edit'>
+                        <a className='tooltip tooltip-neutral' data-tip='Edit' onClick={() => handleEditUser(permission)}>
                           <Icon name='pencil-square' className='text-accent' />
                         </a>
                         <a

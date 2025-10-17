@@ -5,28 +5,30 @@ import { proxy, useSnapshot } from 'valtio';
 import type { PermissionsValt } from './permissionsValt';
 
 interface Props {
-  name?: string;
+  user?: User;
   permissionsValt: PermissionsValt;
 }
 
+interface User {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  roleId?: 'admin' | 'judge';
+}
+
 interface Store {
-  user?: {
-    userId: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    roleId?: 'admin' | 'judge';
-  };
-  emailToSearch: string;
+  user?: User;
+  searchCriteria: string;
   searchStatus: 'idle' | 'searching' | 'done';
 }
 
-const init = (permissionsValt: PermissionsValt) => {
+const init = (permissionsValt: PermissionsValt, user?: User) => {
   const uniqueId = crypto.randomUUID();
   const popoverId = `role-popover-${uniqueId}`;
   const anchorName = `--role-anchor-${uniqueId}`;
 
-  const store = proxy<Store>({ emailToSearch: '', searchStatus: 'idle' });
+  const store = proxy<Store>({ user, searchCriteria: '', searchStatus: user ? 'done' : 'idle' });
 
   const searchUserByEmail = async (email: string) => {
     store.searchStatus = 'searching';
@@ -59,16 +61,16 @@ const init = (permissionsValt: PermissionsValt) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     store.searchStatus = 'idle';
-    store.emailToSearch = e.target.value;
+    store.searchCriteria = e.target.value;
   };
 
   const handleSearch = () => {
-    searchUserByEmail(store.emailToSearch);
+    searchUserByEmail(store.searchCriteria);
   };
 
   const handleRemoveUser = () => {
     store.user = undefined;
-    store.emailToSearch = '';
+    store.searchCriteria = '';
     store.searchStatus = 'idle';
   };
 
@@ -83,13 +85,17 @@ const init = (permissionsValt: PermissionsValt) => {
 
   const handleSave = async () => {
     if (store.user && store.user.roleId) {
-      await permissionsValt.addPermission(
-        store.user.userId,
-        store.user.roleId,
-        store.user.email,
-        store.user.firstName,
-        store.user.lastName
-      );
+      if (user) {
+        await permissionsValt.updatePermission(store.user.userId, store.user.roleId);
+      } else {
+        await permissionsValt.addPermission(
+          store.user.userId,
+          store.user.roleId,
+          store.user.email,
+          store.user.firstName,
+          store.user.lastName
+        );
+      }
 
       permissionsModal.close();
     }
@@ -119,16 +125,16 @@ function PermissionsModal(props: Props) {
     handleRemoveUser,
     handleChooseRole,
     handleSave
-  } = useMemo(() => init(props.permissionsValt), [props.permissionsValt]);
+  } = useMemo(() => init(props.permissionsValt, props.user), [props.permissionsValt]);
 
   const snap = useSnapshot(store);
   const isValid = snap.user?.roleId !== undefined;
 
   return (
     <div className='modal-box w-[600px] max-w-[600px]'>
-      <h3 className='font-bold text-lg mb-4'>{props.name ? 'Edit User' : 'Add User'}</h3>
+      <h3 className='font-bold text-lg mb-4'>{props.user ? 'Edit User' : 'Add User'}</h3>
       <div className='flex flex-col gap-2 items-center'>
-        {(snap.searchStatus !== 'done' || (snap.searchStatus === 'done' && !snap.user)) && (
+        {!props.user && (snap.searchStatus !== 'done' || (snap.searchStatus === 'done' && !snap.user)) && (
           <div className='join w-full'>
             <div className='w-full'>
               <label className='input validator join-item w-full'>
@@ -142,7 +148,7 @@ function PermissionsModal(props: Props) {
                   pattern='^\w+@\w+\.\w+$'
                   required
                   aria-invalid={snap.searchStatus === 'done' && !snap.user ? 'true' : 'false'}
-                  value={snap.emailToSearch}
+                  value={snap.searchCriteria}
                   onChange={handleChange}
                 />
               </label>
@@ -155,7 +161,7 @@ function PermissionsModal(props: Props) {
             <button
               className='btn btn-accent join-item w-32'
               onClick={handleSearch}
-              disabled={snap.searchStatus === 'searching' || snap.emailToSearch.length === 0}
+              disabled={snap.searchStatus === 'searching' || snap.searchCriteria.length === 0}
             >
               {snap.searchStatus === 'searching' ? 'Searching...' : 'Search'}
             </button>
@@ -201,11 +207,13 @@ function PermissionsModal(props: Props) {
                 </li>
               </ul>
             </div>
-            <div>
-              <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={handleRemoveUser}>
-                <Icon name='trash' className='text-error size-6 cursor-pointer hover:brightness-75' />
-              </a>
-            </div>
+            {!props.user && (
+              <div>
+                <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={handleRemoveUser}>
+                  <Icon name='trash' className='text-error size-6 cursor-pointer hover:brightness-75' />
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -224,8 +232,8 @@ function PermissionsModal(props: Props) {
 PermissionsModal.displayName = 'PermissionsModal';
 
 class PermissionsModalManager {
-  open = async (permissionsValt: PermissionsValt, name?: string) => {
-    return await modal.open(<PermissionsModal permissionsValt={permissionsValt} name={name} />);
+  open = async (permissionsValt: PermissionsValt, user?: User) => {
+    return await modal.open(<PermissionsModal permissionsValt={permissionsValt} user={user} />);
   };
 
   close = () => {
