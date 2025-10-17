@@ -1,24 +1,31 @@
 import { Icon } from '@/frontend/components/Icon';
 import { modal } from '@/frontend/components/Modal';
-import { createRef, useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { proxy, useSnapshot } from 'valtio';
+import type { PermissionsValt } from './permissionsValt';
 
 interface Props {
   name?: string;
+  permissionsValt: PermissionsValt;
 }
 
 interface Store {
   user?: {
-    id: string;
+    userId: string;
     email: string;
     firstName: string;
     lastName: string;
+    roleId?: 'admin' | 'judge';
   };
   emailToSearch: string;
   searchStatus: 'idle' | 'searching' | 'done';
 }
 
-const init = () => {
+const init = (permissionsValt: PermissionsValt) => {
+  const uniqueId = crypto.randomUUID();
+  const popoverId = `role-popover-${uniqueId}`;
+  const anchorName = `--role-anchor-${uniqueId}`;
+
   const store = proxy<Store>({ emailToSearch: '', searchStatus: 'idle' });
 
   const searchUserByEmail = async (email: string) => {
@@ -29,10 +36,14 @@ const init = () => {
     store.searchStatus = 'done';
 
     if (result.status === 200) {
-      const response = (await result.json()) as { user: Store['user'] };
+      const response = (await result.json()) as { user: { id: string; firstName: string; lastName: string } };
 
-      store.user = response.user;
-      store.user!.email = email;
+      store.user = {
+        userId: response.user.id,
+        email,
+        firstName: response.user.firstName,
+        lastName: response.user.lastName
+      };
 
       return true;
     } else if (result.status === 404) {
@@ -44,14 +55,6 @@ const init = () => {
     return false;
   };
 
-  return { store, searchUserByEmail };
-};
-
-function PermissionsModal(props: Props) {
-  const { store, searchUserByEmail } = useMemo(init, []);
-  const snap = useSnapshot(store);
-  const searchRef = createRef<HTMLInputElement>();
-
   const handleCancel = () => permissionsModal.close();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,7 +63,7 @@ function PermissionsModal(props: Props) {
   };
 
   const handleSearch = () => {
-    searchUserByEmail(searchRef.current?.value ?? '');
+    searchUserByEmail(store.emailToSearch);
   };
 
   const handleRemoveUser = () => {
@@ -68,6 +71,58 @@ function PermissionsModal(props: Props) {
     store.emailToSearch = '';
     store.searchStatus = 'idle';
   };
+
+  const handleChooseRole = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const role = e.currentTarget.dataset.role as 'admin' | 'judge' | undefined;
+    const popover = document.getElementById(popoverId);
+
+    store.user!.roleId = role;
+
+    popover?.hidePopover();
+  };
+
+  const handleSave = async () => {
+    if (store.user && store.user.roleId) {
+      await permissionsValt.addPermission(
+        store.user.userId,
+        store.user.roleId,
+        store.user.email,
+        store.user.firstName,
+        store.user.lastName
+      );
+
+      permissionsModal.close();
+    }
+  };
+
+  return {
+    store,
+    popoverId,
+    anchorName,
+    handleCancel,
+    handleChange,
+    handleSearch,
+    handleRemoveUser,
+    handleChooseRole,
+    handleSave
+  };
+};
+
+function PermissionsModal(props: Props) {
+  const {
+    store,
+    popoverId,
+    anchorName,
+    handleCancel,
+    handleChange,
+    handleSearch,
+    handleRemoveUser,
+    handleChooseRole,
+    handleSave
+  } = useMemo(() => init(props.permissionsValt), [props.permissionsValt]);
+
+  const snap = useSnapshot(store);
+  const isValid = snap.user?.roleId !== undefined;
 
   return (
     <div className='modal-box w-[600px] max-w-[600px]'>
@@ -87,7 +142,6 @@ function PermissionsModal(props: Props) {
                   pattern='^\w+@\w+\.\w+$'
                   required
                   aria-invalid={snap.searchStatus === 'done' && !snap.user ? 'true' : 'false'}
-                  ref={searchRef}
                   value={snap.emailToSearch}
                   onChange={handleChange}
                 />
@@ -112,11 +166,40 @@ function PermissionsModal(props: Props) {
           <div className='flex gap-4 w-full items-center'>
             <div className='avatar'>
               <div className='w-8 rounded-full'>
-                <img src={`/user-image/${snap.user.id}`} />
+                <img src={`/user-image/${snap.user.userId}`} />
               </div>
             </div>
             <div className='flex-1'>
               {snap.user.firstName} {snap.user.lastName} ({snap.user.email})
+            </div>
+            <div className='flex-none w-32'>
+              <button className='btn w-full' popoverTarget={popoverId} style={{ anchorName } as CSSProperties}>
+                {snap.user.roleId ? (
+                  <span className={`badge badge-${snap.user.roleId === 'admin' ? 'info' : 'accent'}`}>
+                    {snap.user.roleId}
+                  </span>
+                ) : (
+                  'Choose Role'
+                )}
+              </button>
+
+              <ul
+                className='dropdown menu w-32 rounded-box bg-base-100 shadow-sm'
+                popover='auto'
+                id={popoverId}
+                style={{ positionAnchor: anchorName } as CSSProperties}
+              >
+                <li>
+                  <button data-role='admin' onClick={handleChooseRole}>
+                    <span className='badge badge-info'>admin</span>
+                  </button>
+                </li>
+                <li>
+                  <button data-role='judge' onClick={handleChooseRole}>
+                    <span className='badge badge-accent'>judge</span>
+                  </button>
+                </li>
+              </ul>
             </div>
             <div>
               <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={handleRemoveUser}>
@@ -130,7 +213,7 @@ function PermissionsModal(props: Props) {
         <button className='btn btn-secondary' onClick={handleCancel}>
           Cancel
         </button>
-        <button className='btn btn-primary' disabled>
+        <button className='btn btn-primary' disabled={!isValid} onClick={handleSave}>
           Save
         </button>
       </div>
@@ -141,12 +224,12 @@ function PermissionsModal(props: Props) {
 PermissionsModal.displayName = 'PermissionsModal';
 
 class PermissionsModalManager {
-  open = async (name?: string) => {
-    return await modal.open<string | null>(<PermissionsModal name={name} />);
+  open = async (permissionsValt: PermissionsValt, name?: string) => {
+    return await modal.open(<PermissionsModal permissionsValt={permissionsValt} name={name} />);
   };
 
-  close = (name: string | null = null) => {
-    modal.close(name);
+  close = () => {
+    modal.close();
   };
 }
 

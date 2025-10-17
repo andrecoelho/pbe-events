@@ -1,7 +1,7 @@
 import { db } from '@/server/db';
 import { getSession } from '@/server/session';
 import type { PBEEvent, Routes } from '@/server/types';
-import { apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
+import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
 
 interface UserPermission {
@@ -26,6 +26,10 @@ const querySelectEvent = db.query<PBEEvent, { $eventId: string; $userId: string 
    WHERE permissions.userId = $userId AND events.id = $eventId AND permissions.roleId IN ('owner', 'admin')`
 );
 
+const queryInsertPermission = db.query<void, { $userId: string; $eventId: string; $roleId: string }>(
+  `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
+);
+
 export const permissionRoutes: Routes = {
   '/api/events/:id/permissions': {
     GET: (req: BunRequest<'/api/events/:id/permissions'>) => {
@@ -45,6 +49,30 @@ export const permissionRoutes: Routes = {
       const permissions = querySelectPermissions.all({ $eventId: eventId });
 
       return apiData({ eventName: event.name, permissions });
+    },
+    POST: async (req: BunRequest<'/api/events/:id/permissions'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const eventId = req.params.id;
+      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+
+      if (!event) {
+        return apiForbidden();
+      }
+
+      const { userId, roleId } = await req.json();
+
+      if (!userId || !roleId) {
+        return apiBadRequest('userId and roleId are required');
+      }
+
+      queryInsertPermission.run({ $userId: userId, $eventId: eventId, $roleId: roleId });
+
+      return apiData({ ok: true });
     }
   }
 };

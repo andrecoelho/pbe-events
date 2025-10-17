@@ -30,7 +30,7 @@ export function Permissions() {
   const snap = useSnapshot(permissionsValt.store);
 
   const handleAddUser = () => {
-    permissionsModal.open();
+    permissionsModal.open(permissionsValt);
   };
 
   if (!snap.initialized) {
