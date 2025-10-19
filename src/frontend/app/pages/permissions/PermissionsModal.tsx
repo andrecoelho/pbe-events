@@ -85,7 +85,9 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
 
   const handleSave = async () => {
     if (store.user && store.user.roleId) {
-      if (user) {
+      const userExists = permissionsValt.store.permissions.find((p) => p.userId === store.user!.userId);
+
+      if (userExists) {
         await permissionsValt.updatePermission(store.user.userId, store.user.roleId);
       } else {
         await permissionsValt.addPermission(
