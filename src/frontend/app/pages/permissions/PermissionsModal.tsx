@@ -180,14 +180,21 @@ function PermissionsModal(props: Props) {
             <div className='flex-1'>
               {snap.user.firstName} {snap.user.lastName} ({snap.user.email})
             </div>
-            <div className='flex-none w-32'>
-              <button className='btn w-full' popoverTarget={popoverId} style={{ anchorName } as CSSProperties}>
+            <div className='flex-none w-36'>
+              <button
+                className='btn btn-outline w-full'
+                popoverTarget={popoverId}
+                style={{ anchorName } as CSSProperties}
+              >
                 {snap.user.roleId ? (
                   <span className={`badge badge-${snap.user.roleId === 'admin' ? 'info' : 'accent'}`}>
                     {snap.user.roleId}
                   </span>
                 ) : (
-                  'Choose Role'
+                  <span>
+                    Choose Role
+                    <Icon name='chevron-down' className='size-4 inline-block ml-1' />
+                  </span>
                 )}
               </button>
 
