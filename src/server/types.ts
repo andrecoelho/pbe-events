@@ -30,3 +30,11 @@ export interface Permission {
   roleId: 'owner' | 'admin' | 'judge';
   createdAt: string;
 }
+
+export interface Team {
+  id: string;
+  name: string;
+  number: number;
+  eventId: string;
+  createdAt: string;
+}

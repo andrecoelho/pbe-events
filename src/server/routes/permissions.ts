@@ -1,4 +1,5 @@
 import { db } from '@/server/db';
+import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { PBEEvent, Routes } from '@/server/types';
 import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
@@ -17,13 +18,6 @@ const querySelectPermissions = db.query<UserPermission, { $eventId: string }>(
    FROM permissions
    JOIN users ON permissions.userId = users.id
    WHERE eventId = $eventId`
-);
-
-const querySelectEvent = db.query<PBEEvent, { $eventId: string; $userId: string }>(
-  `SELECT events.name
-   FROM events
-   JOIN permissions ON events.id = permissions.eventId
-   WHERE permissions.userId = $userId AND events.id = $eventId AND permissions.roleId IN ('owner', 'admin')`
 );
 
 const queryInsertPermission = db.query<void, { $userId: string; $eventId: string; $roleId: string }>(
@@ -72,7 +66,7 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { userId, roleId } = await req.json();
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
 
       if (!userId || !roleId) {
         return apiBadRequest('userId and roleId are required');
@@ -80,7 +74,7 @@ export const permissionRoutes: Routes = {
 
       queryInsertPermission.run({ $userId: userId, $eventId: eventId, $roleId: roleId });
 
-      return apiData({ ok: true });
+      return apiData();
     },
 
     PATCH: async (req: BunRequest<'/api/events/:id/permissions'>) => {
@@ -97,7 +91,7 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { userId, roleId } = await req.json();
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
 
       if (!userId || !roleId) {
         return apiBadRequest('userId and roleId are required');
@@ -109,7 +103,7 @@ export const permissionRoutes: Routes = {
 
       queryUpdatePermission.run({ $userId: userId, $eventId: eventId, $roleId: roleId });
 
-      return apiData({ ok: true });
+      return apiData();
     },
 
     DELETE: async (req: BunRequest<'/api/events/:id/permissions'>) => {
@@ -126,7 +120,7 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { userId } = await req.json();
+      const { userId } = (await req.json()) as { userId: string };
 
       if (!userId) {
         return apiBadRequest('userId is required');
@@ -134,7 +128,7 @@ export const permissionRoutes: Routes = {
 
       queryDeletePermission.run({ $userId: userId, $eventId: eventId });
 
-      return apiData({ ok: true });
+      return apiData();
     }
   }
 };

@@ -6,6 +6,7 @@ import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { permissionRoutes } from '@/server/routes/permissions';
 import { sessionRoutes } from '@/server/routes/session';
+import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
@@ -21,6 +22,7 @@ const server = Bun.serve({
     ...sessionRoutes,
     ...eventsRoutes,
     ...permissionRoutes,
+    ...teamsRoutes,
     ...userRoutes
   },
   async fetch(req): Promise<Response> {
