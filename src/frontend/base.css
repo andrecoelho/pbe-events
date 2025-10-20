@@ -1,11 +1,11 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {
-  name: "pbe";
+  name: 'pbe';
   default: true;
   prefersdark: false;
-  color-scheme: "light";
+  color-scheme: 'light';
 
   --color-base-100: oklch(100% 0 0);
   --color-base-200: oklch(98% 0 0);
@@ -53,5 +53,10 @@
 
   body #root {
     @apply absolute inset-0 bg-linear-to-br from-primary/60 to-primary;
+  }
+
+  a.tooltip:focus-visible::before,
+  a.tooltip:focus-visible::after {
+    content: none !important;
   }
 }

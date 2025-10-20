@@ -13,7 +13,7 @@
     @apply flex justify-center gap-4;
   }
 
-  td.col-actions > a > svg {
+  td.col-actions > button > svg {
     @apply size-6 cursor-pointer hover:brightness-75;
   }
 }

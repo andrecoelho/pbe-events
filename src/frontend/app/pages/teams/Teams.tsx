@@ -64,15 +64,29 @@ export function Teams() {
                   <td className='col-number'>{team.number}</td>
                   <td className='col-name'>{team.name}</td>
                   <td className='col-actions'>
-                    <a className='tooltip tooltip-neutral' data-tip='Edit' onClick={() => handleEditTeam(team)}>
+                    <button
+                      className='tooltip tooltip-neutral'
+                      data-tip='Edit'
+                      onClick={() => handleEditTeam(team)}
+                      aria-label={`Edit team ${team.name}`}
+                    >
                       <Icon name='pencil-square' className='text-accent cursor-pointer hover:brightness-75' />
-                    </a>
-                    <a className='tooltip tooltip-neutral' data-tip='Connection Link'>
+                    </button>
+                    <button
+                      className='tooltip tooltip-neutral'
+                      data-tip='Connection Link'
+                      aria-label={`Connection link for team ${team.name}`}
+                    >
                       <Icon name='link' className='text-info' />
-                    </a>
-                    <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={() => handleRemoveTeam(team)}>
+                    </button>
+                    <button
+                      className='tooltip tooltip-neutral'
+                      data-tip='Delete'
+                      onClick={() => handleRemoveTeam(team)}
+                      aria-label={`Delete team ${team.name}`}
+                    >
                       <Icon name='trash' className='text-error cursor-pointer hover:brightness-75' />
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -47,39 +47,70 @@ export const EventCard = memo((props: Props) => {
       </h2>
 
       <div className='absolute top-2 left-2 flex gap-2'>
-        <a className='tooltip tooltip-neutral' data-tip='Permissions' href={`/permissions/${props.event.id}`}>
+        <a
+          className='tooltip tooltip-neutral'
+          data-tip='Permissions'
+          href={`/permissions/${props.event.id}`}
+          aria-label={`Permissions for event ${props.event.name}`}
+        >
           <Icon name='key' className='text-stone-500 hover:brightness-0' />
         </a>
-        <a className='tooltip tooltip-neutral' data-tip='Duplicate'>
+        <button
+          className='tooltip tooltip-neutral'
+          data-tip='Duplicate'
+          aria-label={`Duplicate event ${props.event.name}`}
+        >
           <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75' />
-        </a>
-        <a className='tooltip tooltip-neutral' data-tip='Delete' onClick={handleDeleteEvent}>
+        </button>
+        <button
+          className='tooltip tooltip-neutral'
+          data-tip='Delete'
+          onClick={handleDeleteEvent}
+          aria-label={`Delete event ${props.event.name}`}
+        >
           <Icon name='trash' className='text-error hover:brightness-75' />
-        </a>
+        </button>
       </div>
 
       <div className='absolute top-2 right-2 flex flex-col gap-2'>
-        <a className='tooltip tooltip-neutral' data-tip='Questions'>
+        <button
+          className='tooltip tooltip-neutral'
+          data-tip='Questions'
+          aria-label={`Questions for event ${props.event.name}`}
+        >
           <Icon name='light-bulb' className='text-yellow-500 hover:brightness-75' />
-        </a>
-        <a className='tooltip tooltip-neutral' data-tip='Teams' href={`/teams/${props.event.id}`}>
+        </button>
+        <a
+          className='tooltip tooltip-neutral'
+          data-tip='Teams'
+          href={`/teams/${props.event.id}`}
+          aria-label={`Teams for event ${props.event.name}`}
+        >
           <Icon name='user-group' className='text-purple-500 hover:brightness-75' />
         </a>
-        <a className='tooltip tooltip-neutral' data-tip='Intro Slides'>
+        <button
+          className='tooltip tooltip-neutral'
+          data-tip='Intro Slides'
+          aria-label={`Intro slides for event ${props.event.name}`}
+        >
           <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
-        </a>
+        </button>
       </div>
 
       <div className='absolute bottom-2 left-2 flex gap-2'>
-        <a className='tooltip tooltip-neutral' data-tip='Run'>
+        <button className='tooltip tooltip-neutral' data-tip='Run' aria-label={`Run event ${props.event.name}`}>
           <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
-        </a>
-        <a className='tooltip tooltip-neutral' data-tip='Grade'>
+        </button>
+        <button className='tooltip tooltip-neutral' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
           <Icon name='scale' className='text-amber-600 hover:brightness-75' />
-        </a>
-        <a className='tooltip tooltip-neutral' data-tip='Results'>
+        </button>
+        <button
+          className='tooltip tooltip-neutral'
+          data-tip='Results'
+          aria-label={`Results for event ${props.event.name}`}
+        >
           <Icon name='chart-bar' className='text-cyan-600 hover:brightness-75' />
-        </a>
+        </button>
       </div>
     </div>
   );

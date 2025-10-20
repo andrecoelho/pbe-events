@@ -92,16 +92,22 @@ export function Permissions() {
                   <td className='col-actions'>
                     {permission.roleId !== 'owner' && (
                       <>
-                        <a className='tooltip tooltip-neutral' data-tip='Edit' onClick={() => handleEditUser(permission)}>
+                        <button
+                          className='tooltip tooltip-neutral'
+                          data-tip='Edit'
+                          onClick={() => handleEditUser(permission)}
+                          aria-label={`Edit permissions for ${permission.firstName} ${permission.lastName}`}
+                        >
                           <Icon name='pencil-square' className='text-accent' />
-                        </a>
-                        <a
+                        </button>
+                        <button
                           className='tooltip tooltip-neutral'
                           data-tip='Delete'
                           onClick={() => handleDeleteUser(permission.userId)}
+                          aria-label={`Delete permissions for ${permission.firstName} ${permission.lastName}`}
                         >
                           <Icon name='trash' className='text-error' />
-                        </a>
+                        </button>
                       </>
                     )}
                   </td>
