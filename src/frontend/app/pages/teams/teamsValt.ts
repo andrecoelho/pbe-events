@@ -4,6 +4,7 @@ interface TeamsStore {
   initialized: boolean;
   eventId: string;
   eventName: string;
+  copiedTeamIds: Set<string>;
   teams: {
     id: string;
     name: string;
@@ -13,9 +14,10 @@ interface TeamsStore {
 
 export class TeamsValt {
   store: TeamsStore;
+  private copyTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
-    this.store = proxy({ initialized: false } as TeamsStore);
+    this.store = proxy({ initialized: false, copiedTeamIds: new Set() } as TeamsStore);
   }
 
   async init(eventId: string) {
@@ -101,5 +103,45 @@ export class TeamsValt {
     const response = (await result.json()) as { error: string };
 
     return { ok: false, error: response.error };
+  }
+
+  async copyTeamLink(teamId: string) {
+    // TODO: Update this URL once the team event route is determined
+    const teamEventUrl = `${window.location.origin}/team-event/${this.store.eventId}/${teamId}`;
+
+    try {
+      await navigator.clipboard.writeText(teamEventUrl);
+
+      // Clear any existing timeout for this team
+      const existingTimeout = this.copyTimeouts.get(teamId);
+
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      // Add team to copied set
+      this.store.copiedTeamIds.add(teamId);
+
+      // Reset the icon after 2 seconds
+      const timeout = setTimeout(() => {
+        this.store.copiedTeamIds.delete(teamId);
+        this.copyTimeouts.delete(teamId);
+
+        this.store.copiedTeamIds = new Set(this.store.copiedTeamIds);
+      }, 2000);
+
+      this.store.copiedTeamIds.add(teamId);
+      this.copyTimeouts.set(teamId, timeout);
+
+      this.store.copiedTeamIds = new Set(this.store.copiedTeamIds);
+    } catch (error) {
+      console.error('Failed to copy link to clipboard:', error);
+    }
+  }
+
+  cleanup() {
+    // Clear all pending timeouts
+    this.copyTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.copyTimeouts.clear();
   }
 }

@@ -3,7 +3,7 @@ import { teamsModal } from '@/frontend/app/pages/teams/TeamsModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Teams.css';
 
@@ -33,12 +33,22 @@ const init = () => {
     }
   };
 
-  return { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam };
+  const handleCopyTeamLink = async (team: { id: string; name: string; number: number }) => {
+    await teamsValt.copyTeamLink(team.id);
+  };
+
+  return { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink };
 };
 
 export function Teams() {
-  const { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam } = useMemo(init, []);
+  const { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink } = useMemo(init, []);
   const snap = useSnapshot(teamsValt.store);
+
+  useEffect(() => {
+    return () => {
+      teamsValt.cleanup();
+    };
+  }, [teamsValt]);
 
   if (!snap.initialized) {
     return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
@@ -74,10 +84,16 @@ export function Teams() {
                     </button>
                     <button
                       className='tooltip tooltip-neutral'
-                      data-tip='Connection Link'
+                      data-tip={snap.copiedTeamIds.has(team.id) ? 'Copied!' : 'Copy Connection Link'}
+                      onClick={() => handleCopyTeamLink(team)}
                       aria-label={`Connection link for team ${team.name}`}
                     >
-                      <Icon name='link' className='text-info' />
+                      <Icon
+                        name={snap.copiedTeamIds.has(team.id) ? 'check' : 'link'}
+                        className={`${
+                          snap.copiedTeamIds.has(team.id) ? 'text-success' : 'text-info'
+                        } cursor-pointer hover:brightness-75`}
+                      />
                     </button>
                     <button
                       className='tooltip tooltip-neutral'
