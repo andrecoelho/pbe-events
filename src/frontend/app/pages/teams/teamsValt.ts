@@ -21,6 +21,7 @@ export class TeamsValt {
   async init(eventId: string) {
     const result = await fetch(`/api/events/${eventId}/teams`);
     const response = (await result.json()) as { eventName: string; teams: TeamsStore['teams'] };
+
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.teams = response.teams;
@@ -61,6 +62,7 @@ export class TeamsValt {
     if (result.status === 200) {
       team.name = name;
       team.number = number;
+
       return { ok: true };
     }
 
