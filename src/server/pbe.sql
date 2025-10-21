@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS answers;
-DROP TABLE IF EXISTS questionsInfo;
+DROP TABLE IF EXISTS questionTranslations;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS languages;
@@ -85,7 +85,7 @@ CREATE TABLE questions (
   FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE
 );
 
-CREATE TABLE questionsInfo (
+CREATE TABLE questionTranslations (
   id TEXT NOT NULL,
   body TEXT NOT NULL,
   answer TEXT NOT NULL,
@@ -107,5 +107,5 @@ CREATE TABLE answers (
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   FOREIGN KEY (teamId) REFERENCES teams(id) ON DELETE CASCADE,
-  FOREIGN KEY (questionInfoId) REFERENCES questionsInfo(id) ON DELETE CASCADE
+  FOREIGN KEY (questionInfoId) REFERENCES questionTranslations(id) ON DELETE CASCADE
 );
