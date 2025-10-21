@@ -38,3 +38,21 @@ export interface Team {
   eventId: string;
   createdAt: string;
 }
+
+export interface Question {
+  id: string;
+  type: 'PS' | 'PW' | 'TF' | 'FB';
+  maxPoints: number;
+  seconds: number;
+  eventId: string;
+  createdAt: string;
+}
+
+export interface QuestionInfo {
+  id: string;
+  body: string;
+  answer: string;
+  languageCode: string;
+  questionId: string;
+  createdAt: string;
+}

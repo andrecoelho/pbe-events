@@ -5,6 +5,7 @@ import login from '@/frontend/login/login.html';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { permissionRoutes } from '@/server/routes/permissions';
+import { questionsRoutes } from '@/server/routes/questions';
 import { sessionRoutes } from '@/server/routes/session';
 import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
@@ -23,7 +24,8 @@ const server = Bun.serve({
     ...eventsRoutes,
     ...permissionRoutes,
     ...teamsRoutes,
-    ...userRoutes
+    ...userRoutes,
+    ...questionsRoutes
   },
   async fetch(req): Promise<Response> {
     const url = new URL(req.url);

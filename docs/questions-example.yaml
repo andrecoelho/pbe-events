@@ -1,0 +1,69 @@
+# Questions Import File Format
+# This file can be uploaded to import questions for an event
+#
+# Question Types:
+#   PS = Points Specific (fixed points for correct answer)
+#   PW = Points per Word (points awarded per word in answer)
+#   TF = True/False (answer must be "true" or "false")
+#   FB = Fill in the Blank (answer fills in the blank)
+#
+# Each question can have multiple language versions in the info array
+
+- type: PS
+  maxPoints: 10
+  seconds: 30
+  info:
+    - lang: en
+      body: What is the capital of France?
+      answer: Paris
+    - lang: es
+      body: ¿Cuál es la capital de Francia?
+      answer: París
+
+- type: TF
+  maxPoints: 5
+  seconds: 15
+  info:
+    - lang: en
+      body: The Earth is flat.
+      answer: false
+
+- type: PW
+  maxPoints: 20
+  seconds: 60
+  info:
+    - lang: en
+      body: Describe the water cycle in your own words.
+      answer: evaporation condensation precipitation collection
+
+- type: FB
+  maxPoints: 8
+  seconds: 20
+  info:
+    - lang: en
+      body: The _____ is the largest planet in our solar system.
+      answer: Jupiter
+
+- type: PS
+  maxPoints: 15
+  seconds: 45
+  info:
+    - lang: en
+      body: In what year did World War II end?
+      answer: 1945
+
+- type: TF
+  maxPoints: 5
+  seconds: 10
+  info:
+    - lang: en
+      body: Python is a compiled programming language.
+      answer: false
+
+- type: FB
+  maxPoints: 10
+  seconds: 25
+  info:
+    - lang: en
+      body: The process of plants converting sunlight into energy is called _____.
+      answer: photosynthesis
