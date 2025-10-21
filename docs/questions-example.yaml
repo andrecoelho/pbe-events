@@ -43,7 +43,9 @@ questions:
     seconds: 60
     info:
       - lang: en
-        body: Describe the water cycle in your own words.
+        body: |
+          Describe the water cycle in your own words.
+          Include at least four stages in your answer.
         answer: evaporation condensation precipitation collection
 
   - type: FB
@@ -59,7 +61,10 @@ questions:
     seconds: 45
     info:
       - lang: en
-        body: In what year did World War II end?
+        body: |
+          In what year did World War II end?
+
+          Consider the year when Japan formally surrendered.
         answer: 1945
 
   - type: TF

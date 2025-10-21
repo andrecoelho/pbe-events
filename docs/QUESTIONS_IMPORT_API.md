@@ -75,8 +75,23 @@ An array of question objects.
   seconds: 30           # Required: Time limit in seconds (positive number)
   info:                 # Required: Array of question info (at least one)
     - lang: en          # Required: Language code (must be defined in languages section)
-      body: Question?   # Required: Question text (non-empty string)
+      body: Question?   # Required: Question text (non-empty string, supports multi-line)
       answer: Answer    # Required: Answer text (non-empty string)
+```
+
+**Note:** Question bodies support multi-line text using YAML's `|` syntax:
+
+```yaml
+- type: PS
+  maxPoints: 10
+  seconds: 30
+  info:
+    - lang: en
+      body: |
+        This is a multi-line question.
+
+        You can include multiple paragraphs or instructions.
+      answer: Your answer here
 ```
 
 ### Question Types
