@@ -12,6 +12,11 @@ import {
 } from '@/server/utils/responses';
 
 // Types for the YAML import
+interface LanguageDefinition {
+  code: string;
+  name: string;
+}
+
 interface QuestionInfo {
   lang: string;
   body: string;
@@ -23,6 +28,11 @@ interface QuestionImport {
   maxPoints: number;
   seconds: number;
   info: QuestionInfo[];
+}
+
+interface QuestionsFileFormat {
+  languages: LanguageDefinition[];
+  questions: QuestionImport[];
 }
 
 interface Language {
@@ -83,23 +93,78 @@ const queryGetEventName = db.query<{ name: string }, { $eventId: string; $userId
    WHERE events.id = $eventId AND permissions.userId = $userId`
 );
 
+const queryDeleteLanguages = db.query<{}, { $eventId: string }>(
+  `DELETE FROM languages WHERE eventId = $eventId`
+);
+
+const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventId: string }>(
+  `INSERT INTO languages (code, name, eventId) VALUES ($code, $name, $eventId)`
+);
+
 /**
  * Validates the YAML structure and data
  */
 function validateQuestionsData(
-  data: unknown,
-  validLanguages: Set<string>
-): { valid: boolean; error?: string; questions?: QuestionImport[] } {
-  // Check if data is an array
-  if (!Array.isArray(data)) {
-    return { valid: false, error: 'YAML file must contain an array of questions' };
+  data: unknown
+): { valid: boolean; error?: string; languages?: LanguageDefinition[]; questions?: QuestionImport[] } {
+  // Check if data is an object with languages and questions
+  if (typeof data !== 'object' || data === null) {
+    return { valid: false, error: 'YAML file must contain an object with languages and questions' };
+  }
+
+  const fileData = data as any;
+
+  // Validate languages array
+  if (!Array.isArray(fileData.languages)) {
+    return { valid: false, error: 'YAML file must contain a languages array' };
+  }
+
+  if (fileData.languages.length === 0) {
+    return { valid: false, error: 'At least one language must be defined' };
+  }
+
+  const languages: LanguageDefinition[] = [];
+  const validLanguageCodes = new Set<string>();
+
+  // Validate each language
+  for (let i = 0; i < fileData.languages.length; i++) {
+    const lang = fileData.languages[i];
+
+    if (typeof lang !== 'object' || lang === null) {
+      return { valid: false, error: `Language ${i + 1}: Must be an object` };
+    }
+
+    // Validate code
+    if (typeof lang.code !== 'string' || lang.code.trim() === '') {
+      return { valid: false, error: `Language ${i + 1}: code must be a non-empty string` };
+    }
+
+    // Validate name
+    if (typeof lang.name !== 'string' || lang.name.trim() === '') {
+      return { valid: false, error: `Language ${i + 1}: name must be a non-empty string` };
+    }
+
+    const code = lang.code.trim();
+
+    // Check for duplicate language codes
+    if (validLanguageCodes.has(code)) {
+      return { valid: false, error: `Language ${i + 1}: Duplicate language code "${code}"` };
+    }
+
+    validLanguageCodes.add(code);
+    languages.push({ code, name: lang.name.trim() });
+  }
+
+  // Check if questions is an array
+  if (!Array.isArray(fileData.questions)) {
+    return { valid: false, error: 'YAML file must contain a questions array' };
   }
 
   const questions: QuestionImport[] = [];
   const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
 
-  for (let i = 0; i < data.length; i++) {
-    const q = data[i];
+  for (let i = 0; i < fileData.questions.length; i++) {
+    const q = fileData.questions[i];
 
     // Validate question structure
     if (typeof q !== 'object' || q === null) {
@@ -150,7 +215,7 @@ function validateQuestionsData(
       }
 
       // Validate language code
-      if (typeof info.lang !== 'string' || !validLanguages.has(info.lang)) {
+      if (typeof info.lang !== 'string' || !validLanguageCodes.has(info.lang)) {
         return {
           valid: false,
           error: `Question ${i + 1}, Info ${j + 1}: Invalid or unknown language code "${info.lang}"`
@@ -189,7 +254,7 @@ function validateQuestionsData(
     questions.push(q as QuestionImport);
   }
 
-  return { valid: true, questions };
+  return { valid: true, languages, questions };
 }
 
 /**
@@ -286,35 +351,39 @@ export const questionsRoutes: Routes = {
         return apiBadRequest(`Invalid YAML format: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
-      // Get valid languages for this event
-      const languages = queryGetLanguages.all({ $eventId: eventId });
-
-      if (languages.length === 0) {
-        return apiBadRequest('Event has no languages configured. Please add languages first.');
-      }
-
-      const validLanguages = new Set(languages.map((l) => l.code));
-
       // Validate the data
-      const validation = validateQuestionsData(yamlData, validLanguages);
+      const validation = validateQuestionsData(yamlData);
 
       if (!validation.valid) {
         return apiBadRequest(validation.error || 'Invalid data');
       }
 
-      // Import questions in a transaction
+      // Import questions and languages in a transaction
       try {
         db.transaction(() => {
-          // Delete existing questions for this event
+          // Delete existing languages (this will cascade to questionsInfo and then questions due to foreign keys)
+          queryDeleteLanguages.run({ $eventId: eventId });
+
+          // Delete existing questions (in case cascade didn't catch everything)
           queryDeleteQuestions.run({ $eventId: eventId });
+
+          // Insert new languages
+          for (const lang of validation.languages!) {
+            queryInsertLanguage.run({
+              $code: lang.code,
+              $name: lang.name,
+              $eventId: eventId
+            });
+          }
 
           // Import new questions
           importQuestions(validation.questions!, eventId);
         })();
 
         return apiData({
-          message: 'Questions imported successfully',
-          count: validation.questions!.length
+          message: 'Questions and languages imported successfully',
+          languageCount: validation.languages!.length,
+          questionCount: validation.questions!.length
         });
       } catch (error) {
         console.error('Error importing questions:', error);
@@ -352,15 +421,25 @@ export const questionsRoutes: Routes = {
         return apiNotFound('Event not found');
       }
 
+      // Get all languages for this event
+      const languages = queryGetLanguages.all({ $eventId: eventId });
+
       // Get all questions for this event
       const questions = queryGetQuestions.all({ $eventId: eventId });
 
-      if (questions.length === 0) {
-        return apiBadRequest('No questions found for this event');
+      // Check if there's anything to export
+      if (languages.length === 0 || questions.length === 0) {
+        return apiBadRequest('Nothing to export - event has no languages or questions configured');
       }
 
-      // Build the export data structure
-      const exportData: QuestionImport[] = [];
+      // Build the languages array
+      const languagesExport: LanguageDefinition[] = languages.map((l) => ({
+        code: l.code,
+        name: l.name
+      }));
+
+      // Build the questions export data structure
+      const questionsExport: QuestionImport[] = [];
 
       for (const question of questions) {
         const questionInfo = queryGetQuestionInfo.all({ $questionId: question.id });
@@ -371,13 +450,19 @@ export const questionsRoutes: Routes = {
           answer: qi.answer
         }));
 
-        exportData.push({
+        questionsExport.push({
           type: question.type as 'PS' | 'PW' | 'TF' | 'FB',
           maxPoints: question.maxPoints,
           seconds: question.seconds,
           info
         });
       }
+
+      // Build complete export structure
+      const exportData: QuestionsFileFormat = {
+        languages: languagesExport,
+        questions: questionsExport
+      };
 
       // Convert to YAML
       let yamlContent: string;

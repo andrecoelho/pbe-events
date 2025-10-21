@@ -18,19 +18,54 @@ Exports all questions for a specific event as a YAML file. The exported file can
 
 - User must be authenticated (have a valid session)
 - User must have `owner` or `admin` role for the event
-- Event must have at least one language configured
 - File must be a valid YAML file (.yaml or .yml extension)
+- File must include a `languages` section defining all languages used in questions
 
 ## Request Format
 
 **Content-Type:** `multipart/form-data`
 
 **Form Data:**
-- `file` (File): YAML file containing questions
+- `file` (File): YAML file containing languages and questions
 
 ## YAML File Format
 
-The file must contain an array of question objects. See `questions-example.yaml` for a complete example.
+The file must contain an object with two main sections: `languages` and `questions`. See `questions-example.yaml` for a complete example.
+
+### Root Structure
+
+```yaml
+languages:
+  - code: en
+    name: English
+  - code: es
+    name: Spanish
+
+questions:
+  - type: PS
+    maxPoints: 10
+    # ... question details
+```
+
+### Languages Section
+
+The `languages` array defines all languages that will be available for the event. **This section overrides all existing languages for the event.**
+
+```yaml
+languages:
+  - code: en        # Required: Language code (e.g., en, es, fr)
+    name: English   # Required: Language display name
+  - code: es
+    name: Spanish
+```
+
+**Language Object:**
+- `code`: String - Unique language code (e.g., "en", "es", "fr")
+- `name`: String - Display name for the language (e.g., "English", "Spanish")
+
+### Questions Section
+
+An array of question objects.
 
 ### Question Object Structure
 
@@ -39,7 +74,7 @@ The file must contain an array of question objects. See `questions-example.yaml`
   maxPoints: 10         # Required: Maximum points (positive number)
   seconds: 30           # Required: Time limit in seconds (positive number)
   info:                 # Required: Array of question info (at least one)
-    - lang: en          # Required: Language code (must exist in event languages)
+    - lang: en          # Required: Language code (must be defined in languages section)
       body: Question?   # Required: Question text (non-empty string)
       answer: Answer    # Required: Answer text (non-empty string)
 ```
@@ -80,8 +115,9 @@ Each question can have multiple language versions by adding more entries to the 
 ```json
 {
   "ok": true,
-  "message": "Questions imported successfully",
-  "count": 7
+  "message": "Questions and languages imported successfully",
+  "languageCount": 2,
+  "questionCount": 7
 }
 ```
 
@@ -109,7 +145,19 @@ Each question can have multiple language versions by adding more entries to the 
 
 ```json
 {
-  "error": "Event has no languages configured. Please add languages first."
+  "error": "YAML file must contain an object with languages and questions"
+}
+```
+
+```json
+{
+  "error": "At least one language must be defined"
+}
+```
+
+```json
+{
+  "error": "Language 2: Duplicate language code \"en\""
 }
 ```
 
@@ -152,15 +200,19 @@ Each question can have multiple language versions by adding more entries to the 
 ## Validation Rules
 
 1. **File Type:** Must be .yaml or .yml
-2. **YAML Structure:** Must be a valid YAML array
-3. **Question Type:** Must be one of: PS, PW, TF, FB
-4. **Max Points:** Must be a positive number
-5. **Seconds:** Must be a positive number
-6. **Info Array:** Must have at least one entry
-7. **Language Code:** Must exist in the event's configured languages
-8. **Question Body:** Must be a non-empty string
-9. **Answer:** Must be a non-empty string
-10. **True/False Answers:** For TF type, answer must be "true" or "false"
+2. **YAML Structure:** Must be a valid YAML object with `languages` and `questions` properties
+3. **Languages Section:** Must be a non-empty array
+4. **Language Code:** Must be a non-empty string and unique within the file
+5. **Language Name:** Must be a non-empty string
+6. **Questions Section:** Must be an array
+7. **Question Type:** Must be one of: PS, PW, TF, FB
+8. **Max Points:** Must be a positive number
+9. **Seconds:** Must be a positive number
+10. **Info Array:** Must have at least one entry
+11. **Language Code in Question:** Must match a language code defined in the languages section
+12. **Question Body:** Must be a non-empty string
+13. **Answer:** Must be a non-empty string
+14. **True/False Answers:** For TF type, answer must be "true" or "false"
 
 ## Example Usage
 
@@ -190,7 +242,7 @@ const response = await fetch(`/api/events/${eventId}/questions/import`, {
 const result = await response.json();
 
 if (result.ok) {
-  console.log(`Imported ${result.count} questions`);
+  console.log(`Imported ${result.languageCount} languages and ${result.questionCount} questions`);
 } else {
   console.error(`Error: ${result.error}`);
 }
@@ -221,7 +273,7 @@ Returns a YAML file in the same format used for import. The file will be automat
 **Status:** 400 Bad Request
 ```json
 {
-  "error": "No questions found for this event"
+  "error": "Nothing to export - event has no languages or questions configured"
 }
 ```
 
@@ -284,9 +336,11 @@ if (response.ok) {
 
 ## Important Notes
 
-- **Destructive Operation (Import):** The import endpoint deletes all existing questions for the event before importing new ones
-- **Transaction Safety (Import):** The import operation is wrapped in a database transaction, so either all questions are imported or none are (atomic operation)
-- **Language Prerequisite (Import):** Make sure to configure languages for the event before importing questions
+- **Destructive Operation (Import):** The import endpoint deletes all existing questions AND languages for the event before importing new ones
+- **Language Override (Import):** The languages section in the YAML file completely replaces all event languages
+- **Transaction Safety (Import):** The import operation is wrapped in a database transaction, so either everything is imported or nothing is (atomic operation)
+- **Cascade Deletion:** Deleting languages will cascade delete related questions and question info due to foreign key constraints
+- **No Language Prerequisite:** You don't need to set up languages beforehand - they are defined in the import file
 - **File Size (Import):** Bun handles multipart form data efficiently, but consider reasonable file sizes for browser uploads
-- **Export Format:** The export endpoint generates YAML in the exact same format as the import endpoint expects
-- **Backup Use Case:** Export can be used to create backups of questions before making changes
+- **Export Format:** The export endpoint generates YAML in the exact same format as the import endpoint expects, including languages
+- **Backup Use Case:** Export can be used to create complete backups of questions and languages before making changes
