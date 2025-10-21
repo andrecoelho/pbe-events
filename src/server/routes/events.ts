@@ -39,8 +39,12 @@ const queryInsertPermission = db.query<{}, { $userId: string; $eventId: string; 
   `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
 );
 
-const querySelectPermissions = db.query<Permission, { $userId: string; $eventId: string }>(
-  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId`
+const querySelectPermissionForUpdate = db.query<Permission, { $userId: string; $eventId: string }>(
+  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId AND roleId IN ('owner', 'admin')`
+);
+
+const querySelectPermissionForDelete = db.query<Permission, { $userId: string; $eventId: string }>(
+  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId AND roleId = 'owner'`
 );
 
 export const eventsRoutes: Routes = {
@@ -99,13 +103,9 @@ export const eventsRoutes: Routes = {
       }
 
       const id = req.params.id;
-      const userEvent = querySelectPermissions.get({ $userId: session.userId, $eventId: id });
+      const permission = querySelectPermissionForUpdate.get({ $userId: session.userId, $eventId: id });
 
-      if (!userEvent) {
-        return apiNotFound('Event not found');
-      }
-
-      if (userEvent.roleId !== 'owner' && userEvent.roleId !== 'admin') {
+      if (!permission) {
         return apiForbidden();
       }
 
@@ -121,13 +121,9 @@ export const eventsRoutes: Routes = {
       }
 
       const id = req.params.id;
-      const userEvent = querySelectPermissions.get({ $userId: session.userId, $eventId: id });
+      const permission = querySelectPermissionForDelete.get({ $userId: session.userId, $eventId: id });
 
-      if (!userEvent) {
-        return apiNotFound('Event not found');
-      }
-
-      if (userEvent.roleId !== 'owner') {
+      if (!permission) {
         return apiForbidden();
       }
 
