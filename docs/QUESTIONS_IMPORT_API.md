@@ -70,13 +70,13 @@ An array of question objects.
 ### Question Object Structure
 
 ```yaml
-- type: PS              # Required: Question type (PS, PW, TF, or FB)
-  maxPoints: 10         # Required: Maximum points (positive number)
-  seconds: 30           # Required: Time limit in seconds (positive number)
-  info:                 # Required: Array of question info (at least one)
-    - lang: en          # Required: Language code (must be defined in languages section)
-      body: Question?   # Required: Question text (non-empty string, supports multi-line)
-      answer: Answer    # Required: Answer text (non-empty string)
+- type: PS                  # Required: Question type (PS, PW, TF, or FB)
+  maxPoints: 10             # Required: Maximum points (positive number)
+  seconds: 30               # Required: Time limit in seconds (positive number)
+  translations:             # Required: Array of question translations (at least one)
+    - lang: en              # Required: Language code (must be defined in languages section)
+      body: Question?       # Required: Question text (non-empty string, supports multi-line)
+      answer: Answer        # Required: Answer text (non-empty string)
 ```
 
 **Note:** Question bodies support multi-line text using YAML's `|` syntax:
@@ -85,7 +85,7 @@ An array of question objects.
 - type: PS
   maxPoints: 10
   seconds: 30
-  info:
+  translations:
     - lang: en
       body: |
         This is a multi-line question.
@@ -103,23 +103,40 @@ An array of question objects.
 
 ### Multi-language Support
 
-Each question can have multiple language versions by adding more entries to the `info` array:
+Each question **must** have a translation for **every** language defined in the `languages` section. This ensures consistency across all questions in the event.
+
+**Example with complete translations:**
 
 ```yaml
-- type: PS
-  maxPoints: 10
-  seconds: 30
-  info:
-    - lang: en
-      body: What is the capital of France?
-      answer: Paris
-    - lang: es
-      body: ¿Cuál es la capital de Francia?
-      answer: París
-    - lang: fr
-      body: Quelle est la capitale de la France?
-      answer: Paris
+languages:
+  - code: en
+    name: English
+  - code: es
+    name: Spanish
+  - code: fr
+    name: French
+
+questions:
+  - type: PS
+    maxPoints: 10
+    seconds: 30
+    translations:
+      # All three languages are required for every question
+      - lang: en
+        body: What is the capital of France?
+        answer: Paris
+      - lang: es
+        body: ¿Cuál es la capital de Francia?
+        answer: París
+      - lang: fr
+        body: Quelle est la capitale de la France?
+        answer: Paris
 ```
+
+**Important:**
+- Each question must include a translation for all languages
+- Duplicate translations for the same language in a question are not allowed
+- The validation will fail if any question is missing a translation for any defined language
 
 ## Response Format
 
@@ -184,7 +201,19 @@ Each question can have multiple language versions by adding more entries to the 
 
 ```json
 {
-  "error": "Question 2, Info 1: Invalid or unknown language code \"de\""
+  "error": "Question 2, Translation 1: Invalid or unknown language code \"de\""
+}
+```
+
+```json
+{
+  "error": "Question 3: Missing translations for language(s): es, fr"
+}
+```
+
+```json
+{
+  "error": "Question 2: Duplicate translation for language \"en\""
 }
 ```
 
@@ -223,11 +252,13 @@ Each question can have multiple language versions by adding more entries to the 
 7. **Question Type:** Must be one of: PS, PW, TF, FB
 8. **Max Points:** Must be a positive number
 9. **Seconds:** Must be a positive number
-10. **Info Array:** Must have at least one entry
-11. **Language Code in Question:** Must match a language code defined in the languages section
-12. **Question Body:** Must be a non-empty string
-13. **Answer:** Must be a non-empty string
-14. **True/False Answers:** For TF type, answer must be "true" or "false"
+10. **Translations Array:** Must have at least one entry
+11. **Complete Translations:** Each question must have a translation for **every** language defined in the languages section
+12. **No Duplicate Translations:** Each question cannot have multiple translations for the same language
+13. **Language Code in Question:** Must match a language code defined in the languages section
+14. **Question Body:** Must be a non-empty string
+15. **Answer:** Must be a non-empty string
+16. **True/False Answers:** For TF type, answer must be "true" or "false"
 
 ## Example Usage
 
@@ -354,7 +385,7 @@ if (response.ok) {
 - **Destructive Operation (Import):** The import endpoint deletes all existing questions AND languages for the event before importing new ones
 - **Language Override (Import):** The languages section in the YAML file completely replaces all event languages
 - **Transaction Safety (Import):** The import operation is wrapped in a database transaction, so either everything is imported or nothing is (atomic operation)
-- **Cascade Deletion:** Deleting languages will cascade delete related questions and question info due to foreign key constraints
+- **Cascade Deletion:** Deleting languages will cascade delete related questions and question translations due to foreign key constraints
 - **No Language Prerequisite:** You don't need to set up languages beforehand - they are defined in the import file
 - **File Size (Import):** Bun handles multipart form data efficiently, but consider reasonable file sizes for browser uploads
 - **Export Format:** The export endpoint generates YAML in the exact same format as the import endpoint expects, including languages

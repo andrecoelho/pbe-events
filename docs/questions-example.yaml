@@ -10,7 +10,8 @@
 #   TF = True/False (answer must be "true" or "false")
 #   FB = Fill in the Blank (answer fills in the blank)
 #
-# Each question can have multiple language versions in the info array
+# IMPORTANT: Each question MUST have a translation for EVERY language defined in the languages section
+# Each question can have multiple language versions in the translations array
 
 languages:
   - code: en
@@ -22,7 +23,7 @@ questions:
   - type: PS
     maxPoints: 10
     seconds: 30
-    info:
+    translations:
       - lang: en
         body: What is the capital of France?
         answer: Paris
@@ -33,52 +34,75 @@ questions:
   - type: TF
     maxPoints: 5
     seconds: 15
-    info:
+    translations:
       - lang: en
         body: The Earth is flat.
+        answer: false
+      - lang: es
+        body: La Tierra es plana.
         answer: false
 
   - type: PW
     maxPoints: 20
     seconds: 60
-    info:
+    translations:
       - lang: en
         body: |
           Describe the water cycle in your own words.
           Include at least four stages in your answer.
         answer: evaporation condensation precipitation collection
+      - lang: es
+        body: |
+          Describe el ciclo del agua con tus propias palabras.
+          Incluye al menos cuatro etapas en tu respuesta.
+        answer: evaporación condensación precipitación recolección
 
   - type: FB
     maxPoints: 8
     seconds: 20
-    info:
+    translations:
       - lang: en
         body: The _____ is the largest planet in our solar system.
         answer: Jupiter
+      - lang: es
+        body: El _____ es el planeta más grande de nuestro sistema solar.
+        answer: Júpiter
 
   - type: PS
     maxPoints: 15
     seconds: 45
-    info:
+    translations:
       - lang: en
         body: |
           In what year did World War II end?
 
           Consider the year when Japan formally surrendered.
         answer: 1945
+      - lang: es
+        body: |
+          ¿En qué año terminó la Segunda Guerra Mundial?
+
+          Considera el año en que Japón se rindió formalmente.
+        answer: 1945
 
   - type: TF
     maxPoints: 5
     seconds: 10
-    info:
+    translations:
       - lang: en
         body: Python is a compiled programming language.
+        answer: false
+      - lang: es
+        body: Python es un lenguaje de programación compilado.
         answer: false
 
   - type: FB
     maxPoints: 10
     seconds: 25
-    info:
+    translations:
       - lang: en
         body: The process of plants converting sunlight into energy is called _____.
         answer: photosynthesis
+      - lang: es
+        body: El proceso por el cual las plantas convierten la luz solar en energía se llama _____.
+        answer: fotosíntesis
