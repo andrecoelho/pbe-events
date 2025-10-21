@@ -182,20 +182,16 @@ function PermissionsModal(props: Props) {
             </div>
             <div className='flex-none w-36'>
               <button
-                className='btn btn-outline w-full'
+                className='btn btn-outline w-full whitespace-nowrap flex justify-between'
                 popoverTarget={popoverId}
                 style={{ anchorName } as CSSProperties}
               >
-                {snap.user.roleId ? (
-                  <span className={`badge badge-${snap.user.roleId === 'admin' ? 'info' : 'accent'}`}>
-                    {snap.user.roleId}
-                  </span>
-                ) : (
-                  <span>
-                    Choose Role
-                    <Icon name='chevron-down' className='size-4 inline-block ml-1' />
-                  </span>
-                )}
+                <span
+                  className={snap.user.roleId ? `badge badge-${snap.user.roleId === 'admin' ? 'info' : 'accent'}` : ''}
+                >
+                  {snap.user.roleId || 'Choose Role'}
+                </span>
+                <Icon name='chevron-down' className='size-4' />
               </button>
 
               <ul
