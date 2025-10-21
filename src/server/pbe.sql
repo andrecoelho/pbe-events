@@ -75,6 +75,7 @@ CREATE TABLE teams (
 
 CREATE TABLE questions (
   id TEXT NOT NULL,
+  number INTEGER NOT NULL,
   -- PS = Points Specific, PW = Points per Word, TF = True/False, FB = Fill in the Blank
   type TEXT NOT NULL CHECK (type IN ('PS', 'PW', 'TF', 'FB')),
   maxPoints NUMERIC NOT NULL,
@@ -82,7 +83,8 @@ CREATE TABLE questions (
   eventId TEXT NOT NULL,
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE
+  FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE,
+  UNIQUE (eventId, number)
 );
 
 CREATE TABLE questionTranslations (

@@ -53,10 +53,10 @@ const queryGetLanguages = db.query<Language, { $eventId: string }>(
 
 const queryInsertQuestion = db.query<
   {},
-  { $id: string; $type: string; $maxPoints: number; $seconds: number; $eventId: string }
+  { $id: string; $number: number; $type: string; $maxPoints: number; $seconds: number; $eventId: string }
 >(
-  `INSERT INTO questions (id, type, maxPoints, seconds, eventId)
-   VALUES ($id, $type, $maxPoints, $seconds, $eventId)`
+  `INSERT INTO questions (id, number, type, maxPoints, seconds, eventId)
+   VALUES ($id, $number, $type, $maxPoints, $seconds, $eventId)`
 );
 
 const queryInsertQuestionTranslation = db.query<
@@ -70,12 +70,12 @@ const queryInsertQuestionTranslation = db.query<
 const queryDeleteQuestions = db.query<{}, { $eventId: string }>(`DELETE FROM questions WHERE eventId = $eventId`);
 
 const queryGetQuestions = db.query<
-  { id: string; type: string; maxPoints: number; seconds: number },
+  { id: string; number: number; type: string; maxPoints: number; seconds: number },
   { $eventId: string }
 >(
-  `SELECT id, type, maxPoints, seconds FROM questions
+  `SELECT id, number, type, maxPoints, seconds FROM questions
    WHERE eventId = $eventId
-   ORDER BY createdAt ASC`
+   ORDER BY number ASC`
 );
 
 const queryGetQuestionTranslations = db.query<{ languageCode: string; body: string; answer: string }, { $questionId: string }>(
@@ -98,21 +98,46 @@ const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventI
 
 // Individual question CRUD queries
 const queryGetQuestion = db.query<
-  { id: string; type: string; maxPoints: number; seconds: number; eventId: string },
+  { id: string; number: number; type: string; maxPoints: number; seconds: number; eventId: string },
   { $questionId: string }
 >(
-  `SELECT id, type, maxPoints, seconds, eventId FROM questions WHERE id = $questionId`
+  `SELECT id, number, type, maxPoints, seconds, eventId FROM questions WHERE id = $questionId`
 );
 
 const queryUpdateQuestion = db.query<
   {},
-  { $id: string; $type: string; $maxPoints: number; $seconds: number }
+  { $id: string; $number: number; $type: string; $maxPoints: number; $seconds: number }
 >(
-  `UPDATE questions SET type = $type, maxPoints = $maxPoints, seconds = $seconds WHERE id = $id`
+  `UPDATE questions SET number = $number, type = $type, maxPoints = $maxPoints, seconds = $seconds WHERE id = $id`
 );
 
 const queryDeleteQuestion = db.query<{}, { $id: string }>(
   `DELETE FROM questions WHERE id = $id`
+);
+
+// Get the maximum question number for an event
+const queryGetMaxQuestionNumber = db.query<
+  { maxNumber: number | null },
+  { $eventId: string }
+>(
+  `SELECT MAX(number) as maxNumber FROM questions WHERE eventId = $eventId`
+);
+
+// Increment question numbers for reordering (shift questions up)
+const queryIncrementQuestionNumbers = db.query<
+  {},
+  { $eventId: string; $fromNumber: number }
+>(
+  `UPDATE questions SET number = number + 1
+   WHERE eventId = $eventId AND number >= $fromNumber`
+);
+
+// Update just the question number
+const queryUpdateQuestionNumber = db.query<
+  {},
+  { $id: string; $number: number }
+>(
+  `UPDATE questions SET number = $number WHERE id = $id`
 );
 
 // Individual question translation CRUD queries
@@ -335,12 +360,17 @@ function toSafeFilename(name: string): string {
 function importQuestions(questions: QuestionImport[], eventId: string): number {
   let imported = 0;
 
-  for (const question of questions) {
+  for (let i = 0; i < questions.length; i++) {
+    const question = questions[i];
+    if (!question) continue; // Safety check
+
     const questionId = Bun.randomUUIDv7();
+    const questionNumber = i + 1; // Assign question number based on position (1-indexed)
 
     // Insert question
     queryInsertQuestion.run({
       $id: questionId,
+      $number: questionNumber,
       $type: question.type,
       $maxPoints: question.maxPoints,
       $seconds: question.seconds,
@@ -593,15 +623,20 @@ export const questionsRoutes: Routes = {
       try {
         const questionId = Bun.randomUUIDv7();
 
+        // Get the next available question number
+        const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
+        const nextNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
+
         queryInsertQuestion.run({
           $id: questionId,
+          $number: nextNumber,
           $type: type,
           $maxPoints: maxPoints,
           $seconds: seconds,
           $eventId: eventId
         });
 
-        return apiData({ id: questionId, type, maxPoints, seconds });
+        return apiData({ id: questionId, number: nextNumber, type, maxPoints, seconds });
       } catch (error) {
         console.error('Error creating question:', error);
         return apiServerError('Failed to create question');
@@ -639,9 +674,18 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { type, maxPoints, seconds } = body;
+      const { number, type, maxPoints, seconds } = body as {
+        number?: number;
+        type?: 'PS' | 'PW' | 'TF' | 'FB';
+        maxPoints?: number;
+        seconds?: number;
+      };
 
       // Validate fields if provided
+      if (number !== undefined && (typeof number !== 'number' || number <= 0)) {
+        return apiBadRequest('number must be a positive number');
+      }
+
       if (type !== undefined) {
         const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
         if (!validTypes.has(type)) {
@@ -658,8 +702,52 @@ export const questionsRoutes: Routes = {
       }
 
       try {
+        // Handle reordering if number is being changed
+        if (number !== undefined && number !== question.number) {
+          const oldNumber = question.number;
+          const newNumber = number; // TypeScript knows this is a number due to validation above
+
+          // Use a transaction to handle the reordering atomically
+          db.transaction(() => {
+            // Step 1: Move current question to a temporary position (negative number)
+            // This prevents conflicts with the UNIQUE constraint
+            queryUpdateQuestionNumber.run({
+              $id: questionId,
+              $number: -1
+            });
+
+            if (newNumber < oldNumber) {
+              // Moving question to an earlier position (e.g., from 5 to 2)
+              // Increment all questions from newNumber to oldNumber-1
+              // Questions 2,3,4 become 3,4,5
+              db.query(`
+                UPDATE questions
+                SET number = number + 1
+                WHERE eventId = ? AND number >= ? AND number < ?
+              `).run(question.eventId, newNumber, oldNumber);
+            } else {
+              // Moving question to a later position (e.g., from 2 to 5)
+              // Decrement all questions from oldNumber+1 to newNumber
+              // Questions 3,4,5 become 2,3,4
+              db.query(`
+                UPDATE questions
+                SET number = number - 1
+                WHERE eventId = ? AND number > ? AND number <= ?
+              `).run(question.eventId, oldNumber, newNumber);
+            }
+
+            // Step 2: Move current question to its new position
+            queryUpdateQuestionNumber.run({
+              $id: questionId,
+              $number: newNumber
+            });
+          })();
+        }
+
+        // Update other fields (type, maxPoints, seconds)
         queryUpdateQuestion.run({
           $id: questionId,
+          $number: number ?? question.number,
           $type: type ?? question.type,
           $maxPoints: maxPoints ?? question.maxPoints,
           $seconds: seconds ?? question.seconds
