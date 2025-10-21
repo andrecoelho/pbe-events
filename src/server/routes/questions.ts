@@ -78,10 +78,7 @@ const queryGetQuestions = db.query<
    ORDER BY createdAt ASC`
 );
 
-const queryGetQuestionInfo = db.query<
-  { languageCode: string; body: string; answer: string },
-  { $questionId: string }
->(
+const queryGetQuestionInfo = db.query<{ languageCode: string; body: string; answer: string }, { $questionId: string }>(
   `SELECT languageCode, body, answer FROM questionsInfo
    WHERE questionId = $questionId
    ORDER BY languageCode ASC`
@@ -93,9 +90,7 @@ const queryGetEventName = db.query<{ name: string }, { $eventId: string; $userId
    WHERE events.id = $eventId AND permissions.userId = $userId`
 );
 
-const queryDeleteLanguages = db.query<{}, { $eventId: string }>(
-  `DELETE FROM languages WHERE eventId = $eventId`
-);
+const queryDeleteLanguages = db.query<{}, { $eventId: string }>(`DELETE FROM languages WHERE eventId = $eventId`);
 
 const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventId: string }>(
   `INSERT INTO languages (code, name, eventId) VALUES ($code, $name, $eventId)`
@@ -104,9 +99,12 @@ const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventI
 /**
  * Validates the YAML structure and data
  */
-function validateQuestionsData(
-  data: unknown
-): { valid: boolean; error?: string; languages?: LanguageDefinition[]; questions?: QuestionImport[] } {
+function validateQuestionsData(data: unknown): {
+  valid: boolean;
+  error?: string;
+  languages?: LanguageDefinition[];
+  questions?: QuestionImport[];
+} {
   // Check if data is an object with languages and questions
   if (typeof data !== 'object' || data === null) {
     return { valid: false, error: 'YAML file must contain an object with languages and questions' };
