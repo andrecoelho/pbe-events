@@ -78,7 +78,10 @@ const queryGetQuestions = db.query<
    ORDER BY number ASC`
 );
 
-const queryGetQuestionTranslations = db.query<{ languageCode: string; body: string; answer: string }, { $questionId: string }>(
+const queryGetQuestionTranslations = db.query<
+  { languageCode: string; body: string; answer: string },
+  { $questionId: string }
+>(
   `SELECT languageCode, body, answer FROM questionTranslations
    WHERE questionId = $questionId
    ORDER BY languageCode ASC`
@@ -88,6 +91,35 @@ const queryGetEventName = db.query<{ name: string }, { $eventId: string; $userId
   `SELECT events.name FROM events
    JOIN permissions ON events.id = permissions.eventId
    WHERE events.id = $eventId AND permissions.userId = $userId`
+);
+
+// Optimized query to get all questions with translations in a single query
+const queryGetQuestionsWithTranslations = db.query<
+  {
+    questionId: string;
+    number: number;
+    type: string;
+    maxPoints: number;
+    seconds: number;
+    translationLanguageCode: string | null;
+    translationBody: string | null;
+    translationAnswer: string | null;
+  },
+  { $eventId: string }
+>(
+  `SELECT
+    q.id as questionId,
+    q.number,
+    q.type,
+    q.maxPoints,
+    q.seconds,
+    qt.languageCode as translationLanguageCode,
+    qt.body as translationBody,
+    qt.answer as translationAnswer
+   FROM questions q
+   LEFT JOIN questionTranslations qt ON q.id = qt.questionId
+   WHERE q.eventId = $eventId
+   ORDER BY q.number ASC, qt.languageCode ASC`
 );
 
 const queryDeleteLanguages = db.query<{}, { $eventId: string }>(`DELETE FROM languages WHERE eventId = $eventId`);
@@ -100,43 +132,28 @@ const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventI
 const queryGetQuestion = db.query<
   { id: string; number: number; type: string; maxPoints: number; seconds: number; eventId: string },
   { $questionId: string }
->(
-  `SELECT id, number, type, maxPoints, seconds, eventId FROM questions WHERE id = $questionId`
-);
+>(`SELECT id, number, type, maxPoints, seconds, eventId FROM questions WHERE id = $questionId`);
 
 const queryUpdateQuestion = db.query<
   {},
   { $id: string; $number: number; $type: string; $maxPoints: number; $seconds: number }
->(
-  `UPDATE questions SET number = $number, type = $type, maxPoints = $maxPoints, seconds = $seconds WHERE id = $id`
-);
+>(`UPDATE questions SET number = $number, type = $type, maxPoints = $maxPoints, seconds = $seconds WHERE id = $id`);
 
-const queryDeleteQuestion = db.query<{}, { $id: string }>(
-  `DELETE FROM questions WHERE id = $id`
-);
+const queryDeleteQuestion = db.query<{}, { $id: string }>(`DELETE FROM questions WHERE id = $id`);
 
 // Get the maximum question number for an event
-const queryGetMaxQuestionNumber = db.query<
-  { maxNumber: number | null },
-  { $eventId: string }
->(
+const queryGetMaxQuestionNumber = db.query<{ maxNumber: number | null }, { $eventId: string }>(
   `SELECT MAX(number) as maxNumber FROM questions WHERE eventId = $eventId`
 );
 
 // Increment question numbers for reordering (shift questions up)
-const queryIncrementQuestionNumbers = db.query<
-  {},
-  { $eventId: string; $fromNumber: number }
->(
+const queryIncrementQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
   `UPDATE questions SET number = number + 1
    WHERE eventId = $eventId AND number >= $fromNumber`
 );
 
 // Update just the question number
-const queryUpdateQuestionNumber = db.query<
-  {},
-  { $id: string; $number: number }
->(
+const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>(
   `UPDATE questions SET number = $number WHERE id = $id`
 );
 
@@ -144,20 +161,13 @@ const queryUpdateQuestionNumber = db.query<
 const queryGetSingleQuestionTranslation = db.query<
   { id: string; body: string; answer: string; languageCode: string; questionId: string },
   { $id: string }
->(
-  `SELECT id, body, answer, languageCode, questionId FROM questionTranslations WHERE id = $id`
-);
+>(`SELECT id, body, answer, languageCode, questionId FROM questionTranslations WHERE id = $id`);
 
-const queryUpdateQuestionTranslation = db.query<
-  {},
-  { $id: string; $body: string; $answer: string }
->(
+const queryUpdateQuestionTranslation = db.query<{}, { $id: string; $body: string; $answer: string }>(
   `UPDATE questionTranslations SET body = $body, answer = $answer WHERE id = $id`
 );
 
-const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(
-  `DELETE FROM questionTranslations WHERE id = $id`
-);
+const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM questionTranslations WHERE id = $id`);
 
 /**
  * Validates the YAML structure and data
@@ -326,9 +336,7 @@ function validateQuestionsData(data: unknown): {
     }
 
     // Validate that all languages are present in this question
-    const missingLanguages = Array.from(validLanguageCodes).filter(
-      (code) => !questionLanguages.has(code)
-    );
+    const missingLanguages = Array.from(validLanguageCodes).filter((code) => !questionLanguages.has(code));
 
     if (missingLanguages.length > 0) {
       return {
@@ -397,6 +405,147 @@ function importQuestions(questions: QuestionImport[], eventId: string): number {
 }
 
 export const questionsRoutes: Routes = {
+  '/api/events/:eventId/questions': {
+    // Get all questions for an event with event name
+    GET: (req: BunRequest<'/api/events/:eventId/questions'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const eventId = req.params.eventId;
+
+      // Check permissions - allow any user with access to the event
+      const permission = queryCheckPermission.get({
+        $userId: session.userId,
+        $eventId: eventId
+      });
+
+      if (!permission) {
+        return apiForbidden();
+      }
+
+      // Get event name
+      const event = queryGetEventName.get({
+        $eventId: eventId,
+        $userId: session.userId
+      });
+
+      if (!event) {
+        return apiNotFound('Event not found');
+      }
+
+      // Get all questions with translations in a single query (optimized)
+      const rows = queryGetQuestionsWithTranslations.all({ $eventId: eventId });
+
+      // Group translations by question
+      const questionsMap = new Map<
+        string,
+        {
+          id: string;
+          number: number;
+          type: string;
+          maxPoints: number;
+          seconds: number;
+          translations: Array<{ languageCode: string; body: string; answer: string }>;
+        }
+      >();
+
+      for (const row of rows) {
+        if (!questionsMap.has(row.questionId)) {
+          questionsMap.set(row.questionId, {
+            id: row.questionId,
+            number: row.number,
+            type: row.type,
+            maxPoints: row.maxPoints,
+            seconds: row.seconds,
+            translations: []
+          });
+        }
+
+        // Add translation if it exists (LEFT JOIN may return null for questions without translations)
+        if (row.translationLanguageCode && row.translationBody && row.translationAnswer) {
+          questionsMap.get(row.questionId)!.translations.push({
+            languageCode: row.translationLanguageCode,
+            body: row.translationBody,
+            answer: row.translationAnswer
+          });
+        }
+      }
+
+      // Convert map to array (will maintain order since we inserted in ORDER BY order)
+      const questionsWithTranslations = Array.from(questionsMap.values());
+
+      return apiData({
+        eventName: event.name,
+        questions: questionsWithTranslations
+      });
+    },
+
+    // Add a new question (without info)
+    POST: async (req: BunRequest<'/api/events/:eventId/questions'>) => {
+      const session = getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const eventId = req.params.eventId;
+
+      // Check permissions
+      const permission = queryCheckPermission.get({
+        $userId: session.userId,
+        $eventId: eventId
+      });
+
+      if (!permission) {
+        return apiForbidden();
+      }
+
+      // Parse request body
+      const body = await req.json();
+      const { type, maxPoints, seconds } = body;
+
+      // Validate required fields
+      if (!type || typeof maxPoints !== 'number' || typeof seconds !== 'number') {
+        return apiBadRequest('Missing or invalid fields: type, maxPoints, and seconds are required');
+      }
+
+      // Validate type
+      const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
+      if (!validTypes.has(type)) {
+        return apiBadRequest('Invalid type. Must be PS, PW, TF, or FB');
+      }
+
+      // Validate numeric values
+      if (maxPoints <= 0 || seconds <= 0) {
+        return apiBadRequest('maxPoints and seconds must be positive numbers');
+      }
+
+      try {
+        const questionId = Bun.randomUUIDv7();
+
+        // Get the next available question number
+        const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
+        const nextNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
+
+        queryInsertQuestion.run({
+          $id: questionId,
+          $number: nextNumber,
+          $type: type,
+          $maxPoints: maxPoints,
+          $seconds: seconds,
+          $eventId: eventId
+        });
+
+        return apiData({ id: questionId, number: nextNumber, type, maxPoints, seconds });
+      } catch (error) {
+        console.error('Error creating question:', error);
+        return apiServerError('Failed to create question');
+      }
+    }
+  },
   '/api/events/:eventId/questions/import': {
     POST: async (req: BunRequest<'/api/events/:eventId/questions/import'>) => {
       const session = getSession(req);
@@ -579,71 +728,6 @@ export const questionsRoutes: Routes = {
     }
   },
 
-  // Add a new question (without info)
-  '/api/events/:eventId/questions': {
-    POST: async (req: BunRequest<'/api/events/:eventId/questions'>) => {
-      const session = getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.eventId;
-
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: eventId
-      });
-
-      if (!permission) {
-        return apiForbidden();
-      }
-
-      // Parse request body
-      const body = await req.json();
-      const { type, maxPoints, seconds } = body;
-
-      // Validate required fields
-      if (!type || typeof maxPoints !== 'number' || typeof seconds !== 'number') {
-        return apiBadRequest('Missing or invalid fields: type, maxPoints, and seconds are required');
-      }
-
-      // Validate type
-      const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
-      if (!validTypes.has(type)) {
-        return apiBadRequest('Invalid type. Must be PS, PW, TF, or FB');
-      }
-
-      // Validate numeric values
-      if (maxPoints <= 0 || seconds <= 0) {
-        return apiBadRequest('maxPoints and seconds must be positive numbers');
-      }
-
-      try {
-        const questionId = Bun.randomUUIDv7();
-
-        // Get the next available question number
-        const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
-        const nextNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
-
-        queryInsertQuestion.run({
-          $id: questionId,
-          $number: nextNumber,
-          $type: type,
-          $maxPoints: maxPoints,
-          $seconds: seconds,
-          $eventId: eventId
-        });
-
-        return apiData({ id: questionId, number: nextNumber, type, maxPoints, seconds });
-      } catch (error) {
-        console.error('Error creating question:', error);
-        return apiServerError('Failed to create question');
-      }
-    }
-  },
-
   // Update a question
   '/api/questions/:questionId': {
     PATCH: async (req: BunRequest<'/api/questions/:questionId'>) => {
@@ -720,20 +804,24 @@ export const questionsRoutes: Routes = {
               // Moving question to an earlier position (e.g., from 5 to 2)
               // Increment all questions from newNumber to oldNumber-1
               // Questions 2,3,4 become 3,4,5
-              db.query(`
+              db.query(
+                `
                 UPDATE questions
                 SET number = number + 1
                 WHERE eventId = ? AND number >= ? AND number < ?
-              `).run(question.eventId, newNumber, oldNumber);
+              `
+              ).run(question.eventId, newNumber, oldNumber);
             } else {
               // Moving question to a later position (e.g., from 2 to 5)
               // Decrement all questions from oldNumber+1 to newNumber
               // Questions 3,4,5 become 2,3,4
-              db.query(`
+              db.query(
+                `
                 UPDATE questions
                 SET number = number - 1
                 WHERE eventId = ? AND number > ? AND number <= ?
-              `).run(question.eventId, oldNumber, newNumber);
+              `
+              ).run(question.eventId, oldNumber, newNumber);
             }
 
             // Step 2: Move current question to its new position
