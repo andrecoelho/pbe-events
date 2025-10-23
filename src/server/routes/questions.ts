@@ -20,7 +20,7 @@ interface LanguageDefinition {
 interface QuestionTranslation {
   lang: string;
   prompt: string;
-  answer: string;
+  answer: string | boolean; // boolean for TF questions, string for others
 }
 
 interface QuestionImport {
@@ -242,11 +242,27 @@ function validateQuestionsData(data: unknown): {
       return { valid: false, error: `Question ${i + 1}: Must be an object` };
     }
 
+    // Helper to get a prompt for error messages (use first translation if available)
+    const getPromptHint = (): string => {
+      if (Array.isArray(q.translations) && q.translations.length > 0) {
+        const firstTranslation = q.translations[0];
+
+        if (firstTranslation && typeof firstTranslation.prompt === 'string') {
+          const prompt = firstTranslation.prompt.trim();
+          const maxLength = 60;
+
+          return prompt.length > maxLength ? ` ("${prompt.substring(0, maxLength)}...")` : ` ("${prompt}")`;
+        }
+      }
+
+      return '';
+    };
+
     // Validate type
     if (!validTypes.has(q.type)) {
       return {
         valid: false,
-        error: `Question ${i + 1}: Invalid type "${q.type}". Must be PS, PW, TF, or FB`
+        error: `Question ${i + 1}${getPromptHint()}: Invalid type "${q.type}". Must be PS, PW, TF, or FB`
       };
     }
 
@@ -254,7 +270,7 @@ function validateQuestionsData(data: unknown): {
     if (typeof q.maxPoints !== 'number' || q.maxPoints <= 0) {
       return {
         valid: false,
-        error: `Question ${i + 1}: maxPoints must be a positive number`
+        error: `Question ${i + 1}${getPromptHint()}: maxPoints must be a positive number`
       };
     }
 
@@ -262,7 +278,7 @@ function validateQuestionsData(data: unknown): {
     if (typeof q.seconds !== 'number' || q.seconds <= 0) {
       return {
         valid: false,
-        error: `Question ${i + 1}: seconds must be a positive number`
+        error: `Question ${i + 1}${getPromptHint()}: seconds must be a positive number`
       };
     }
 
@@ -284,7 +300,7 @@ function validateQuestionsData(data: unknown): {
       if (typeof translation !== 'object' || translation === null) {
         return {
           valid: false,
-          error: `Question ${i + 1}, Translation ${j + 1}: Must be an object`
+          error: `Question ${i + 1}${getPromptHint()}, Translation ${j + 1}: Must be an object`
         };
       }
 
@@ -292,7 +308,9 @@ function validateQuestionsData(data: unknown): {
       if (typeof translation.lang !== 'string' || !validLanguageCodes.has(translation.lang)) {
         return {
           valid: false,
-          error: `Question ${i + 1}, Translation ${j + 1}: Invalid or unknown language code "${translation.lang}"`
+          error: `Question ${i + 1}${getPromptHint()}, Translation ${j + 1}: Invalid or unknown language code "${
+            translation.lang
+          }"`
         };
       }
 
@@ -300,7 +318,7 @@ function validateQuestionsData(data: unknown): {
       if (questionLanguages.has(translation.lang)) {
         return {
           valid: false,
-          error: `Question ${i + 1}: Duplicate translation for language "${translation.lang}"`
+          error: `Question ${i + 1}${getPromptHint()}: Duplicate translation for language "${translation.lang}"`
         };
       }
 
@@ -310,26 +328,27 @@ function validateQuestionsData(data: unknown): {
       if (typeof translation.prompt !== 'string' || translation.prompt.trim() === '') {
         return {
           valid: false,
-          error: `Question ${i + 1}, Translation ${j + 1}: prompt must be a non-empty string`
+          error: `Question ${i + 1}${getPromptHint()}, Translation ${j + 1}: prompt must be a non-empty string`
         };
       }
 
       // Validate answer
-      if (typeof translation.answer !== 'string' || translation.answer.trim() === '') {
-        return {
-          valid: false,
-          error: `Question ${i + 1}, Translation ${j + 1}: answer must be a non-empty string`
-        };
-      }
-
-      // For TF questions, validate answer is "true" or "false"
       if (q.type === 'TF') {
-        const normalizedAnswer = translation.answer.toLowerCase().trim();
-
-        if (normalizedAnswer !== 'true' && normalizedAnswer !== 'false') {
+        // For True/False questions, answer must be a boolean
+        if (typeof translation.answer !== 'boolean') {
           return {
             valid: false,
-            error: `Question ${i + 1}, Translation ${j + 1}: True/False answer must be "true" or "false"`
+            error: `Question ${i + 1}${getPromptHint()}, Translation ${
+              j + 1
+            }: True/False answer must be a boolean (true or false, not a string)`
+          };
+        }
+      } else {
+        // For other question types, answer must be a non-empty string
+        if (typeof translation.answer !== 'string' || translation.answer.trim() === '') {
+          return {
+            valid: false,
+            error: `Question ${i + 1}${getPromptHint()}, Translation ${j + 1}: answer must be a non-empty string`
           };
         }
       }
@@ -341,7 +360,9 @@ function validateQuestionsData(data: unknown): {
     if (missingLanguages.length > 0) {
       return {
         valid: false,
-        error: `Question ${i + 1}: Missing translations for language(s): ${missingLanguages.join(', ')}`
+        error: `Question ${i + 1}${getPromptHint()}: Missing translations for language(s): ${missingLanguages.join(
+          ', '
+        )}`
       };
     }
 
@@ -389,10 +410,14 @@ function importQuestions(questions: QuestionImport[], eventId: string): number {
     for (const translation of question.translations) {
       const translationId = Bun.randomUUIDv7();
 
+      // Convert boolean answers to string for storage
+      const answerValue =
+        typeof translation.answer === 'boolean' ? translation.answer.toString() : translation.answer.trim();
+
       queryInsertQuestionTranslation.run({
         $id: translationId,
         $prompt: translation.prompt.trim(),
-        $answer: translation.answer.trim(),
+        $answer: answerValue,
         $languageCode: translation.lang,
         $questionId: questionId
       });
@@ -718,7 +743,8 @@ export const questionsRoutes: Routes = {
         const translations: QuestionTranslation[] = questionTranslations.map((qt) => ({
           lang: qt.languageCode,
           prompt: qt.prompt,
-          answer: qt.answer
+          // Convert string "true"/"false" back to booleans for TF questions
+          answer: question.type === 'TF' ? qt.answer === 'true' : qt.answer
         }));
 
         questionsExport.push({
@@ -739,7 +765,7 @@ export const questionsRoutes: Routes = {
       let yamlContent: string;
 
       try {
-        yamlContent = Bun.YAML.stringify(exportData);
+        yamlContent = Bun.YAML.stringify(exportData, null, 2);
       } catch (error) {
         console.error('Error converting to YAML:', error);
         return apiServerError('Failed to generate YAML file');
