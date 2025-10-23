@@ -4,6 +4,7 @@ import { AppValt, AppValtContext } from '@/frontend/app/appValt';
 import { NavBar } from '@/frontend/app/NavBar';
 import { Events } from '@/frontend/app/pages/events/Events';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
+import { Questions } from '@/frontend/app/pages/questions/Questions';
 import { Teams } from '@/frontend/app/pages/teams/Teams';
 import { Loading } from '@/frontend/components/Loading';
 import { useRouter, type Routes } from '@/frontend/utils/useRouter';
@@ -13,6 +14,7 @@ import { useSnapshot } from 'valtio';
 const routes: Routes = new Map([
   [/^\/permissions/, Permissions],
   [/^\/teams/, Teams],
+  [/^\/questions/, Questions],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 

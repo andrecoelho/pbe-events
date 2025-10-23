@@ -1,0 +1,86 @@
+.Questions {
+  display: flex;
+  flex-direction: column;
+}
+
+.ImportExport {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.QuestionsEditor {
+  display: flex;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.QuestionsList {
+  min-width: 80px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+}
+
+.QuestionNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border: 2px solid oklch(var(--bc) / 0.2);
+  border-radius: 0.5rem;
+  background: oklch(var(--b2));
+  color: oklch(var(--bc));
+  font-weight: 600;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.QuestionNumber:hover {
+  border-color: oklch(var(--p));
+  background: oklch(var(--p) / 0.1);
+}
+
+.QuestionNumber.active {
+  border-color: oklch(var(--p));
+  background: oklch(var(--p));
+  color: oklch(var(--pc));
+}
+
+.QuestionActions {
+  position: absolute;
+  left: 70px;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: oklch(var(--b1));
+  border: 1px solid oklch(var(--bc) / 0.2);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  z-index: 10;
+  min-width: 150px;
+}
+
+.QuestionEditor {
+  flex: 1;
+  min-width: 0;
+}
+
+.QuestionMetadata {
+  background: oklch(var(--b2) / 0.5);
+}
+
+.Translation {
+  background: oklch(var(--b2) / 0.3);
+}
+
+/* Shadow for sticky footer */
+.shadow-md-top {
+  box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1);
+}
