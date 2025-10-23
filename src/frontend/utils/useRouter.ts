@@ -25,6 +25,10 @@ export const useRouter = (routes: Routes) => {
     };
 
     const handleNavigate = (event: any) => {
+      if (event.downloadRequest !== null) {
+        return;
+      }
+
       const url = new URL(event.destination.url);
 
       if (event.navigationType === 'reload' || url.origin !== window.location.origin) {
