@@ -39,13 +39,11 @@ export function Questions() {
   const selectedQuestion = snap.questions.find((q) => q.number === snap.selectedQuestionNumber);
 
   const handleAddQuestion = async () => {
-    await questionsValt.createQuestion('PS', 10, 30);
-    // Selection is handled in valt
+    await questionsValt.createQuestion('PS', 1, 30);
   };
 
   const handleInsertBefore = async (beforeNumber: number) => {
-    await questionsValt.insertQuestionBefore(beforeNumber, 'PS', 10, 30);
-    // Selection is handled in valt
+    await questionsValt.insertQuestionBefore(beforeNumber, 'PS', 11, 30);
   };
 
   const handleDeleteQuestion = async (questionNumber: number) => {
@@ -58,33 +56,44 @@ export function Questions() {
 
     if (confirmed) {
       await questionsValt.deleteQuestion(question.id);
-      // Selection is handled in valt
     }
   };
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
-    if (!selectedQuestion) return;
+    if (!selectedQuestion) {
+      return;
+    }
+
     await questionsValt.updateQuestion(selectedQuestion.id, { type });
   };
 
   const handleMaxPointsChange = async (maxPoints: number) => {
-    if (!selectedQuestion) return;
+    if (!selectedQuestion) {
+      return;
+    }
+
     await questionsValt.updateQuestion(selectedQuestion.id, { maxPoints });
   };
 
   const handleSecondsChange = async (seconds: number) => {
-    if (!selectedQuestion) return;
+    if (!selectedQuestion) {
+      return;
+    }
+
     await questionsValt.updateQuestion(selectedQuestion.id, { seconds });
   };
 
   const handleTranslationChange = async (languageCode: string, field: 'prompt' | 'answer', value: string) => {
-    if (!selectedQuestion) return;
+    if (!selectedQuestion) {
+      return;
+    }
 
     const translation = selectedQuestion.translations.find((t) => t.languageCode === languageCode);
 
     if (translation) {
       const prompt = field === 'prompt' ? value : translation.prompt;
       const answer = field === 'answer' ? value : translation.answer;
+
       await questionsValt.upsertTranslation(selectedQuestion.id, languageCode, prompt, answer);
     }
   };
@@ -103,7 +112,6 @@ export function Questions() {
 
     if (confirmed) {
       await questionsValt.importQuestions(file);
-      // Selection is handled in valt's init method
     }
 
     // Reset file input
@@ -122,28 +130,14 @@ export function Questions() {
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Questions</h1>
         <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
 
-        {/* Import/Export Section */}
-        <div className='ImportExport border border-base-300 rounded-lg p-4 mb-6'>
-          <h3 className='text-lg font-semibold mb-3'>Import / Export Questions</h3>
-          <div className='flex gap-4'>
-            <button className='btn btn-secondary' onClick={handleImportClick}>
-              <Icon name='arrow-down-tray' className='size-4' />
-              Import
-            </button>
-            <button className='btn btn-secondary' onClick={handleExport} disabled={snap.questions.length === 0}>
-              <Icon name='arrow-up-tray' className='size-4' />
-              Export
-            </button>
-          </div>
-          <input ref={fileInputRef} type='file' accept='.yaml,.yml' onChange={handleFileChange} className='hidden' />
-        </div>
-
         {/* Questions List and Editor */}
-        {snap.questions.length === 0 ? (
+        {snap.questions.length === 0 && (
           <div className='text-center py-8'>
             <p className='text-neutral mb-4'>No questions yet. Add your first question to get started.</p>
           </div>
-        ) : (
+        )}
+
+        {snap.questions.length > 0 && (
           <div className='QuestionsEditor flex gap-6'>
             {/* Question Numbers Column */}
             <div className='QuestionsList flex-shrink-0'>
@@ -172,10 +166,7 @@ export function Questions() {
                           <Icon name='plus' className='size-3' />
                           Insert Before
                         </button>
-                        <button
-                          className='btn btn-xs btn-error'
-                          onClick={() => handleDeleteQuestion(question.number)}
-                        >
+                        <button className='btn btn-xs btn-error' onClick={() => handleDeleteQuestion(question.number)}>
                           <Icon name='trash' className='size-3' />
                           Delete
                         </button>
@@ -264,9 +255,7 @@ export function Questions() {
                                 rows={3}
                                 placeholder='Enter the question prompt...'
                                 value={translation?.prompt || ''}
-                                onChange={(e) =>
-                                  handleTranslationChange(language.code, 'prompt', e.target.value)
-                                }
+                                onChange={(e) => handleTranslationChange(language.code, 'prompt', e.target.value)}
                               />
                             </div>
 
@@ -307,7 +296,16 @@ export function Questions() {
         )}
       </div>
 
-      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
+      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end gap-4 shadow-md-top'>
+        <button className='btn btn-secondary' onClick={handleImportClick}>
+          <Icon name='arrow-down-tray' className='size-4' />
+          Import
+        </button>
+        <button className='btn btn-secondary' onClick={handleExport} disabled={snap.questions.length === 0}>
+          <Icon name='arrow-up-tray' className='size-4' />
+          Export
+        </button>
+
         <button className='btn btn-primary' onClick={handleAddQuestion}>
           <Icon name='plus' className='size-4' />
           Add Question
