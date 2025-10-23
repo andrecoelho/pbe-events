@@ -6,7 +6,7 @@ export type QuestionType = 'PS' | 'PW' | 'TF' | 'FB';
 export interface QuestionTranslation {
   id?: string; // Optional for new translations
   languageCode: string;
-  body: string;
+  prompt: string;
   answer: string;
 }
 
@@ -23,7 +23,10 @@ export interface QuestionsStore {
   initialized: boolean;
   eventId: string;
   eventName: string;
+  languages: { code: string; name: string }[];
   questions: Question[];
+  selectedQuestionNumber: number | null;
+  hoveredQuestionNumber: number | null;
 }
 
 export class QuestionsValt {
@@ -34,7 +37,10 @@ export class QuestionsValt {
       initialized: false,
       eventId: '',
       eventName: '',
-      questions: []
+      languages: [],
+      questions: [],
+      selectedQuestionNumber: null,
+      hoveredQuestionNumber: null
     });
   }
 
@@ -44,14 +50,32 @@ export class QuestionsValt {
     if (result.status === 200) {
       const response = (await result.json()) as {
         eventName: string;
+        languages: { code: string; name: string }[];
         questions: Question[];
       };
 
       this.store.eventId = eventId;
       this.store.eventName = response.eventName;
+      this.store.languages = response.languages;
       this.store.questions = response.questions;
       this.store.initialized = true;
+
+      // Select first question if available
+      if (response.questions.length > 0) {
+        const firstQuestion = response.questions[0];
+        if (firstQuestion) {
+          this.store.selectedQuestionNumber = firstQuestion.number;
+        }
+      }
     }
+  }
+
+  setSelectedQuestion(questionNumber: number | null) {
+    this.store.selectedQuestionNumber = questionNumber;
+  }
+
+  setHoveredQuestion(questionNumber: number | null) {
+    this.store.hoveredQuestionNumber = questionNumber;
   }
 
   /**
@@ -73,17 +97,60 @@ export class QuestionsValt {
         seconds: number;
       };
 
+      // Create translations array with empty translations for each language
+      const translations: QuestionTranslation[] = this.store.languages.map((lang) => ({
+        languageCode: lang.code,
+        prompt: '',
+        answer: ''
+      }));
+
       this.store.questions.push({
         id: response.id,
         number: response.number,
         type: response.type,
         maxPoints: response.maxPoints,
         seconds: response.seconds,
-        translations: []
+        translations
       });
 
       // Keep questions sorted by number
       this.store.questions.sort((a, b) => a.number - b.number);
+
+      // Select the newly added question
+      this.store.selectedQuestionNumber = response.number;
+
+      return { ok: true };
+    }
+
+    const response = (await result.json()) as { error: string };
+
+    return { ok: false, error: response.error };
+  }
+
+  /**
+   * Insert a new question before a specific question number
+   */
+  async insertQuestionBefore(beforeNumber: number, type: QuestionType, maxPoints: number, seconds: number) {
+    const result = await fetch(`/api/events/${this.store.eventId}/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, maxPoints, seconds, insertBefore: beforeNumber })
+    });
+
+    if (result.status === 200) {
+      const response = (await result.json()) as {
+        id: string;
+        number: number;
+        type: QuestionType;
+        maxPoints: number;
+        seconds: number;
+      };
+
+      // Reload all questions to get updated numbers
+      await this.init(this.store.eventId);
+
+      // Select the newly inserted question
+      this.store.selectedQuestionNumber = beforeNumber;
 
       return { ok: true };
     }
@@ -174,7 +241,20 @@ export class QuestionsValt {
     });
 
     if (result.status === 200) {
+      const deletedQuestionNumber = this.store.questions.find((q) => q.id === questionId)?.number;
       this.store.questions = this.store.questions.filter((q) => q.id !== questionId);
+
+      // Select a different question if the deleted one was selected
+      if (this.store.selectedQuestionNumber === deletedQuestionNumber) {
+        if (this.store.questions.length > 0) {
+          const firstQuestion = this.store.questions[0];
+          if (firstQuestion) {
+            this.store.selectedQuestionNumber = firstQuestion.number;
+          }
+        } else {
+          this.store.selectedQuestionNumber = null;
+        }
+      }
 
       return { ok: true };
     }
@@ -185,9 +265,53 @@ export class QuestionsValt {
   }
 
   /**
+   * Update or create a translation for a question
+   * If the translation exists, update it. Otherwise, create it.
+   */
+  async upsertTranslation(questionId: string, languageCode: string, prompt: string, answer: string) {
+    const question = this.store.questions.find((q) => q.id === questionId);
+
+    if (!question) {
+      return { ok: false, error: 'Question not found' };
+    }
+
+    // Find existing translation
+    const existingTranslation = question.translations.find((t) => t.languageCode === languageCode);
+
+    if (existingTranslation && existingTranslation.id) {
+      // Update existing translation
+      return await this.updateTranslation(existingTranslation.id, prompt, answer);
+    } else {
+      // Create new translation
+      const result = await this.addTranslation(questionId, languageCode, prompt, answer);
+
+      // If translation was created but doesn't have an existing entry in the array, we need to update it
+      if (result.ok && !existingTranslation) {
+        // Translation was added by addTranslation
+      } else if (result.ok && existingTranslation && !existingTranslation.id) {
+        // Find the newly added translation (which has an id) and remove the placeholder
+        const newTranslation = question.translations.find(
+          (t) => t.languageCode === languageCode && t.id !== undefined
+        );
+        if (newTranslation) {
+          // Remove the placeholder
+          const placeholderIndex = question.translations.findIndex(
+            (t) => t.languageCode === languageCode && t.id === undefined
+          );
+          if (placeholderIndex >= 0) {
+            question.translations.splice(placeholderIndex, 1);
+          }
+        }
+      }
+
+      return result;
+    }
+  }
+
+  /**
    * Add a translation to a question
    */
-  async addTranslation(questionId: string, languageCode: string, questionBody: string, answer: string) {
+  async addTranslation(questionId: string, languageCode: string, prompt: string, answer: string) {
     const question = this.store.questions.find((q) => q.id === questionId);
 
     if (!question) {
@@ -197,21 +321,21 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/${questionId}/translations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ languageCode, questionBody, answer })
+      body: JSON.stringify({ languageCode, questionBody: prompt, answer })
     });
 
     if (result.status === 200) {
       const response = (await result.json()) as {
         id: string;
         languageCode: string;
-        body: string;
+        prompt: string;
         answer: string;
       };
 
       question.translations.push({
         id: response.id,
         languageCode: response.languageCode,
-        body: response.body,
+        prompt: response.prompt,
         answer: response.answer
       });
 
@@ -226,7 +350,7 @@ export class QuestionsValt {
   /**
    * Update a question translation
    */
-  async updateTranslation(translationId: string, questionBody?: string, answer?: string) {
+  async updateTranslation(translationId: string, prompt?: string, answer?: string) {
     // Find the question and translation
     let question: Question | undefined;
     let translation: QuestionTranslation | undefined;
@@ -246,11 +370,11 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/translations/${translationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionBody, answer })
+      body: JSON.stringify({ questionBody: prompt, answer })
     });
 
     if (result.status === 200) {
-      if (questionBody !== undefined) translation.body = questionBody;
+      if (prompt !== undefined) translation.prompt = prompt;
       if (answer !== undefined) translation.answer = answer;
 
       return { ok: true };

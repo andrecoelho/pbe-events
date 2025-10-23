@@ -89,7 +89,7 @@ CREATE TABLE questions (
 
 CREATE TABLE questionTranslations (
   id TEXT NOT NULL,
-  body TEXT NOT NULL,
+  prompt TEXT NOT NULL,
   answer TEXT NOT NULL,
   languageCode TEXT NOT NULL,
   questionId TEXT NOT NULL,

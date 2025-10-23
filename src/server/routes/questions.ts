@@ -19,7 +19,7 @@ interface LanguageDefinition {
 
 interface QuestionTranslation {
   lang: string;
-  body: string;
+  prompt: string;
   answer: string;
 }
 
@@ -61,10 +61,10 @@ const queryInsertQuestion = db.query<
 
 const queryInsertQuestionTranslation = db.query<
   {},
-  { $id: string; $body: string; $answer: string; $languageCode: string; $questionId: string }
+  { $id: string; $prompt: string; $answer: string; $languageCode: string; $questionId: string }
 >(
-  `INSERT INTO questionTranslations (id, body, answer, languageCode, questionId)
-   VALUES ($id, $body, $answer, $languageCode, $questionId)`
+  `INSERT INTO questionTranslations (id, prompt, answer, languageCode, questionId)
+   VALUES ($id, $prompt, $answer, $languageCode, $questionId)`
 );
 
 const queryDeleteQuestions = db.query<{}, { $eventId: string }>(`DELETE FROM questions WHERE eventId = $eventId`);
@@ -79,10 +79,10 @@ const queryGetQuestions = db.query<
 );
 
 const queryGetQuestionTranslations = db.query<
-  { languageCode: string; body: string; answer: string },
+  { languageCode: string; prompt: string; answer: string },
   { $questionId: string }
 >(
-  `SELECT languageCode, body, answer FROM questionTranslations
+  `SELECT languageCode, prompt, answer FROM questionTranslations
    WHERE questionId = $questionId
    ORDER BY languageCode ASC`
 );
@@ -102,7 +102,7 @@ const queryGetQuestionsWithTranslations = db.query<
     maxPoints: number;
     seconds: number;
     translationLanguageCode: string | null;
-    translationBody: string | null;
+    translationPrompt: string | null;
     translationAnswer: string | null;
   },
   { $eventId: string }
@@ -114,7 +114,7 @@ const queryGetQuestionsWithTranslations = db.query<
     q.maxPoints,
     q.seconds,
     qt.languageCode as translationLanguageCode,
-    qt.body as translationBody,
+    qt.prompt as translationPrompt,
     qt.answer as translationAnswer
    FROM questions q
    LEFT JOIN questionTranslations qt ON q.id = qt.questionId
@@ -159,12 +159,12 @@ const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>
 
 // Individual question translation CRUD queries
 const queryGetSingleQuestionTranslation = db.query<
-  { id: string; body: string; answer: string; languageCode: string; questionId: string },
+  { id: string; prompt: string; answer: string; languageCode: string; questionId: string },
   { $id: string }
->(`SELECT id, body, answer, languageCode, questionId FROM questionTranslations WHERE id = $id`);
+>(`SELECT id, prompt, answer, languageCode, questionId FROM questionTranslations WHERE id = $id`);
 
-const queryUpdateQuestionTranslation = db.query<{}, { $id: string; $body: string; $answer: string }>(
-  `UPDATE questionTranslations SET body = $body, answer = $answer WHERE id = $id`
+const queryUpdateQuestionTranslation = db.query<{}, { $id: string; $prompt: string; $answer: string }>(
+  `UPDATE questionTranslations SET prompt = $prompt, answer = $answer WHERE id = $id`
 );
 
 const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM questionTranslations WHERE id = $id`);
@@ -306,11 +306,11 @@ function validateQuestionsData(data: unknown): {
 
       questionLanguages.add(translation.lang);
 
-      // Validate body
-      if (typeof translation.body !== 'string' || translation.body.trim() === '') {
+      // Validate prompt
+      if (typeof translation.prompt !== 'string' || translation.prompt.trim() === '') {
         return {
           valid: false,
-          error: `Question ${i + 1}, Translation ${j + 1}: body must be a non-empty string`
+          error: `Question ${i + 1}, Translation ${j + 1}: prompt must be a non-empty string`
         };
       }
 
@@ -391,7 +391,7 @@ function importQuestions(questions: QuestionImport[], eventId: string): number {
 
       queryInsertQuestionTranslation.run({
         $id: translationId,
-        $body: translation.body.trim(),
+        $prompt: translation.prompt.trim(),
         $answer: translation.answer.trim(),
         $languageCode: translation.lang,
         $questionId: questionId
@@ -448,7 +448,7 @@ export const questionsRoutes: Routes = {
           type: string;
           maxPoints: number;
           seconds: number;
-          translations: Array<{ languageCode: string; body: string; answer: string }>;
+          translations: Array<{ languageCode: string; prompt: string; answer: string }>;
         }
       >();
 
@@ -465,10 +465,10 @@ export const questionsRoutes: Routes = {
         }
 
         // Add translation if it exists (LEFT JOIN may return null for questions without translations)
-        if (row.translationLanguageCode && row.translationBody && row.translationAnswer) {
+        if (row.translationLanguageCode && row.translationPrompt && row.translationAnswer) {
           questionsMap.get(row.questionId)!.translations.push({
             languageCode: row.translationLanguageCode,
-            body: row.translationBody,
+            prompt: row.translationPrompt,
             answer: row.translationAnswer
           });
         }
@@ -477,8 +477,12 @@ export const questionsRoutes: Routes = {
       // Convert map to array (will maintain order since we inserted in ORDER BY order)
       const questionsWithTranslations = Array.from(questionsMap.values());
 
+      // Get event languages
+      const languages = queryGetLanguages.all({ $eventId: eventId });
+
       return apiData({
         eventName: event.name,
+        languages: languages.map((l) => ({ code: l.code, name: l.name })),
         questions: questionsWithTranslations
       });
     },
@@ -505,7 +509,7 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { type, maxPoints, seconds } = body;
+      const { type, maxPoints, seconds, insertBefore } = body;
 
       // Validate required fields
       if (!type || typeof maxPoints !== 'number' || typeof seconds !== 'number') {
@@ -523,23 +527,50 @@ export const questionsRoutes: Routes = {
         return apiBadRequest('maxPoints and seconds must be positive numbers');
       }
 
+      // Validate insertBefore if provided
+      if (insertBefore !== undefined && (typeof insertBefore !== 'number' || insertBefore <= 0)) {
+        return apiBadRequest('insertBefore must be a positive number');
+      }
+
       try {
         const questionId = Bun.randomUUIDv7();
+        let questionNumber = 0;
 
-        // Get the next available question number
-        const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
-        const nextNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
+        if (insertBefore !== undefined) {
+          // Insert before specific question: increment all questions >= insertBefore
+          db.transaction(() => {
+            queryIncrementQuestionNumbers.run({
+              $eventId: eventId,
+              $fromNumber: insertBefore
+            });
 
-        queryInsertQuestion.run({
-          $id: questionId,
-          $number: nextNumber,
-          $type: type,
-          $maxPoints: maxPoints,
-          $seconds: seconds,
-          $eventId: eventId
-        });
+            questionNumber = insertBefore;
 
-        return apiData({ id: questionId, number: nextNumber, type, maxPoints, seconds });
+            queryInsertQuestion.run({
+              $id: questionId,
+              $number: questionNumber,
+              $type: type,
+              $maxPoints: maxPoints,
+              $seconds: seconds,
+              $eventId: eventId
+            });
+          })();
+        } else {
+          // Append to end: get the next available question number
+          const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
+          questionNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
+
+          queryInsertQuestion.run({
+            $id: questionId,
+            $number: questionNumber,
+            $type: type,
+            $maxPoints: maxPoints,
+            $seconds: seconds,
+            $eventId: eventId
+          });
+        }
+
+        return apiData({ id: questionId, number: questionNumber, type, maxPoints, seconds });
       } catch (error) {
         console.error('Error creating question:', error);
         return apiServerError('Failed to create question');
@@ -686,7 +717,7 @@ export const questionsRoutes: Routes = {
 
         const translations: QuestionTranslation[] = questionTranslations.map((qt) => ({
           lang: qt.languageCode,
-          body: qt.body,
+          prompt: qt.prompt,
           answer: qt.answer
         }));
 
@@ -943,13 +974,13 @@ export const questionsRoutes: Routes = {
 
         queryInsertQuestionTranslation.run({
           $id: translationId,
-          $body: questionBody.trim(),
+          $prompt: questionBody.trim(),
           $answer: answer.trim(),
           $languageCode: languageCode,
           $questionId: questionId
         });
 
-        return apiData({ id: translationId, languageCode, body: questionBody.trim(), answer: answer.trim() });
+        return apiData({ id: translationId, languageCode, prompt: questionBody.trim(), answer: answer.trim() });
       } catch (error) {
         console.error('Error creating question translation:', error);
         return apiServerError('Failed to create question translation');
@@ -1016,7 +1047,7 @@ export const questionsRoutes: Routes = {
       try {
         queryUpdateQuestionTranslation.run({
           $id: translationId,
-          $body: questionBody !== undefined ? questionBody.trim() : questionTranslation.body,
+          $prompt: questionBody !== undefined ? questionBody.trim() : questionTranslation.prompt,
           $answer: answer !== undefined ? answer.trim() : questionTranslation.answer
         });
 

@@ -25,10 +25,10 @@ questions:
     seconds: 30
     translations:
       - lang: en
-        body: What is the capital of France?
+        prompt: What is the capital of France?
         answer: Paris
       - lang: es
-        body: ¿Cuál es la capital de Francia?
+        prompt: ¿Cuál es la capital de Francia?
         answer: París
 
   - type: TF
@@ -36,10 +36,10 @@ questions:
     seconds: 15
     translations:
       - lang: en
-        body: The Earth is flat.
+        prompt: The Earth is flat.
         answer: false
       - lang: es
-        body: La Tierra es plana.
+        prompt: La Tierra es plana.
         answer: false
 
   - type: PW
@@ -47,12 +47,12 @@ questions:
     seconds: 60
     translations:
       - lang: en
-        body: |
+        prompt: |
           Describe the water cycle in your own words.
           Include at least four stages in your answer.
         answer: evaporation condensation precipitation collection
       - lang: es
-        body: |
+        prompt: |
           Describe el ciclo del agua con tus propias palabras.
           Incluye al menos cuatro etapas en tu respuesta.
         answer: evaporación condensación precipitación recolección
@@ -62,10 +62,10 @@ questions:
     seconds: 20
     translations:
       - lang: en
-        body: The _____ is the largest planet in our solar system.
+        prompt: The _____ is the largest planet in our solar system.
         answer: Jupiter
       - lang: es
-        body: El _____ es el planeta más grande de nuestro sistema solar.
+        prompt: El _____ es el planeta más grande de nuestro sistema solar.
         answer: Júpiter
 
   - type: PS
@@ -73,13 +73,13 @@ questions:
     seconds: 45
     translations:
       - lang: en
-        body: |
+        prompt: |
           In what year did World War II end?
 
           Consider the year when Japan formally surrendered.
         answer: 1945
       - lang: es
-        body: |
+        prompt: |
           ¿En qué año terminó la Segunda Guerra Mundial?
 
           Considera el año en que Japón se rindió formalmente.
@@ -90,10 +90,10 @@ questions:
     seconds: 10
     translations:
       - lang: en
-        body: Python is a compiled programming language.
+        prompt: Python is a compiled programming language.
         answer: false
       - lang: es
-        body: Python es un lenguaje de programación compilado.
+        prompt: Python es un lenguaje de programación compilado.
         answer: false
 
   - type: FB
@@ -101,8 +101,8 @@ questions:
     seconds: 25
     translations:
       - lang: en
-        body: The process of plants converting sunlight into energy is called _____.
+        prompt: The process of plants converting sunlight into energy is called _____.
         answer: photosynthesis
       - lang: es
-        body: El proceso por el cual las plantas convierten la luz solar en energía se llama _____.
+        prompt: El proceso por el cual las plantas convierten la luz solar en energía se llama _____.
         answer: fotosíntesis
