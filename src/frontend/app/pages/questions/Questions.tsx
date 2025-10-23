@@ -297,6 +297,7 @@ export function Questions() {
       </div>
 
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end gap-4 shadow-md-top'>
+        <input ref={fileInputRef} type='file' accept='.yaml,.yml' onChange={handleFileChange} className='hidden' />
         <button className='btn btn-secondary' onClick={handleImportClick}>
           <Icon name='arrow-down-tray' className='size-4' />
           Import
