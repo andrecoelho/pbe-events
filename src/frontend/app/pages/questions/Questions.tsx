@@ -224,7 +224,7 @@ export function Questions() {
                 <h3 className='text-xl font-bold mb-4'>Question {selectedQuestion.number}</h3>
 
                 {/* Question Metadata Section */}
-                <div className='QuestionMetadata border border-base-300 rounded-lg p-4 mb-6'>
+                <fieldset className='fieldset bg-base-300 border-neutral rounded-box border p-4 mb-6'>
                   <div className='grid grid-cols-3 gap-4'>
                     {/* Question Type */}
                     <div>
@@ -272,7 +272,7 @@ export function Questions() {
                       />
                     </div>
                   </div>
-                </div>
+                </fieldset>
 
                 {/* Translations Section */}
                 <div className='QuestionTranslations'>
@@ -281,10 +281,10 @@ export function Questions() {
                     {snap.languages.map((language) => {
                       const translation = selectedQuestion.translations.find((t) => t.languageCode === language.code);
                       return (
-                        <div key={language.code} className='Translation border border-base-300 rounded-lg p-4'>
-                          <h5 className='font-semibold mb-3'>
-                            {language.name} ({language.code})
-                          </h5>
+                        <fieldset key={language.code} className='fieldset bg-base-300 border-neutral rounded-box border p-4'>
+                          <legend className='fieldset-legend'>
+                            {language.name} ({language.code.toUpperCase()})
+                          </legend>
                           <div className='flex flex-col gap-3'>
                             {/* Prompt */}
                             <div>
@@ -326,7 +326,7 @@ export function Questions() {
                               )}
                             </div>
                           </div>
-                        </div>
+                        </fieldset>
                       );
                     })}
                   </div>
