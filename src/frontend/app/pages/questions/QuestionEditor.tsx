@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionMetadata } from './QuestionMetadata';
-import { QuestionTranslationFields } from './QuestionTranslationFields';
+import { QuestionTranslation } from './QuestionTranslation';
 import { useQuestionsValt } from './questionsValt';
 
 export const QuestionEditor = memo(() => {
@@ -26,7 +26,7 @@ export const QuestionEditor = memo(() => {
             const translation = snap.selectedQuestion?.translations.find((t) => t.languageCode === language.code);
 
             return (
-              <QuestionTranslationFields
+              <QuestionTranslation
                 key={language.code}
                 languageCode={language.code}
                 languageName={language.name}

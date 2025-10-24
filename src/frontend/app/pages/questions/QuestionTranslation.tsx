@@ -1,15 +1,15 @@
 import { memo } from 'react';
 import { useSnapshot } from 'valtio';
-import { useQuestionsValt, type QuestionTranslation } from './questionsValt';
+import { useQuestionsValt, type IQuestionTranslation } from './questionsValt';
 
 interface QuestionTranslationFieldsProps {
   languageCode: string;
   languageName: string;
-  translation: QuestionTranslation | undefined;
+  translation: IQuestionTranslation | undefined;
   questionType: string;
 }
 
-export const QuestionTranslationFields = memo(
+export const QuestionTranslation = memo(
   ({ languageCode, languageName, translation, questionType }: QuestionTranslationFieldsProps) => {
     const questionsValt = useQuestionsValt();
     const snap = useSnapshot(questionsValt.store);
@@ -76,4 +76,4 @@ export const QuestionTranslationFields = memo(
   }
 );
 
-QuestionTranslationFields.displayName = 'QuestionTranslationFields';
+QuestionTranslation.displayName = 'QuestionTranslationFields';

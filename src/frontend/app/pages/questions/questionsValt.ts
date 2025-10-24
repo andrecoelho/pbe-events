@@ -3,7 +3,7 @@ import { proxy } from 'valtio';
 
 export type QuestionType = 'PG' | 'PS' | 'TF' | 'FB';
 
-export interface QuestionTranslation {
+export interface IQuestionTranslation {
   id?: string; // Optional for new translations
   languageCode: string;
   prompt: string;
@@ -16,7 +16,7 @@ export interface Question {
   type: QuestionType;
   maxPoints: number;
   seconds: number;
-  translations: QuestionTranslation[];
+  translations: IQuestionTranslation[];
 }
 
 export interface QuestionsStore {
@@ -92,7 +92,7 @@ export class QuestionsValt {
       };
 
       // Create translations array with empty translations for each language
-      const translations: QuestionTranslation[] = this.store.languages.map((lang) => ({
+      const translations: IQuestionTranslation[] = this.store.languages.map((lang) => ({
         languageCode: lang.code,
         prompt: '',
         answer: ''
@@ -369,7 +369,7 @@ export class QuestionsValt {
   async updateTranslation(translationId: string, prompt?: string, answer?: string) {
     // Find the question and translation
     let question: Question | undefined;
-    let translation: QuestionTranslation | undefined;
+    let translation: IQuestionTranslation | undefined;
 
     for (const q of this.store.questions) {
       translation = q.translations.find((t) => t.id === translationId);
