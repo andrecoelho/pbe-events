@@ -95,7 +95,7 @@ export class QuestionsValt {
   /**
    * Create a new question (without translations)
    */
-  async createQuestion(type: QuestionType, maxPoints: number, seconds: number) {
+  async addQuestion(type: QuestionType, maxPoints: number, seconds: number) {
     const result = await fetch(`/api/events/${this.store.eventId}/questions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,13 +103,7 @@ export class QuestionsValt {
     });
 
     if (result.status === 200) {
-      const response = (await result.json()) as {
-        id: string;
-        number: number;
-        type: QuestionType;
-        maxPoints: number;
-        seconds: number;
-      };
+      const response = (await result.json()) as { question: Question };
 
       // Create translations array with empty translations for each language
       const translations: IQuestionTranslation[] = Object.keys(this.store.languages).map((languageCode) => ({
@@ -119,11 +113,11 @@ export class QuestionsValt {
       }));
 
       this.store.questions.push({
-        id: response.id,
-        number: response.number,
-        type: response.type,
-        maxPoints: response.maxPoints,
-        seconds: response.seconds,
+        id: response.question.id,
+        number: response.question.number,
+        type: response.question.type,
+        maxPoints: response.question.maxPoints,
+        seconds: response.question.seconds,
         translations
       });
 
@@ -131,7 +125,7 @@ export class QuestionsValt {
       this.store.questions.sort((a, b) => a.number - b.number);
 
       // Select the newly added question
-      const newQuestion = this.store.questions.find((q) => q.id === response.id);
+      const newQuestion = this.store.questions.find((q) => q.id === response.question.id);
       if (newQuestion) {
         this.store.selectedQuestion = newQuestion;
       }

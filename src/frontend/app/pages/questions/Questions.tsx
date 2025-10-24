@@ -32,7 +32,7 @@ export const Questions = memo(() => {
   }
 
   const handleAddQuestion = async () => {
-    await questionsValt.createQuestion('PG', 1, 30);
+    await questionsValt.addQuestion('PG', 1, 30);
   };
 
   const handleImportClick = () => {
