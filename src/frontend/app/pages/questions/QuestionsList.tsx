@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState, memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionListItem } from './QuestionListItem';
-import { useQuestionsValt } from './questionsValt';
+import { useQuestionsValt, type Question } from './questionsValt';
 
 export const QuestionsList = memo(() => {
   const questionsValt = useQuestionsValt();
   const snap = useSnapshot(questionsValt.store);
+
   const questionsListRef = useRef<HTMLDivElement>(null);
   const [showBottomShadow, setShowBottomShadow] = useState(false);
   const [showTopShadow, setShowTopShadow] = useState(false);
 
   const checkScrollShadow = () => {
     const element = questionsListRef.current;
-    if (!element) return;
+
+    if (!element) {
+      return;
+    }
 
     const hasScroll = element.scrollHeight > element.clientHeight;
     const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 1;

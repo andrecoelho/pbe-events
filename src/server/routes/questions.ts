@@ -101,6 +101,7 @@ const queryGetQuestionsWithTranslations = db.query<
     type: string;
     maxPoints: number;
     seconds: number;
+    translationId: string | null;
     translationLanguageCode: string | null;
     translationPrompt: string | null;
     translationAnswer: string | null;
@@ -113,6 +114,7 @@ const queryGetQuestionsWithTranslations = db.query<
     q.type,
     q.maxPoints,
     q.seconds,
+    qt.id as translationId,
     qt.languageCode as translationLanguageCode,
     qt.prompt as translationPrompt,
     qt.answer as translationAnswer
@@ -485,7 +487,7 @@ export const questionsRoutes: Routes = {
           type: string;
           maxPoints: number;
           seconds: number;
-          translations: Array<{ languageCode: string; prompt: string; answer: string }>;
+          translations: Array<{ id: string; languageCode: string; prompt: string; answer: string }>;
         }
       >();
 
@@ -502,8 +504,9 @@ export const questionsRoutes: Routes = {
         }
 
         // Add translation if it exists (LEFT JOIN may return null for questions without translations)
-        if (row.translationLanguageCode && row.translationPrompt && row.translationAnswer) {
+        if (row.translationId && row.translationLanguageCode && row.translationPrompt && row.translationAnswer) {
           questionsMap.get(row.questionId)!.translations.push({
+            id: row.translationId,
             languageCode: row.translationLanguageCode,
             prompt: row.translationPrompt,
             answer: row.translationAnswer
@@ -519,7 +522,7 @@ export const questionsRoutes: Routes = {
 
       return apiData({
         eventName: event.name,
-        languages: languages.map((l) => ({ code: l.code, name: l.name })),
+        languages: Object.fromEntries(languages.map((l) => [l.code, l.name])),
         questions: questionsWithTranslations
       });
     },
@@ -609,7 +612,7 @@ export const questionsRoutes: Routes = {
           });
         }
 
-        return apiData({ id: questionId, number: questionNumber, type, maxPoints, seconds });
+        return apiData({ question: { id: questionId, number: questionNumber, type, maxPoints, seconds } });
       } catch (error) {
         console.error('Error creating question:', error);
         return apiServerError('Failed to create question');
@@ -829,6 +832,7 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
+
       const { number, type, maxPoints, seconds } = body as {
         number?: number;
         type?: 'PG' | 'PS' | 'TF' | 'FB';
@@ -912,7 +916,7 @@ export const questionsRoutes: Routes = {
           $seconds: seconds ?? question.seconds
         });
 
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error updating question:', error);
         return apiServerError('Failed to update question');
@@ -959,7 +963,7 @@ export const questionsRoutes: Routes = {
           });
         })();
 
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error deleting question:', error);
         return apiServerError('Failed to delete question');
@@ -997,12 +1001,15 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { languageCode, questionPrompt, answer } = body;
+      let { languageCode, prompt, answer } = body;
 
       // Validate required fields
-      if (!languageCode || !questionPrompt || !answer) {
+      if (!languageCode || !prompt || !answer) {
         return apiBadRequest('Missing required fields: languageCode, questionPrompt, and answer');
       }
+
+      prompt = prompt?.trim();
+      answer = answer?.trim();
 
       // Validate that the language exists for this event
       const languages = queryGetLanguages.all({ $eventId: question.eventId });
@@ -1025,13 +1032,15 @@ export const questionsRoutes: Routes = {
 
         queryInsertQuestionTranslation.run({
           $id: translationId,
-          $prompt: questionPrompt.trim(),
-          $answer: answer.trim(),
+          $prompt: prompt,
+          $answer: answer,
           $languageCode: languageCode,
           $questionId: questionId
         });
 
-        return apiData({ id: translationId, languageCode, prompt: questionPrompt.trim(), answer: answer.trim() });
+        return apiData({
+          translation: { id: translationId, languageCode, prompt, answer }
+        });
       } catch (error) {
         console.error('Error creating question translation:', error);
         return apiServerError('Failed to create question translation');
@@ -1076,11 +1085,15 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { questionPrompt, answer } = body;
+
+      const { prompt, answer } = body as {
+        prompt?: string;
+        answer?: string;
+      };
 
       // Validate fields if provided
-      if (questionPrompt !== undefined && typeof questionPrompt !== 'string') {
-        return apiBadRequest('questionPrompt must be a string');
+      if (prompt !== undefined && typeof prompt !== 'string') {
+        return apiBadRequest('prompt must be a string');
       }
 
       if (answer !== undefined && typeof answer !== 'string') {
@@ -1090,6 +1103,7 @@ export const questionsRoutes: Routes = {
       // For TF questions, validate answer is "true" or "false"
       if (answer !== undefined && question.type === 'TF') {
         const normalizedAnswer = answer.toLowerCase().trim();
+
         if (normalizedAnswer !== 'true' && normalizedAnswer !== 'false') {
           return apiBadRequest('True/False answer must be "true" or "false"');
         }
@@ -1098,11 +1112,11 @@ export const questionsRoutes: Routes = {
       try {
         queryUpdateQuestionTranslation.run({
           $id: translationId,
-          $prompt: questionPrompt !== undefined ? questionPrompt.trim() : questionTranslation.prompt,
+          $prompt: prompt !== undefined ? prompt.trim() : questionTranslation.prompt,
           $answer: answer !== undefined ? answer.trim() : questionTranslation.answer
         });
 
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error updating question translation:', error);
         return apiServerError('Failed to update question translation');
@@ -1145,7 +1159,7 @@ export const questionsRoutes: Routes = {
 
       try {
         queryDeleteQuestionTranslation.run({ $id: translationId });
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error deleting question translation:', error);
         return apiServerError('Failed to delete question translation');

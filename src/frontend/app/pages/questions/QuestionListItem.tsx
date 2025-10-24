@@ -1,13 +1,11 @@
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { memo } from 'react';
-import { useQuestionsValt } from './questionsValt';
+import { type Snapshot } from 'valtio';
+import { useQuestionsValt, type Question } from './questionsValt';
 
 interface QuestionListItemProps {
-  question: {
-    readonly id: string;
-    readonly number: number;
-  };
+  question: Snapshot<Question>;
   isSelected: boolean;
   isFirst: boolean;
 }
@@ -25,7 +23,7 @@ export const QuestionListItem = memo(({ question, isSelected, isFirst }: Questio
     );
 
     if (confirmed) {
-      await questionsValt.deleteQuestion(question.id);
+      await questionsValt.deleteQuestion(question);
     }
   };
 

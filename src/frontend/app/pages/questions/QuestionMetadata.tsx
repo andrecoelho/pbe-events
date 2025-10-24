@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { useQuestionsValt, type QuestionType } from './questionsValt';
+import type { Snapshot } from 'valtio';
+import { useQuestionsValt, type Question, type QuestionType } from './questionsValt';
 
 const QUESTION_TYPES = [
   { value: 'PG', label: 'Points General' },
@@ -9,27 +10,22 @@ const QUESTION_TYPES = [
 ];
 
 interface QuestionMetadataProps {
-  question: {
-    readonly id: string;
-    readonly type: QuestionType;
-    readonly maxPoints: number;
-    readonly seconds: number;
-  };
+  question: Snapshot<Question>;
 }
 
 export const QuestionMetadata = memo(({ question }: QuestionMetadataProps) => {
   const questionsValt = useQuestionsValt();
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
-    await questionsValt.updateQuestion(question.id, { type });
+    await questionsValt.updateQuestion(question, { type });
   };
 
   const handleMaxPointsChange = async (maxPoints: number) => {
-    await questionsValt.updateQuestion(question.id, { maxPoints });
+    await questionsValt.updateQuestion(question, { maxPoints });
   };
 
   const handleSecondsChange = async (seconds: number) => {
-    await questionsValt.updateQuestion(question.id, { seconds });
+    await questionsValt.updateQuestion(question, { seconds });
   };
 
   return (
