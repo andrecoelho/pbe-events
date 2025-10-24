@@ -112,6 +112,7 @@ export function Teams() {
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
         <button className='btn btn-primary' onClick={handleAddTeam}>
+          <Icon name='plus' className='size-4' />
           Add Team
         </button>
       </footer>

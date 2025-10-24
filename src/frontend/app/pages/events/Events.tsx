@@ -42,6 +42,7 @@ export const Events = memo(() => {
           {snap.initialized && snap.events.length === 0 && (
             <div className='absolute inset-0 flex flex-col items-center justify-center'>
               <button className='btn btn-secondary btn-lg' onClick={handleCreateEvent}>
+                <Icon name='plus' className='size-4' />
                 Add your first event
               </button>
             </div>
@@ -60,7 +61,8 @@ export const Events = memo(() => {
         {snap.initialized && snap.events.length > 0 && (
           <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
             <button className='btn btn-secondary' onClick={handleCreateEvent}>
-              <Icon name='plus' className='size-4' /> Add Event
+              <Icon name='plus' className='size-4' />
+              Add Event
             </button>
           </footer>
         )}
