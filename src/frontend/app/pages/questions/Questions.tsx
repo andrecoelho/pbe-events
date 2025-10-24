@@ -172,24 +172,45 @@ export function Questions() {
                 ].filter(Boolean).join(', ') || 'none'
               }}
             >
-              <div className='flex flex-col gap-2'>
-                {snap.questions.map((question) => (
-                  <div
-                    key={question.id}
-                    className={`relative flex items-center justify-center rounded-md shadow-md ${
-                      snap.selectedQuestionNumber === question.number
-                        ? 'bg-accent/30 hover:bg-accent/40'
-                        : 'bg-primary/10 hover:bg-primary/20'
-                    }`}
-                    onMouseEnter={() => questionsValt.setHoveredQuestion(question.number)}
-                    onMouseLeave={() => questionsValt.setHoveredQuestion(null)}
-                  >
-                    <button
-                      className={`QuestionNumber ${snap.selectedQuestionNumber === question.number ? 'active' : ''}`}
-                      onClick={() => questionsValt.setSelectedQuestion(question.number)}
+              <div className='flex flex-col gap-0'>
+                {snap.questions.map((question, index) => (
+                  <div key={question.id}>
+                    {/* Divider to insert question before */}
+                    {index > 0 && (
+                      <div
+                        className='h-[3px] my-2 cursor-pointer bg-transparent hover:bg-neutral transition-colors'
+                        onClick={() => handleInsertBefore(question.number)}
+                        title={`Insert question before ${question.number}`}
+                      />
+                    )}
+
+                    {/* Question button */}
+                    <div
+                      className={`group relative flex items-center justify-center rounded-md shadow-md ${
+                        snap.selectedQuestionNumber === question.number
+                          ? 'bg-accent/30 hover:bg-accent/40'
+                          : 'bg-primary/10 hover:bg-primary/20'
+                      }`}
                     >
-                      {question.number}
-                    </button>
+                      <button
+                        className={`QuestionNumber ${snap.selectedQuestionNumber === question.number ? 'active' : ''}`}
+                        onClick={() => questionsValt.setSelectedQuestion(question.number)}
+                      >
+                        {question.number}
+                      </button>
+
+                      {/* Delete button - visible on hover */}
+                      <button
+                        className='absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-error/20 cursor-pointer'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteQuestion(question.number);
+                        }}
+                        title='Delete question'
+                      >
+                        <Icon name='trash' className='size-3 text-error' />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -26,7 +26,6 @@ export interface QuestionsStore {
   languages: { code: string; name: string }[];
   questions: Question[];
   selectedQuestionNumber: number | null;
-  hoveredQuestionNumber: number | null;
 }
 
 export class QuestionsValt {
@@ -39,8 +38,7 @@ export class QuestionsValt {
       eventName: '',
       languages: [],
       questions: [],
-      selectedQuestionNumber: null,
-      hoveredQuestionNumber: null
+      selectedQuestionNumber: null
     });
   }
 
@@ -72,10 +70,6 @@ export class QuestionsValt {
 
   setSelectedQuestion(questionNumber: number | null) {
     this.store.selectedQuestionNumber = questionNumber;
-  }
-
-  setHoveredQuestion(questionNumber: number | null) {
-    this.store.hoveredQuestionNumber = questionNumber;
   }
 
   /**
@@ -241,15 +235,19 @@ export class QuestionsValt {
     });
 
     if (result.status === 200) {
-      const deletedQuestionNumber = this.store.questions.find((q) => q.id === questionId)?.number;
+      const deletedQuestion = this.store.questions.find((q) => q.id === questionId);
+      const deletedQuestionNumber = deletedQuestion?.number;
+      const deletedIndex = this.store.questions.findIndex((q) => q.id === questionId);
+
       this.store.questions = this.store.questions.filter((q) => q.id !== questionId);
 
       // Select a different question if the deleted one was selected
       if (this.store.selectedQuestionNumber === deletedQuestionNumber) {
         if (this.store.questions.length > 0) {
-          const firstQuestion = this.store.questions[0];
-          if (firstQuestion) {
-            this.store.selectedQuestionNumber = firstQuestion.number;
+          // Try to select the next question (at the same index), or the previous one if it was the last
+          const nextQuestion = this.store.questions[deletedIndex] || this.store.questions[deletedIndex - 1];
+          if (nextQuestion) {
+            this.store.selectedQuestionNumber = nextQuestion.number;
           }
         } else {
           this.store.selectedQuestionNumber = null;
