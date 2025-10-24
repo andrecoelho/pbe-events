@@ -42,7 +42,7 @@ export interface Team {
 export interface Question {
   id: string;
   number: number;
-  type: 'PS' | 'PW' | 'TF' | 'FB';
+  type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
   eventId: string;

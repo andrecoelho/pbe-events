@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
-export type QuestionType = 'PS' | 'PW' | 'TF' | 'FB';
+export type QuestionType = 'PG' | 'PS' | 'TF' | 'FB';
 
 export interface QuestionTranslation {
   id?: string; // Optional for new translations
@@ -298,9 +298,7 @@ export class QuestionsValt {
         // Translation was added by addTranslation
       } else if (result.ok && existingTranslation && !existingTranslation.id) {
         // Find the newly added translation (which has an id) and remove the placeholder
-        const newTranslation = question.translations.find(
-          (t) => t.languageCode === languageCode && t.id !== undefined
-        );
+        const newTranslation = question.translations.find((t) => t.languageCode === languageCode && t.id !== undefined);
         if (newTranslation) {
           // Remove the placeholder
           const placeholderIndex = question.translations.findIndex(

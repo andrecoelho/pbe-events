@@ -5,8 +5,8 @@
 # The import will override all existing languages for the event
 #
 # Question Types:
+#   PG = Points General (points awarded generally)
 #   PS = Points Specific (fixed points for correct answer)
-#   PW = Points per Word (points awarded per word in answer)
 #   TF = True/False (answer must be "true" or "false")
 #   FB = Fill in the Blank (answer fills in the blank)
 #
@@ -42,7 +42,7 @@ questions:
         prompt: La Tierra es plana.
         answer: false
 
-  - type: PW
+  - type: PG
     maxPoints: 20
     seconds: 60
     translations:

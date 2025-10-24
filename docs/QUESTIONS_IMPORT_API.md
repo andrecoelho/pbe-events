@@ -70,7 +70,7 @@ An array of question objects.
 ### Question Object Structure
 
 ```yaml
-- type: PS                  # Required: Question type (PS, PW, TF, or FB)
+- type: PS                  # Required: Question type (PG, PS, TF, or FB)
   maxPoints: 10             # Required: Maximum points (positive number)
   seconds: 30               # Required: Time limit in seconds (positive number)
   translations:             # Required: Array of question translations (at least one)
@@ -96,8 +96,8 @@ An array of question objects.
 
 ### Question Types
 
+- **PG** (Points General): Points awarded generally
 - **PS** (Points Specific): Fixed points awarded for correct answer
-- **PW** (Points per Word): Points awarded per word in the answer
 - **TF** (True/False): Answer must be "true" or "false" (case-insensitive)
 - **FB** (Fill in the Blank): Answer fills in the blank(s) in the question
 
@@ -195,7 +195,7 @@ questions:
 
 ```json
 {
-  "error": "Question 3: Invalid type \"XX\". Must be PS, PW, TF, or FB"
+  "error": "Question 3: Invalid type \"XX\". Must be PG, PS, TF, or FB"
 }
 ```
 
@@ -249,7 +249,7 @@ questions:
 4. **Language Code:** Must be a non-empty string and unique within the file
 5. **Language Name:** Must be a non-empty string
 6. **Questions Section:** Must be an array
-7. **Question Type:** Must be one of: PS, PW, TF, FB
+7. **Question Type:** Must be one of: PG, PS, TF, FB
 8. **Max Points:** Must be a positive number
 9. **Seconds:** Must be a positive number
 10. **Translations Array:** Must have at least one entry

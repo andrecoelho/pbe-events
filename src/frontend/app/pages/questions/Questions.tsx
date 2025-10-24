@@ -7,9 +7,9 @@ import { Loading } from '@/frontend/components/Loading';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
-const QUESTION_TYPE_OPTIONS = [
+const QUESTION_TYPES = [
+  { value: 'PG', label: 'Points General' },
   { value: 'PS', label: 'Points Specific' },
-  { value: 'PW', label: 'Points per Word' },
   { value: 'TF', label: 'True/False' },
   { value: 'FB', label: 'Fill in the Blank' }
 ];
@@ -59,11 +59,11 @@ export function Questions() {
   const selectedQuestion = snap.questions.find((q) => q.number === snap.selectedQuestionNumber);
 
   const handleAddQuestion = async () => {
-    await questionsValt.createQuestion('PW', 1, 30);
+    await questionsValt.createQuestion('PG', 1, 30);
   };
 
-  const handleInsertBefore = async (beforeNumber: number) => {
-    await questionsValt.insertQuestionBefore(beforeNumber, 'PW', 1, 30);
+  const handleInsertQuestionBefore = async (beforeNumber: number) => {
+    await questionsValt.insertQuestionBefore(beforeNumber, 'PG', 1, 30);
   };
 
   const handleDeleteQuestion = async (questionNumber: number) => {
@@ -151,7 +151,6 @@ export function Questions() {
         <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
       </div>
       <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
-
         {snap.questions.length === 0 && (
           <div className='text-center py-8'>
             <p className='text-neutral mb-4'>No questions yet. Add your first question to get started.</p>
@@ -166,10 +165,13 @@ export function Questions() {
               className='QuestionsList flex-none overflow-y-auto h-full relative'
               onScroll={checkScrollShadow}
               style={{
-                boxShadow: [
-                  showTopShadow ? 'inset 0 8px 8px -8px rgba(0, 0, 0, 0.2)' : '',
-                  showBottomShadow ? 'inset 0 -8px 8px -8px rgba(0, 0, 0, 0.2)' : ''
-                ].filter(Boolean).join(', ') || 'none'
+                boxShadow:
+                  [
+                    showTopShadow ? 'inset 0 8px 8px -8px rgba(0, 0, 0, 0.2)' : '',
+                    showBottomShadow ? 'inset 0 -8px 8px -8px rgba(0, 0, 0, 0.2)' : ''
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'none'
               }}
             >
               <div className='flex flex-col gap-0 p-4'>
@@ -179,7 +181,7 @@ export function Questions() {
                     {index > 0 && (
                       <div
                         className='h-[3px] my-2 cursor-pointer bg-transparent hover:bg-neutral transition-colors'
-                        onClick={() => handleInsertBefore(question.number)}
+                        onClick={() => handleInsertQuestionBefore(question.number)}
                         title={`Insert question before ${question.number}`}
                       />
                     )}
@@ -234,7 +236,7 @@ export function Questions() {
                         value={selectedQuestion.type}
                         onChange={(e) => handleQuestionTypeChange(e.target.value as QuestionType)}
                       >
-                        {QUESTION_TYPE_OPTIONS.map((option) => (
+                        {QUESTION_TYPES.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>

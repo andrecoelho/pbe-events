@@ -76,8 +76,8 @@ CREATE TABLE teams (
 CREATE TABLE questions (
   id TEXT NOT NULL,
   number INTEGER NOT NULL,
-  -- PS = Points Specific, PW = Points per Word, TF = True/False, FB = Fill in the Blank
-  type TEXT NOT NULL CHECK (type IN ('PS', 'PW', 'TF', 'FB')),
+  -- PG = Points General, PS = Points Specific, TF = True/False, FB = Fill in the Blank
+  type TEXT NOT NULL CHECK (type IN ('PG', 'PS', 'TF', 'FB')),
   maxPoints NUMERIC NOT NULL,
   seconds NUMERIC NOT NULL,
   eventId TEXT NOT NULL,

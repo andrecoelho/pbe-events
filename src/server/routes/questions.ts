@@ -24,7 +24,7 @@ interface QuestionTranslation {
 }
 
 interface QuestionImport {
-  type: 'PS' | 'PW' | 'TF' | 'FB';
+  type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
   translations: QuestionTranslation[];
@@ -244,7 +244,7 @@ function validateQuestionsData(data: unknown): {
   }
 
   const questions: QuestionImport[] = [];
-  const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
+  const validTypes = new Set(['PG', 'PS', 'TF', 'FB']);
 
   for (let i = 0; i < fileData.questions.length; i++) {
     const q = fileData.questions[i];
@@ -274,7 +274,7 @@ function validateQuestionsData(data: unknown): {
     if (!validTypes.has(q.type)) {
       return {
         valid: false,
-        error: `Question ${i + 1}${getPromptHint()}: Invalid type "${q.type}". Must be PS, PW, TF, or FB`
+        error: `Question ${i + 1}${getPromptHint()}: Invalid type "${q.type}". Must be PG, PS, TF, or FB`
       };
     }
 
@@ -554,9 +554,9 @@ export const questionsRoutes: Routes = {
       }
 
       // Validate type
-      const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
+      const validTypes = new Set(['PG', 'PS', 'TF', 'FB']);
       if (!validTypes.has(type)) {
-        return apiBadRequest('Invalid type. Must be PS, PW, TF, or FB');
+        return apiBadRequest('Invalid type. Must be PG, PS, TF, or FB');
       }
 
       // Validate numeric values
@@ -762,7 +762,7 @@ export const questionsRoutes: Routes = {
         }));
 
         questionsExport.push({
-          type: question.type as 'PS' | 'PW' | 'TF' | 'FB',
+          type: question.type as 'PG' | 'PS' | 'TF' | 'FB',
           maxPoints: question.maxPoints,
           seconds: question.seconds,
           translations
@@ -831,7 +831,7 @@ export const questionsRoutes: Routes = {
       const body = await req.json();
       const { number, type, maxPoints, seconds } = body as {
         number?: number;
-        type?: 'PS' | 'PW' | 'TF' | 'FB';
+        type?: 'PG' | 'PS' | 'TF' | 'FB';
         maxPoints?: number;
         seconds?: number;
       };
@@ -842,9 +842,9 @@ export const questionsRoutes: Routes = {
       }
 
       if (type !== undefined) {
-        const validTypes = new Set(['PS', 'PW', 'TF', 'FB']);
+        const validTypes = new Set(['PG', 'PS', 'TF', 'FB']);
         if (!validTypes.has(type)) {
-          return apiBadRequest('Invalid type. Must be PS, PW, TF, or FB');
+          return apiBadRequest('Invalid type. Must be PG, PS, TF, or FB');
         }
       }
 
