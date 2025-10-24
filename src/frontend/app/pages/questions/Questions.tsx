@@ -172,7 +172,7 @@ export function Questions() {
                 ].filter(Boolean).join(', ') || 'none'
               }}
             >
-              <div className='flex flex-col gap-0'>
+              <div className='flex flex-col gap-0 p-4'>
                 {snap.questions.map((question, index) => (
                   <div key={question.id}>
                     {/* Divider to insert question before */}
