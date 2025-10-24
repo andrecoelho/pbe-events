@@ -31,6 +31,26 @@ export function Questions() {
   const { questionsValt } = useMemo(init, []);
   const snap = useSnapshot(questionsValt.store);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const questionsListRef = useRef<HTMLDivElement>(null);
+  const [showBottomShadow, setShowBottomShadow] = useState(false);
+  const [showTopShadow, setShowTopShadow] = useState(false);
+
+  const checkScrollShadow = () => {
+    const element = questionsListRef.current;
+    if (!element) return;
+
+    const hasScroll = element.scrollHeight > element.clientHeight;
+    const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 1;
+    const isScrolled = element.scrollTop > 0;
+
+    setShowBottomShadow(hasScroll && !isAtBottom);
+    setShowTopShadow(isScrolled);
+  };
+
+  useEffect(() => {
+    checkScrollShadow();
+    // Recheck when questions change
+  }, [snap.questions.length]);
 
   if (!snap.initialized) {
     return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
@@ -126,11 +146,12 @@ export function Questions() {
 
   return (
     <div className='Questions bg-base-100 flex-1 relative flex flex-col overflow-hidden'>
-      <div className='flex-1 overflow-auto p-8'>
+      <div className='flex-none p-8 pb-4'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Questions</h1>
         <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
+      </div>
+      <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
 
-        {/* Questions List and Editor */}
         {snap.questions.length === 0 && (
           <div className='text-center py-8'>
             <p className='text-neutral mb-4'>No questions yet. Add your first question to get started.</p>
@@ -138,14 +159,28 @@ export function Questions() {
         )}
 
         {snap.questions.length > 0 && (
-          <div className='QuestionsEditor flex gap-6'>
+          <div className='QuestionsEditor flex gap-6 flex-1 min-h-0'>
             {/* Question Numbers Column */}
-            <div className='QuestionsList flex-shrink-0'>
+            <div
+              ref={questionsListRef}
+              className='QuestionsList flex-none overflow-y-auto h-full relative'
+              onScroll={checkScrollShadow}
+              style={{
+                boxShadow: [
+                  showTopShadow ? 'inset 0 8px 8px -8px rgba(0, 0, 0, 0.2)' : '',
+                  showBottomShadow ? 'inset 0 -8px 8px -8px rgba(0, 0, 0, 0.2)' : ''
+                ].filter(Boolean).join(', ') || 'none'
+              }}
+            >
               <div className='flex flex-col gap-2'>
                 {snap.questions.map((question) => (
                   <div
                     key={question.id}
-                    className='relative'
+                    className={`relative flex items-center justify-center rounded-md shadow-md ${
+                      snap.selectedQuestionNumber === question.number
+                        ? 'bg-accent/30 hover:bg-accent/40'
+                        : 'bg-primary/10 hover:bg-primary/20'
+                    }`}
                     onMouseEnter={() => questionsValt.setHoveredQuestion(question.number)}
                     onMouseLeave={() => questionsValt.setHoveredQuestion(null)}
                   >
@@ -155,23 +190,6 @@ export function Questions() {
                     >
                       {question.number}
                     </button>
-
-                    {/* Hover Popover */}
-                    {snap.hoveredQuestionNumber === question.number && (
-                      <div className='QuestionActions'>
-                        <button
-                          className='btn btn-xs btn-secondary'
-                          onClick={() => handleInsertBefore(question.number)}
-                        >
-                          <Icon name='plus' className='size-3' />
-                          Insert Before
-                        </button>
-                        <button className='btn btn-xs btn-error' onClick={() => handleDeleteQuestion(question.number)}>
-                          <Icon name='trash' className='size-3' />
-                          Delete
-                        </button>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -179,7 +197,7 @@ export function Questions() {
 
             {/* Question Editor */}
             {selectedQuestion && (
-              <div className='QuestionEditor flex-1'>
+              <div className='QuestionEditor flex-1 overflow-y-auto h-full'>
                 <h3 className='text-xl font-bold mb-4'>Question {selectedQuestion.number}</h3>
 
                 {/* Question Metadata Section */}
