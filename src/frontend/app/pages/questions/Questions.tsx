@@ -59,11 +59,11 @@ export function Questions() {
   const selectedQuestion = snap.questions.find((q) => q.number === snap.selectedQuestionNumber);
 
   const handleAddQuestion = async () => {
-    await questionsValt.createQuestion('PS', 1, 30);
+    await questionsValt.createQuestion('PW', 1, 30);
   };
 
   const handleInsertBefore = async (beforeNumber: number) => {
-    await questionsValt.insertQuestionBefore(beforeNumber, 'PS', 11, 30);
+    await questionsValt.insertQuestionBefore(beforeNumber, 'PW', 1, 30);
   };
 
   const handleDeleteQuestion = async (questionNumber: number) => {
