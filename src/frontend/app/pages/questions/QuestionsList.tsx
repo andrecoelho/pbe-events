@@ -45,8 +45,7 @@ export const QuestionsList = memo(() => {
         {snap.questions.map((question, index) => (
           <QuestionListItem
             key={question.id}
-            questionId={question.id}
-            questionNumber={question.number}
+            question={question}
             isSelected={snap.selectedQuestion?.number === question.number}
             isFirst={index === 0}
           />

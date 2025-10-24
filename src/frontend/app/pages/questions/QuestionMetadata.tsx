@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { useSnapshot } from 'valtio';
 import { useQuestionsValt, type QuestionType } from './questionsValt';
 
 const QUESTION_TYPES = [
@@ -9,25 +8,28 @@ const QUESTION_TYPES = [
   { value: 'FB', label: 'Fill in the Blank' }
 ];
 
-export const QuestionMetadata = memo(() => {
-  const questionsValt = useQuestionsValt();
-  const snap = useSnapshot(questionsValt.store);
+interface QuestionMetadataProps {
+  question: {
+    readonly id: string;
+    readonly type: QuestionType;
+    readonly maxPoints: number;
+    readonly seconds: number;
+  };
+}
 
-  if (!snap.selectedQuestion) return null;
+export const QuestionMetadata = memo(({ question }: QuestionMetadataProps) => {
+  const questionsValt = useQuestionsValt();
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
-    if (!snap.selectedQuestion) return;
-    await questionsValt.updateQuestion(snap.selectedQuestion.id, { type });
+    await questionsValt.updateQuestion(question.id, { type });
   };
 
   const handleMaxPointsChange = async (maxPoints: number) => {
-    if (!snap.selectedQuestion) return;
-    await questionsValt.updateQuestion(snap.selectedQuestion.id, { maxPoints });
+    await questionsValt.updateQuestion(question.id, { maxPoints });
   };
 
   const handleSecondsChange = async (seconds: number) => {
-    if (!snap.selectedQuestion) return;
-    await questionsValt.updateQuestion(snap.selectedQuestion.id, { seconds });
+    await questionsValt.updateQuestion(question.id, { seconds });
   };
 
   return (
@@ -40,7 +42,7 @@ export const QuestionMetadata = memo(() => {
           </label>
           <select
             className='select select-bordered w-full'
-            value={snap.selectedQuestion.type}
+            value={question.type}
             onChange={(e) => handleQuestionTypeChange(e.target.value as QuestionType)}
           >
             {QUESTION_TYPES.map((option) => (
@@ -60,7 +62,7 @@ export const QuestionMetadata = memo(() => {
             type='number'
             className='input input-bordered w-full'
             min='1'
-            value={snap.selectedQuestion.maxPoints}
+            value={question.maxPoints}
             onChange={(e) => handleMaxPointsChange(Number(e.target.value))}
           />
         </div>
@@ -74,7 +76,7 @@ export const QuestionMetadata = memo(() => {
             type='number'
             className='input input-bordered w-full'
             min='1'
-            value={snap.selectedQuestion.seconds}
+            value={question.seconds}
             onChange={(e) => handleSecondsChange(Number(e.target.value))}
           />
         </div>

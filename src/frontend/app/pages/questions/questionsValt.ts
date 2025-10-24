@@ -164,7 +164,7 @@ export class QuestionsValt {
    * Update question metadata (number, type, maxPoints, seconds)
    */
   async updateQuestion(
-    questionId: string,
+    questionIdOrQuestion: string | Question,
     updates: {
       number?: number;
       type?: QuestionType;
@@ -172,13 +172,15 @@ export class QuestionsValt {
       seconds?: number;
     }
   ) {
-    const question = this.store.questions.find((q) => q.id === questionId);
+    const question = typeof questionIdOrQuestion === 'string'
+      ? this.store.questions.find((q) => q.id === questionIdOrQuestion)
+      : questionIdOrQuestion;
 
     if (!question) {
       return { ok: false, error: 'Question not found' };
     }
 
-    const result = await fetch(`/api/questions/${questionId}`, {
+    const result = await fetch(`/api/questions/${question.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -192,7 +194,7 @@ export class QuestionsValt {
 
         // Update all affected question numbers
         this.store.questions.forEach((q) => {
-          if (q.id === questionId) {
+          if (q.id === question.id) {
             q.number = newNumber;
           } else if (newNumber < oldNumber) {
             // Moving earlier: increment questions between new and old positions
@@ -235,30 +237,34 @@ export class QuestionsValt {
   /**
    * Delete a question
    */
-  async deleteQuestion(questionId: string) {
-    const result = await fetch(`/api/questions/${questionId}`, {
+  async deleteQuestion(questionIdOrQuestion: string | Question) {
+    const question = typeof questionIdOrQuestion === 'string'
+      ? this.store.questions.find((q) => q.id === questionIdOrQuestion)
+      : questionIdOrQuestion;
+
+    if (!question) {
+      return { ok: false, error: 'Question not found' };
+    }
+
+    const result = await fetch(`/api/questions/${question.id}`, {
       method: 'DELETE'
     });
 
     if (result.status === 200) {
-      const deletedQuestion = this.store.questions.find((q) => q.id === questionId);
-      const deletedQuestionNumber = deletedQuestion?.number;
-      const deletedIndex = this.store.questions.findIndex((q) => q.id === questionId);
+      const deletedIndex = this.store.questions.findIndex((q) => q.id === question.id);
 
       // Remove the deleted question
-      this.store.questions = this.store.questions.filter((q) => q.id !== questionId);
+      this.store.questions = this.store.questions.filter((q) => q.id !== question.id);
 
       // Shift down the question numbers for all questions after the deleted one
-      if (deletedQuestionNumber !== undefined) {
-        this.store.questions.forEach((q) => {
-          if (q.number > deletedQuestionNumber) {
-            q.number -= 1;
-          }
-        });
-      }
+      this.store.questions.forEach((q) => {
+        if (q.number > question.number) {
+          q.number -= 1;
+        }
+      });
 
       // Select a different question if the deleted one was selected
-      if (this.store.selectedQuestion?.number === deletedQuestionNumber) {
+      if (this.store.selectedQuestion?.number === question.number) {
         if (this.store.questions.length > 0) {
           // Try to select the next question (at the same index), or the previous one if it was the last
           const nextQuestion = this.store.questions[deletedIndex] || this.store.questions[deletedIndex - 1];
@@ -286,8 +292,10 @@ export class QuestionsValt {
    * Update or create a translation for a question
    * If the translation exists, update it. Otherwise, create it.
    */
-  async upsertTranslation(questionId: string, languageCode: string, prompt: string, answer: string) {
-    const question = this.store.questions.find((q) => q.id === questionId);
+  async upsertTranslation(questionIdOrQuestion: string | Question, languageCode: string, prompt: string, answer: string) {
+    const question = typeof questionIdOrQuestion === 'string'
+      ? this.store.questions.find((q) => q.id === questionIdOrQuestion)
+      : questionIdOrQuestion;
 
     if (!question) {
       return { ok: false, error: 'Question not found' };
@@ -301,7 +309,7 @@ export class QuestionsValt {
       return await this.updateTranslation(existingTranslation.id, prompt, answer);
     } else {
       // Create new translation
-      const result = await this.addTranslation(questionId, languageCode, prompt, answer);
+      const result = await this.addTranslation(question, languageCode, prompt, answer);
 
       // If translation was created but doesn't have an existing entry in the array, we need to update it
       if (result.ok && !existingTranslation) {
@@ -327,14 +335,16 @@ export class QuestionsValt {
   /**
    * Add a translation to a question
    */
-  async addTranslation(questionId: string, languageCode: string, prompt: string, answer: string) {
-    const question = this.store.questions.find((q) => q.id === questionId);
+  async addTranslation(questionIdOrQuestion: string | Question, languageCode: string, prompt: string, answer: string) {
+    const question = typeof questionIdOrQuestion === 'string'
+      ? this.store.questions.find((q) => q.id === questionIdOrQuestion)
+      : questionIdOrQuestion;
 
     if (!question) {
       return { ok: false, error: 'Question not found' };
     }
 
-    const result = await fetch(`/api/questions/${questionId}/translations`, {
+    const result = await fetch(`/api/questions/${question.id}/translations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ languageCode, questionPrompt: prompt, answer })

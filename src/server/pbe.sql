@@ -97,6 +97,7 @@ CREATE TABLE questionTranslations (
   PRIMARY KEY (id),
   FOREIGN KEY (languageCode) REFERENCES languages(code) ON DELETE CASCADE,
   FOREIGN KEY (questionId) REFERENCES questions(id) ON DELETE CASCADE
+  UNIQUE (languageCode, questionId)
 );
 
 CREATE TABLE answers (

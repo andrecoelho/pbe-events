@@ -1,26 +1,25 @@
 import { memo } from 'react';
-import { useSnapshot } from 'valtio';
 import { useQuestionsValt, type IQuestionTranslation } from './questionsValt';
 
 interface QuestionTranslationFieldsProps {
+  question: {
+    readonly id: string;
+    readonly type: string;
+  };
   languageCode: string;
   languageName: string;
   translation: IQuestionTranslation | undefined;
-  questionType: string;
 }
 
 export const QuestionTranslation = memo(
-  ({ languageCode, languageName, translation, questionType }: QuestionTranslationFieldsProps) => {
+  ({ question, languageCode, languageName, translation }: QuestionTranslationFieldsProps) => {
     const questionsValt = useQuestionsValt();
-    const snap = useSnapshot(questionsValt.store);
 
     const handleTranslationChange = async (field: 'prompt' | 'answer', value: string) => {
-      if (!snap.selectedQuestion) return;
-
       const prompt = field === 'prompt' ? value : translation?.prompt ?? '';
       const answer = field === 'answer' ? value : translation?.answer ?? '';
 
-      await questionsValt.upsertTranslation(snap.selectedQuestion.id, languageCode, prompt, answer);
+      await questionsValt.upsertTranslation(question.id, languageCode, prompt, answer);
     };
 
     return (
@@ -48,7 +47,7 @@ export const QuestionTranslation = memo(
             <label className='label'>
               <span className='label-text'>Answer</span>
             </label>
-            {questionType === 'TF' ? (
+            {question.type === 'TF' ? (
               <label className='label cursor-pointer justify-start gap-2 flex place-items-center mt-2'>
                 <input
                   type='checkbox'

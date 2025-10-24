@@ -4,31 +4,33 @@ import { memo } from 'react';
 import { useQuestionsValt } from './questionsValt';
 
 interface QuestionListItemProps {
-  questionId: string;
-  questionNumber: number;
+  question: {
+    readonly id: string;
+    readonly number: number;
+  };
   isSelected: boolean;
   isFirst: boolean;
 }
 
-export const QuestionListItem = memo(({ questionId, questionNumber, isSelected, isFirst }: QuestionListItemProps) => {
+export const QuestionListItem = memo(({ question, isSelected, isFirst }: QuestionListItemProps) => {
   const questionsValt = useQuestionsValt();
 
   const handleInsertBefore = async () => {
-    await questionsValt.insertQuestionBefore(questionNumber, 'PG', 1, 30);
+    await questionsValt.insertQuestionBefore(question.number, 'PG', 1, 30);
   };
 
   const handleDelete = async () => {
     const confirmed = await confirmModal.open(
-      `Are you sure you want to delete question ${questionNumber}? This action cannot be undone.`
+      `Are you sure you want to delete question ${question.number}? This action cannot be undone.`
     );
 
     if (confirmed) {
-      await questionsValt.deleteQuestion(questionId);
+      await questionsValt.deleteQuestion(question.id);
     }
   };
 
   const handleSelect = () => {
-    questionsValt.setSelectedQuestion(questionNumber);
+    questionsValt.setSelectedQuestion(question.number);
   };
 
   return (
@@ -38,7 +40,7 @@ export const QuestionListItem = memo(({ questionId, questionNumber, isSelected, 
         <div
           className='h-[3px] my-2 cursor-pointer bg-transparent hover:bg-neutral transition-colors'
           onClick={handleInsertBefore}
-          title={`Insert question before ${questionNumber}`}
+          title={`Insert question before ${question.number}`}
         />
       )}
 
@@ -49,7 +51,7 @@ export const QuestionListItem = memo(({ questionId, questionNumber, isSelected, 
         }`}
       >
         <button className={`QuestionNumber ${isSelected ? 'active' : ''}`} onClick={handleSelect}>
-          {questionNumber}
+          {question.number}
         </button>
 
         {/* Delete button - visible on hover */}
