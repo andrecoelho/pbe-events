@@ -152,6 +152,12 @@ const queryIncrementQuestionNumbers = db.query<{}, { $eventId: string; $fromNumb
    WHERE eventId = $eventId AND number >= $fromNumber`
 );
 
+// Decrement question numbers for reordering (shift questions down)
+const queryDecrementQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
+  `UPDATE questions SET number = number - 1
+   WHERE eventId = $eventId AND number > $fromNumber`
+);
+
 // Update just the question number
 const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>(
   `UPDATE questions SET number = $number WHERE id = $id`
@@ -933,7 +939,18 @@ export const questionsRoutes: Routes = {
       }
 
       try {
-        queryDeleteQuestion.run({ $id: questionId });
+        // Use a transaction to delete the question and shift numbers down atomically
+        db.transaction(() => {
+          // Delete the question
+          queryDeleteQuestion.run({ $id: questionId });
+
+          // Shift all questions after this one down by decrementing their numbers
+          queryDecrementQuestionNumbers.run({
+            $eventId: question.eventId,
+            $fromNumber: question.number
+          });
+        })();
+
         return apiData({ ok: true });
       } catch (error) {
         console.error('Error deleting question:', error);

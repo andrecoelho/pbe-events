@@ -239,7 +239,17 @@ export class QuestionsValt {
       const deletedQuestionNumber = deletedQuestion?.number;
       const deletedIndex = this.store.questions.findIndex((q) => q.id === questionId);
 
+      // Remove the deleted question
       this.store.questions = this.store.questions.filter((q) => q.id !== questionId);
+
+      // Shift down the question numbers for all questions after the deleted one
+      if (deletedQuestionNumber !== undefined) {
+        this.store.questions.forEach((q) => {
+          if (q.number > deletedQuestionNumber) {
+            q.number -= 1;
+          }
+        });
+      }
 
       // Select a different question if the deleted one was selected
       if (this.store.selectedQuestionNumber === deletedQuestionNumber) {
