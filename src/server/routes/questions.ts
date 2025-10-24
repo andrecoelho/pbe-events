@@ -146,10 +146,16 @@ const queryGetMaxQuestionNumber = db.query<{ maxNumber: number | null }, { $even
   `SELECT MAX(number) as maxNumber FROM questions WHERE eventId = $eventId`
 );
 
-// Increment question numbers for reordering (shift questions up)
-const queryIncrementQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
-  `UPDATE questions SET number = number + 1
+// Invert question numbers for reordering (shift questions up)
+const queryInvertQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
+  `UPDATE questions SET number = (number * (-1)) - 1
    WHERE eventId = $eventId AND number >= $fromNumber`
+);
+
+// Invert question numbers back to positive for reordering (shift questions up)
+const queryInvertNegativeQuestionNumbers = db.query<{}, { $eventId: string }>(
+  `UPDATE questions SET number = number * (-1)
+   WHERE eventId = $eventId AND number < 0`
 );
 
 // Decrement question numbers for reordering (shift questions down)
@@ -570,10 +576,12 @@ export const questionsRoutes: Routes = {
         if (insertBefore !== undefined) {
           // Insert before specific question: increment all questions >= insertBefore
           db.transaction(() => {
-            queryIncrementQuestionNumbers.run({
+            queryInvertQuestionNumbers.run({
               $eventId: eventId,
               $fromNumber: insertBefore
             });
+
+            queryInvertNegativeQuestionNumbers.run({ $eventId: eventId });
 
             questionNumber = insertBefore;
 
