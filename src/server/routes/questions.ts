@@ -997,11 +997,11 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { languageCode, questionBody, answer } = body;
+      const { languageCode, questionPrompt, answer } = body;
 
       // Validate required fields
-      if (!languageCode || !questionBody || !answer) {
-        return apiBadRequest('Missing required fields: languageCode, questionBody, and answer');
+      if (!languageCode || !questionPrompt || !answer) {
+        return apiBadRequest('Missing required fields: languageCode, questionPrompt, and answer');
       }
 
       // Validate that the language exists for this event
@@ -1025,13 +1025,13 @@ export const questionsRoutes: Routes = {
 
         queryInsertQuestionTranslation.run({
           $id: translationId,
-          $prompt: questionBody.trim(),
+          $prompt: questionPrompt.trim(),
           $answer: answer.trim(),
           $languageCode: languageCode,
           $questionId: questionId
         });
 
-        return apiData({ id: translationId, languageCode, prompt: questionBody.trim(), answer: answer.trim() });
+        return apiData({ id: translationId, languageCode, prompt: questionPrompt.trim(), answer: answer.trim() });
       } catch (error) {
         console.error('Error creating question translation:', error);
         return apiServerError('Failed to create question translation');
@@ -1076,11 +1076,11 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      const { questionBody, answer } = body;
+      const { questionPrompt, answer } = body;
 
       // Validate fields if provided
-      if (questionBody !== undefined && typeof questionBody !== 'string') {
-        return apiBadRequest('questionBody must be a string');
+      if (questionPrompt !== undefined && typeof questionPrompt !== 'string') {
+        return apiBadRequest('questionPrompt must be a string');
       }
 
       if (answer !== undefined && typeof answer !== 'string') {
@@ -1098,7 +1098,7 @@ export const questionsRoutes: Routes = {
       try {
         queryUpdateQuestionTranslation.run({
           $id: translationId,
-          $prompt: questionBody !== undefined ? questionBody.trim() : questionTranslation.prompt,
+          $prompt: questionPrompt !== undefined ? questionPrompt.trim() : questionTranslation.prompt,
           $answer: answer !== undefined ? answer.trim() : questionTranslation.answer
         });
 

@@ -327,7 +327,7 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/${questionId}/translations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ languageCode, questionBody: prompt, answer })
+      body: JSON.stringify({ languageCode, questionPrompt: prompt, answer })
     });
 
     if (result.status === 200) {
@@ -376,7 +376,7 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/translations/${translationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionBody: prompt, answer })
+      body: JSON.stringify({ questionPrompt: prompt, answer })
     });
 
     if (result.status === 200) {

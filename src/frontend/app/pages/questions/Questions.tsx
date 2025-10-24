@@ -276,12 +276,14 @@ export function Questions() {
 
                 {/* Translations Section */}
                 <div className='QuestionTranslations'>
-                  <h4 className='text-lg font-semibold mb-3'>Translations</h4>
                   <div className='flex flex-col gap-4'>
                     {snap.languages.map((language) => {
                       const translation = selectedQuestion.translations.find((t) => t.languageCode === language.code);
                       return (
-                        <fieldset key={language.code} className='fieldset bg-base-300 border-neutral rounded-box border p-4'>
+                        <fieldset
+                          key={language.code}
+                          className='fieldset bg-base-300 border-neutral rounded-box border p-4'
+                        >
                           <legend className='fieldset-legend'>
                             {language.name} ({language.code.toUpperCase()})
                           </legend>
@@ -306,15 +308,25 @@ export function Questions() {
                                 <span className='label-text'>Answer</span>
                               </label>
                               {selectedQuestion.type === 'TF' ? (
-                                <select
-                                  className='select select-bordered w-full'
-                                  value={translation?.answer || ''}
-                                  onChange={(e) => handleTranslationChange(language.code, 'answer', e.target.value)}
-                                >
-                                  <option value=''>Select answer...</option>
-                                  <option value='true'>True</option>
-                                  <option value='false'>False</option>
-                                </select>
+                                <label className='label cursor-pointer justify-start gap-2 flex place-items-center mt-2'>
+                                  <input
+                                    type='checkbox'
+                                    className={`toggle ${
+                                      translation?.answer === 'true' ? 'toggle-success' : 'toggle-error'
+                                    }`}
+                                    checked={translation?.answer === 'true'}
+                                    onChange={(e) =>
+                                      handleTranslationChange(
+                                        language.code,
+                                        'answer',
+                                        e.target.checked ? 'true' : 'false'
+                                      )
+                                    }
+                                  />
+                                  <span className={`text-base ${translation?.answer === 'true' ? 'text-success' : 'text-error'}`}>
+                                    {translation?.answer === 'true' ? 'True' : 'False'}
+                                  </span>
+                                </label>
                               ) : (
                                 <input
                                   type='text'
