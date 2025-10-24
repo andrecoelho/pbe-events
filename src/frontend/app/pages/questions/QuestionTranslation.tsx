@@ -76,4 +76,4 @@ export const QuestionTranslation = memo(
   }
 );
 
-QuestionTranslation.displayName = 'QuestionTranslationFields';
+QuestionTranslation.displayName = 'QuestionTranslation';
