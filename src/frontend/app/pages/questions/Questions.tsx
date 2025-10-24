@@ -341,7 +341,7 @@ export function Questions() {
           <Icon name='arrow-down-tray' className='size-4' />
           Import
         </button>
-        <button className='btn btn-secondary' onClick={handleExport} disabled={snap.questions.length === 0}>
+        <button className='btn btn-accent' onClick={handleExport} disabled={snap.questions.length === 0}>
           <Icon name='arrow-up-tray' className='size-4' />
           Export
         </button>
