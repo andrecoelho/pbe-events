@@ -56,8 +56,6 @@ export function Questions() {
     return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
   }
 
-  const selectedQuestion = snap.questions.find((q) => q.number === snap.selectedQuestionNumber);
-
   const handleAddQuestion = async () => {
     await questionsValt.createQuestion('PG', 1, 30);
   };
@@ -80,41 +78,41 @@ export function Questions() {
   };
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
-    if (!selectedQuestion) {
+    if (!snap.selectedQuestion) {
       return;
     }
 
-    await questionsValt.updateQuestion(selectedQuestion.id, { type });
+    await questionsValt.updateQuestion(snap.selectedQuestion.id, { type });
   };
 
   const handleMaxPointsChange = async (maxPoints: number) => {
-    if (!selectedQuestion) {
+    if (!snap.selectedQuestion) {
       return;
     }
 
-    await questionsValt.updateQuestion(selectedQuestion.id, { maxPoints });
+    await questionsValt.updateQuestion(snap.selectedQuestion.id, { maxPoints });
   };
 
   const handleSecondsChange = async (seconds: number) => {
-    if (!selectedQuestion) {
+    if (!snap.selectedQuestion) {
       return;
     }
 
-    await questionsValt.updateQuestion(selectedQuestion.id, { seconds });
+    await questionsValt.updateQuestion(snap.selectedQuestion.id, { seconds });
   };
 
   const handleTranslationChange = async (languageCode: string, field: 'prompt' | 'answer', value: string) => {
-    if (!selectedQuestion) {
+    if (!snap.selectedQuestion) {
       return;
     }
 
-    const translation = selectedQuestion.translations.find((t) => t.languageCode === languageCode);
+    const translation = snap.selectedQuestion.translations.find((t) => t.languageCode === languageCode);
 
     if (translation) {
       const prompt = field === 'prompt' ? value : translation.prompt;
       const answer = field === 'answer' ? value : translation.answer;
 
-      await questionsValt.upsertTranslation(selectedQuestion.id, languageCode, prompt, answer);
+      await questionsValt.upsertTranslation(snap.selectedQuestion.id, languageCode, prompt, answer);
     }
   };
 
@@ -189,13 +187,15 @@ export function Questions() {
                     {/* Question button */}
                     <div
                       className={`group relative flex items-center justify-center rounded-md shadow-md ${
-                        snap.selectedQuestionNumber === question.number
+                        snap.selectedQuestion?.number === question.number
                           ? 'bg-accent/30 hover:bg-accent/40'
                           : 'bg-primary/10 hover:bg-primary/20'
                       }`}
                     >
                       <button
-                        className={`QuestionNumber ${snap.selectedQuestionNumber === question.number ? 'active' : ''}`}
+                        className={`QuestionNumber ${
+                          snap.selectedQuestion?.number === question.number ? 'active' : ''
+                        }`}
                         onClick={() => questionsValt.setSelectedQuestion(question.number)}
                       >
                         {question.number}
@@ -219,9 +219,9 @@ export function Questions() {
             </div>
 
             {/* Question Editor */}
-            {selectedQuestion && (
+            {snap.selectedQuestion && (
               <div className='QuestionEditor flex-1 overflow-y-auto h-full'>
-                <h3 className='text-xl font-bold mb-4'>Question {selectedQuestion.number}</h3>
+                <h3 className='text-xl font-bold mb-4'>Question {snap.selectedQuestion.number}</h3>
 
                 {/* Question Metadata Section */}
                 <fieldset className='fieldset bg-base-300 border-neutral rounded-box border p-4 mb-6'>
@@ -233,7 +233,7 @@ export function Questions() {
                       </label>
                       <select
                         className='select select-bordered w-full'
-                        value={selectedQuestion.type}
+                        value={snap.selectedQuestion.type}
                         onChange={(e) => handleQuestionTypeChange(e.target.value as QuestionType)}
                       >
                         {QUESTION_TYPES.map((option) => (
@@ -253,7 +253,7 @@ export function Questions() {
                         type='number'
                         className='input input-bordered w-full'
                         min='1'
-                        value={selectedQuestion.maxPoints}
+                        value={snap.selectedQuestion.maxPoints}
                         onChange={(e) => handleMaxPointsChange(Number(e.target.value))}
                       />
                     </div>
@@ -267,7 +267,7 @@ export function Questions() {
                         type='number'
                         className='input input-bordered w-full'
                         min='1'
-                        value={selectedQuestion.seconds}
+                        value={snap.selectedQuestion.seconds}
                         onChange={(e) => handleSecondsChange(Number(e.target.value))}
                       />
                     </div>
@@ -278,7 +278,10 @@ export function Questions() {
                 <div className='QuestionTranslations'>
                   <div className='flex flex-col gap-4'>
                     {snap.languages.map((language) => {
-                      const translation = selectedQuestion.translations.find((t) => t.languageCode === language.code);
+                      const translation = snap.selectedQuestion?.translations.find(
+                        (t) => t.languageCode === language.code
+                      );
+
                       return (
                         <fieldset
                           key={language.code}
@@ -307,7 +310,7 @@ export function Questions() {
                               <label className='label'>
                                 <span className='label-text'>Answer</span>
                               </label>
-                              {selectedQuestion.type === 'TF' ? (
+                              {snap.selectedQuestion?.type === 'TF' ? (
                                 <label className='label cursor-pointer justify-start gap-2 flex place-items-center mt-2'>
                                   <input
                                     type='checkbox'
@@ -323,7 +326,11 @@ export function Questions() {
                                       )
                                     }
                                   />
-                                  <span className={`text-base ${translation?.answer === 'true' ? 'text-success' : 'text-error'}`}>
+                                  <span
+                                    className={`text-base ${
+                                      translation?.answer === 'true' ? 'text-success' : 'text-error'
+                                    }`}
+                                  >
                                     {translation?.answer === 'true' ? 'True' : 'False'}
                                   </span>
                                 </label>

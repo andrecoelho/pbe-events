@@ -25,7 +25,7 @@ export interface QuestionsStore {
   eventName: string;
   languages: { code: string; name: string }[];
   questions: Question[];
-  selectedQuestionNumber: number | null;
+  selectedQuestion: Question | null;
 }
 
 export class QuestionsValt {
@@ -38,7 +38,7 @@ export class QuestionsValt {
       eventName: '',
       languages: [],
       questions: [],
-      selectedQuestionNumber: null
+      selectedQuestion: null
     });
   }
 
@@ -62,14 +62,14 @@ export class QuestionsValt {
       if (response.questions.length > 0) {
         const firstQuestion = response.questions[0];
         if (firstQuestion) {
-          this.store.selectedQuestionNumber = firstQuestion.number;
+          this.store.selectedQuestion = firstQuestion;
         }
       }
     }
   }
 
   setSelectedQuestion(questionNumber: number | null) {
-    this.store.selectedQuestionNumber = questionNumber;
+    this.store.selectedQuestion = this.store.questions.find((q) => q.number === questionNumber) ?? null;
   }
 
   /**
@@ -111,7 +111,10 @@ export class QuestionsValt {
       this.store.questions.sort((a, b) => a.number - b.number);
 
       // Select the newly added question
-      this.store.selectedQuestionNumber = response.number;
+      const newQuestion = this.store.questions.find((q) => q.id === response.id);
+      if (newQuestion) {
+        this.store.selectedQuestion = newQuestion;
+      }
 
       return { ok: true };
     }
@@ -144,7 +147,10 @@ export class QuestionsValt {
       await this.init(this.store.eventId);
 
       // Select the newly inserted question
-      this.store.selectedQuestionNumber = beforeNumber;
+      const newQuestion = this.store.questions.find((q) => q.number === beforeNumber);
+      if (newQuestion) {
+        this.store.selectedQuestion = newQuestion;
+      }
 
       return { ok: true };
     }
@@ -252,16 +258,20 @@ export class QuestionsValt {
       }
 
       // Select a different question if the deleted one was selected
-      if (this.store.selectedQuestionNumber === deletedQuestionNumber) {
+      if (this.store.selectedQuestion?.number === deletedQuestionNumber) {
         if (this.store.questions.length > 0) {
           // Try to select the next question (at the same index), or the previous one if it was the last
           const nextQuestion = this.store.questions[deletedIndex] || this.store.questions[deletedIndex - 1];
-          if (nextQuestion) {
-            this.store.selectedQuestionNumber = nextQuestion.number;
-          }
+          this.store.selectedQuestion = nextQuestion ?? null;
         } else {
-          this.store.selectedQuestionNumber = null;
+          this.store.selectedQuestion = null;
         }
+      } else if (this.store.selectedQuestion) {
+        // Update the reference to the selected question after deletion
+        const updatedSelectedQuestion = this.store.questions.find(
+          (q) => q.id === this.store.selectedQuestion?.id
+        );
+        this.store.selectedQuestion = updatedSelectedQuestion ?? null;
       }
 
       return { ok: true };
