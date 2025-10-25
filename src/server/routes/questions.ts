@@ -487,7 +487,7 @@ export const questionsRoutes: Routes = {
           type: string;
           maxPoints: number;
           seconds: number;
-          translations: Array<{ id: string; languageCode: string; prompt: string; answer: string }>;
+          translations: Record<string, { id: string; languageCode: string; prompt: string; answer: string }>; // key: language code
         }
       >();
 
@@ -499,23 +499,21 @@ export const questionsRoutes: Routes = {
             type: row.type,
             maxPoints: row.maxPoints,
             seconds: row.seconds,
-            translations: []
+            translations: {}
           });
         }
 
         // Add translation if it exists (LEFT JOIN may return null for questions without translations)
+        // Index by languageCode instead of translationId
         if (row.translationId && row.translationLanguageCode && row.translationPrompt && row.translationAnswer) {
-          questionsMap.get(row.questionId)!.translations.push({
+          questionsMap.get(row.questionId)!.translations[row.translationLanguageCode] = {
             id: row.translationId,
             languageCode: row.translationLanguageCode,
             prompt: row.translationPrompt,
             answer: row.translationAnswer
-          });
+          };
         }
       }
-
-      // Convert map to array (will maintain order since we inserted in ORDER BY order)
-      const questionsWithTranslations = Array.from(questionsMap.values());
 
       // Get event languages
       const languages = queryGetLanguages.all({ $eventId: eventId });
@@ -523,7 +521,7 @@ export const questionsRoutes: Routes = {
       return apiData({
         eventName: event.name,
         languages: Object.fromEntries(languages.map((l) => [l.code, l.name])),
-        questions: questionsWithTranslations
+        questions: Object.fromEntries(questionsMap)
       });
     },
 

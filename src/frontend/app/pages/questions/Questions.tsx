@@ -69,13 +69,13 @@ export const Questions = memo(() => {
           <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
         </div>
         <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
-          {snap.questions.length === 0 && (
+          {Object.keys(snap.questions).length === 0 && (
             <div className='text-center py-8'>
               <p className='text-neutral mb-4'>No questions yet. Add your first question to get started.</p>
             </div>
           )}
 
-          {snap.questions.length > 0 && (
+          {Object.keys(snap.questions).length > 0 && (
             <div className='QuestionsEditor flex gap-6 flex-1 min-h-0'>
               {/* Question Numbers Column */}
               <QuestionsList />
@@ -92,7 +92,7 @@ export const Questions = memo(() => {
             <Icon name='arrow-down-tray' className='size-4' />
             Import
           </button>
-          <button className='btn btn-accent' onClick={handleExport} disabled={snap.questions.length === 0}>
+          <button className='btn btn-accent' onClick={handleExport} disabled={Object.keys(snap.questions).length === 0}>
             <Icon name='arrow-up-tray' className='size-4' />
             Export
           </button>

@@ -28,7 +28,10 @@ export const QuestionsList = memo(() => {
 
   useEffect(() => {
     checkScrollShadow();
-  }, [snap.questions.length]);
+  }, [Object.keys(snap.questions).length]);
+
+  // Sort questions by number
+  const sortedQuestions = Object.values(snap.questions).sort((a, b) => a.number - b.number);
 
   return (
     <div
@@ -46,14 +49,16 @@ export const QuestionsList = memo(() => {
       }}
     >
       <div className='flex flex-col gap-0 p-4'>
-        {snap.questions.map((question, index) => (
-          <QuestionListItem
-            key={question.id}
-            question={question}
-            isSelected={snap.selectedQuestion?.number === question.number}
-            isFirst={index === 0}
-          />
-        ))}
+        {sortedQuestions.map((question, index) => {
+          return (
+            <QuestionListItem
+              key={question.id}
+              question={question}
+              isSelected={snap.selectedQuestion?.number === question.number}
+              isFirst={index === 0}
+            />
+          );
+        })}
       </div>
     </div>
   );

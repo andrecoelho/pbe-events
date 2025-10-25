@@ -16,7 +16,7 @@ export interface Question {
   type: QuestionType;
   maxPoints: number;
   seconds: number;
-  translations: IQuestionTranslation[];
+  translations: Record<string, IQuestionTranslation>; // key: language code, value: translation
 }
 
 export interface QuestionsStore {
@@ -24,7 +24,7 @@ export interface QuestionsStore {
   eventId: string;
   eventName: string;
   languages: Record<string, string>; // key: language code, value: language name
-  questions: Question[];
+  questions: Record<string, Question>; // key: question id, value: question
   selectedQuestion: Question | null;
 }
 
@@ -37,7 +37,7 @@ export class QuestionsValt {
       eventId: '',
       eventName: '',
       languages: {},
-      questions: [],
+      questions: {},
       selectedQuestion: null
     });
   }
@@ -49,7 +49,7 @@ export class QuestionsValt {
       const response = (await result.json()) as {
         eventName: string;
         languages: { [code: string]: string };
-        questions: Question[];
+        questions: Record<string, Question>;
       };
 
       this.store.eventId = eventId;
@@ -60,27 +60,26 @@ export class QuestionsValt {
       this.store.questions = response.questions;
 
       // Ensure every question has a translation for each language
-      for (const question of this.store.questions) {
+      for (const [, question] of Object.entries(this.store.questions)) {
         for (const languageCode of Object.keys(this.store.languages)) {
-          const existingTranslation = question.translations.find((t) => t.languageCode === languageCode);
-
-          if (!existingTranslation) {
+          // Check if translation exists for this language code
+          if (!question.translations[languageCode]) {
             // Add placeholder translation without id
-            question.translations.push({
+            question.translations[languageCode] = {
               languageCode,
               prompt: '',
               answer: ''
-            });
+            };
           }
         }
       }
 
       this.store.initialized = true;
 
-      // Select first question if available
-      if (response.questions.length > 0) {
-        const firstQuestion = response.questions[0];
-
+      // Select first question if available (sorted by number)
+      const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
+      if (sortedQuestions.length > 0) {
+        const firstQuestion = sortedQuestions[0];
         if (firstQuestion) {
           this.store.selectedQuestion = firstQuestion;
         }
@@ -89,7 +88,40 @@ export class QuestionsValt {
   }
 
   setSelectedQuestion(questionNumber: number | null) {
-    this.store.selectedQuestion = this.store.questions.find((q) => q.number === questionNumber) ?? null;
+    if (questionNumber === null) {
+      this.store.selectedQuestion = null;
+      return;
+    }
+
+    // Find question by number
+    const question = Object.values(this.store.questions).find((q) => q.number === questionNumber);
+    this.store.selectedQuestion = question ?? null;
+  }
+
+  changeStoreTranslation(
+    question: Question,
+    translation: IQuestionTranslation,
+    updates: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt'>>
+  ) {
+    const questionInStore = this.store.questions[question.id];
+
+    if (!questionInStore) {
+      return;
+    }
+
+    const translationInStore = questionInStore.translations[translation.languageCode];
+
+    if (!translationInStore) {
+      return;
+    }
+
+    if (updates.prompt !== undefined) {
+      translationInStore.prompt = updates.prompt;
+    }
+
+    if (updates.answer !== undefined) {
+      translationInStore.answer = updates.answer;
+    }
   }
 
   /**
@@ -105,30 +137,30 @@ export class QuestionsValt {
     if (result.status === 200) {
       const response = (await result.json()) as { question: Question };
 
-      // Create translations array with empty translations for each language
-      const translations: IQuestionTranslation[] = Object.keys(this.store.languages).map((languageCode) => ({
-        languageCode,
-        prompt: '',
-        answer: ''
-      }));
+      // Create translations record with empty translations for each language (indexed by language code)
+      const translations: Record<string, IQuestionTranslation> = {};
+      for (const languageCode of Object.keys(this.store.languages)) {
+        translations[languageCode] = {
+          languageCode,
+          prompt: '',
+          answer: ''
+        };
+      }
 
-      this.store.questions.push({
+      const newQuestion: Question = {
         id: response.question.id,
         number: response.question.number,
         type: response.question.type,
         maxPoints: response.question.maxPoints,
         seconds: response.question.seconds,
         translations
-      });
+      };
 
-      // Keep questions sorted by number
-      this.store.questions.sort((a, b) => a.number - b.number);
+      // Add question to the record
+      this.store.questions[newQuestion.id] = newQuestion;
 
       // Select the newly added question
-      const newQuestion = this.store.questions.find((q) => q.id === response.question.id);
-      if (newQuestion) {
-        this.store.selectedQuestion = newQuestion;
-      }
+      this.store.selectedQuestion = newQuestion;
 
       return { ok: true };
     }
@@ -151,28 +183,31 @@ export class QuestionsValt {
     if (result.status === 200) {
       const response = (await result.json()) as { question: Question };
 
-      // Create translations array with empty translations for each language
-      const translations: IQuestionTranslation[] = Object.keys(this.store.languages).map((languageCode) => ({
-        languageCode,
-        prompt: '',
-        answer: ''
-      }));
+      // Create translations record with empty translations for each language (indexed by language code)
+      const translations: Record<string, IQuestionTranslation> = {};
+      for (const languageCode of Object.keys(this.store.languages)) {
+        translations[languageCode] = {
+          languageCode,
+          prompt: '',
+          answer: ''
+        };
+      }
 
       // Update question numbers for all questions >= beforeNumber
-      for (const q of this.store.questions) {
+      for (const q of Object.values(this.store.questions)) {
         if (q.number >= beforeNumber) {
           q.number += 1;
         }
       }
 
-      // Insert the new question
+      // Create the new question
       const newQuestion: Question = {
         ...response.question,
         translations
       };
 
-      // Insert at the correct position (beforeNumber is 1-indexed, array is 0-indexed)
-      this.store.questions.splice(beforeNumber - 1, 0, newQuestion);
+      // Add to questions record
+      this.store.questions[newQuestion.id] = newQuestion;
 
       // Select the newly inserted question
       this.store.selectedQuestion = newQuestion;
@@ -192,7 +227,7 @@ export class QuestionsValt {
     question: Snapshot<Question>,
     updates: Partial<Pick<Question, 'number' | 'type' | 'maxPoints' | 'seconds'>>
   ) {
-    const questionInStore = this.store.questions.find((q) => q.id === question.id);
+    const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
       return { ok: false, error: 'Question not found in store' };
@@ -211,7 +246,7 @@ export class QuestionsValt {
         const newNumber = updates.number;
 
         // Update all affected question numbers
-        for (const q of this.store.questions) {
+        for (const q of Object.values(this.store.questions)) {
           if (q.id === question.id) {
             q.number = newNumber;
           } else if (newNumber < oldNumber) {
@@ -226,9 +261,6 @@ export class QuestionsValt {
             }
           }
         }
-
-        // Sort questions by number
-        this.store.questions.sort((a, b) => a.number - b.number);
       }
 
       questionInStore.type = updates.type ?? questionInStore.type;
@@ -250,31 +282,30 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/${question.id}`, { method: 'DELETE' });
 
     if (result.status === 200) {
-      const deletedIndex = this.store.questions.findIndex((q) => q.id === question.id);
+      // Get sorted questions before deletion to find adjacent questions
+      const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
+      const deletedIndex = sortedQuestions.findIndex((q) => q.id === question.id);
 
-      // Remove the deleted question
-      this.store.questions = this.store.questions.filter((q) => q.id !== question.id);
+      // Remove from the questions record
+      delete this.store.questions[question.id];
 
       // Shift down the question numbers for all questions after the deleted one
-      this.store.questions.forEach((q) => {
+      for (const q of Object.values(this.store.questions)) {
         if (q.number > question.number) {
           q.number -= 1;
         }
-      });
+      }
 
       // Select a different question if the deleted one was selected
-      if (this.store.selectedQuestion?.number === question.number) {
-        if (this.store.questions.length > 0) {
+      if (this.store.selectedQuestion?.id === question.id) {
+        const remainingQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
+        if (remainingQuestions.length > 0) {
           // Try to select the next question (at the same index), or the previous one if it was the last
-          const nextQuestion = this.store.questions[deletedIndex] || this.store.questions[deletedIndex - 1];
+          const nextQuestion = remainingQuestions[deletedIndex] || remainingQuestions[deletedIndex - 1];
           this.store.selectedQuestion = nextQuestion ?? null;
         } else {
           this.store.selectedQuestion = null;
         }
-      } else if (this.store.selectedQuestion) {
-        // Update the reference to the selected question after deletion
-        const updatedSelectedQuestion = this.store.questions.find((q) => q.id === this.store.selectedQuestion?.id);
-        this.store.selectedQuestion = updatedSelectedQuestion ?? null;
       }
 
       return { ok: true };
@@ -307,7 +338,7 @@ export class QuestionsValt {
    * Add a translation to a question
    */
   async addTranslation(question: Snapshot<Question>, translation: Snapshot<IQuestionTranslation>) {
-    const questionInStore = this.store.questions.find((q) => q.id === question.id);
+    const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
       return { ok: false, error: 'Question not found in store' };
@@ -326,12 +357,13 @@ export class QuestionsValt {
     if (result.status === 200) {
       const response = (await result.json()) as { translation: IQuestionTranslation };
 
-      questionInStore.translations.push({
+      // Update translations record using the language code as key
+      questionInStore.translations[response.translation.languageCode] = {
         id: response.translation.id,
         languageCode: response.translation.languageCode,
         prompt: response.translation.prompt,
         answer: response.translation.answer
-      });
+      };
 
       return { ok: true };
     }
@@ -349,7 +381,7 @@ export class QuestionsValt {
     translation: Snapshot<IQuestionTranslation>,
     updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt'>>
   ) {
-    const questionInStore = this.store.questions.find((q) => q.id === question.id);
+    const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
       return { ok: false, error: 'Question not found in store' };
@@ -359,7 +391,7 @@ export class QuestionsValt {
       return { ok: false, error: 'Translation must have an id to be updated' };
     }
 
-    const translationInStore = questionInStore.translations.find((t) => t.id === translation.id);
+    const translationInStore = questionInStore.translations[translation.languageCode];
 
     if (!translationInStore) {
       return { ok: false, error: 'Translation not found in store' };

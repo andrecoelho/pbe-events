@@ -25,15 +25,17 @@ export const QuestionEditor = memo(() => {
 
       <div className='QuestionTranslations'>
         <div className='flex flex-col gap-4'>
-          {(selectedQuestion.translations as IQuestionTranslation[]).map((translation) => {
-            return (
-              <QuestionTranslation
-                key={translation.languageCode}
-                question={selectedQuestion}
-                translation={translation}
-              />
-            );
-          })}
+          {Object.values(selectedQuestion.translations)
+            .sort((a, b) => a.languageCode.localeCompare(b.languageCode))
+            .map((translation) => {
+              return (
+                <QuestionTranslation
+                  key={translation.languageCode}
+                  question={selectedQuestion}
+                  translation={translation}
+                />
+              );
+            })}
         </div>
       </div>
     </div>
