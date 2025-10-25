@@ -500,7 +500,10 @@ export const questionsRoutes: Routes = {
           type: string;
           maxPoints: number;
           seconds: number;
-          translations: Record<string, { id: string; languageCode: string; prompt: string; answer: string }>; // key: language code
+          translations: Record<
+            string, // key: language code
+            { id: string; languageCode: string; prompt: string | null; answer: string | null }
+          >;
         }
       >();
 
@@ -518,7 +521,7 @@ export const questionsRoutes: Routes = {
 
         // Add translation if it exists (LEFT JOIN may return null for questions without translations)
         // Index by languageCode instead of translationId
-        if (row.translationId && row.translationLanguageCode && row.translationPrompt && row.translationAnswer) {
+        if (row.translationId && row.translationLanguageCode) {
           questionsMap.get(row.questionId)!.translations[row.translationLanguageCode] = {
             id: row.translationId,
             languageCode: row.translationLanguageCode,
@@ -1036,8 +1039,8 @@ export const questionsRoutes: Routes = {
       let { languageCode, prompt, answer } = body;
 
       // Validate required fields
-      if (!languageCode || !prompt || !answer) {
-        return apiBadRequest('Missing required fields: languageCode, questionPrompt, and answer');
+      if (typeof languageCode !== 'string' || typeof prompt !== 'string' || typeof answer !== 'string') {
+        return apiBadRequest('Missing required fields: languageCode, prompt, and answer');
       }
 
       prompt = prompt?.trim();

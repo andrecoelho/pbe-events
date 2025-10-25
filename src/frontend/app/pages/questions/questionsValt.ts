@@ -344,26 +344,26 @@ export class QuestionsValt {
       return { ok: false, error: 'Question not found in store' };
     }
 
+    const translationInStore = questionInStore.translations[translation.languageCode];
+
+    if (!translationInStore) {
+      return { ok: false, error: 'Translation not found in store' };
+    }
+
     const result = await fetch(`/api/questions/${question.id}/translations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        languageCode: translation.languageCode,
-        questionPrompt: translation.prompt,
-        answer: translation.answer
+        languageCode: translationInStore.languageCode,
+        prompt: translationInStore.prompt,
+        answer: translationInStore.answer
       })
     });
 
     if (result.status === 200) {
       const response = (await result.json()) as { translation: IQuestionTranslation };
 
-      // Update translations record using the language code as key
-      questionInStore.translations[response.translation.languageCode] = {
-        id: response.translation.id,
-        languageCode: response.translation.languageCode,
-        prompt: response.translation.prompt,
-        answer: response.translation.answer
-      };
+      translationInStore.id = response.translation.id;
 
       return { ok: true };
     }
@@ -400,13 +400,10 @@ export class QuestionsValt {
     const result = await fetch(`/api/questions/translations/${translation.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
+      body: JSON.stringify({ languageCode: translation.languageCode, ...updates })
     });
 
     if (result.status === 200) {
-      translationInStore.answer = updates?.answer ?? translationInStore.answer;
-      translationInStore.prompt = updates?.prompt ?? translationInStore.prompt;
-
       return { ok: true };
     }
 

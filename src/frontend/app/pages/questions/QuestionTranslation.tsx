@@ -16,22 +16,25 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
   const answerRef = useRef<HTMLInputElement>(null);
 
   const handleTranslationChange = useCallback(
-    debounce(async (field: 'prompt' | 'answer', value: string) => {
-      await questionsValt.upsertTranslation(question, translation, { [field]: value });
-    }, 500),
-    []
+    debounce(
+      async (question: Question, translation: IQuestionTranslation, field: 'prompt' | 'answer', value: string) => {
+        await questionsValt.upsertTranslation(question, translation, { [field]: value });
+      },
+      500
+    ),
+    [questionsValt]
   );
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     questionsValt.changeStoreTranslation(question, translation, { prompt: e.target.value });
-    handleTranslationChange('prompt', e.target.value);
+    handleTranslationChange(question, translation, 'prompt', e.target.value);
   };
 
   const handleAnswerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = question.type === 'TF' ? (e.target.checked ? 'true' : 'false') : e.target.value;
 
     questionsValt.changeStoreTranslation(question, translation, { answer: value });
-    handleTranslationChange('answer', value);
+    handleTranslationChange(question, translation, 'answer', value);
   };
 
   return (
