@@ -1,5 +1,5 @@
 export function apiData(data?: object, headers?: HeadersInit) {
-  return new Response(JSON.stringify({ ...data, ok: true }), {
+  return new Response(JSON.stringify({ ...data }), {
     headers: { 'Content-Type': 'application/json', ...headers }
   });
 }

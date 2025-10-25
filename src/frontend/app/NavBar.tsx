@@ -20,12 +20,12 @@ export const NavBar = memo(() => {
       method: 'POST'
     });
 
-    const response = await result.json();
-
-    if (response.ok) {
+    if (result.status === 200) {
       window.location.href = '/';
       window.location.reload();
     } else {
+      const response = await result.json();
+
       alertModal.open(response.error || 'Logout failed');
     }
   };
