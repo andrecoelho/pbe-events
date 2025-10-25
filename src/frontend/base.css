@@ -41,6 +41,10 @@
     @apply text-stone-950 font-sans;
   }
 
+  ::placeholder {
+    @apply text-stone-400;
+  }
+
   body #root {
     @apply absolute inset-0 bg-linear-to-br from-primary/60 to-primary;
   }
