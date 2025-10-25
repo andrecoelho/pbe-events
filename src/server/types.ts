@@ -53,7 +53,7 @@ export interface QuestionInfo {
   id: string;
   body: string;
   answer: string;
-  languageCode: string;
+  languageId: string;
   questionId: string;
   createdAt: string;
 }

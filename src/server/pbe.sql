@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS answers;
-DROP TABLE IF EXISTS questionTranslations;
+DROP TABLE IF EXISTS translations;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS languages;
@@ -54,12 +54,14 @@ CREATE TABLE permissions (
 );
 
 CREATE TABLE languages (
+  id TEXT NOT NULL,
   code TEXT NOT NULL,
   name TEXT NOT NULL,
   eventId TEXT NOT NULL,
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (code),
-  FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE
+  PRIMARY KEY (id),
+  FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE,
+  UNIQUE (code, eventId)
 );
 
 CREATE TABLE teams (
@@ -87,28 +89,28 @@ CREATE TABLE questions (
   UNIQUE (eventId, number)
 );
 
-CREATE TABLE questionTranslations (
+CREATE TABLE translations (
   id TEXT NOT NULL,
   prompt TEXT NOT NULL,
   answer TEXT NOT NULL,
-  languageCode TEXT NOT NULL,
+  languageId TEXT NOT NULL,
   questionId TEXT NOT NULL,
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  FOREIGN KEY (languageCode) REFERENCES languages(code) ON DELETE CASCADE,
-  FOREIGN KEY (questionId) REFERENCES questions(id) ON DELETE CASCADE
-  UNIQUE (languageCode, questionId)
+  FOREIGN KEY (languageId) REFERENCES languages(id) ON DELETE CASCADE,
+  FOREIGN KEY (questionId) REFERENCES questions(id) ON DELETE CASCADE,
+  UNIQUE (languageId, questionId)
 );
 
 CREATE TABLE answers (
   id TEXT NOT NULL,
   answer TEXT NOT NULL,
-  autoPointsAwarded NUMERIC
+  autoPointsAwarded NUMERIC,
   pointsAwarded NUMERIC,
   teamId TEXT NOT NULL,
-  questionInfoId TEXT NOT NULL,
+  translationId TEXT NOT NULL,
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   FOREIGN KEY (teamId) REFERENCES teams(id) ON DELETE CASCADE,
-  FOREIGN KEY (questionInfoId) REFERENCES questionTranslations(id) ON DELETE CASCADE
+  FOREIGN KEY (translationId) REFERENCES translations(id) ON DELETE CASCADE
 );

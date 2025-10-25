@@ -36,6 +36,7 @@ interface QuestionsFileFormat {
 }
 
 interface Language {
+  id: string;
   code: string;
   name: string;
   eventId: string;
@@ -48,7 +49,7 @@ const queryCheckPermission = db.query<{ roleId: string }, { $userId: string; $ev
 );
 
 const queryGetLanguages = db.query<Language, { $eventId: string }>(
-  `SELECT code, name, eventId FROM languages WHERE eventId = $eventId`
+  `SELECT id, code, name, eventId FROM languages WHERE eventId = $eventId`
 );
 
 const queryInsertQuestion = db.query<
@@ -61,10 +62,10 @@ const queryInsertQuestion = db.query<
 
 const queryInsertQuestionTranslation = db.query<
   {},
-  { $id: string; $prompt: string; $answer: string; $languageCode: string; $questionId: string }
+  { $id: string; $prompt: string; $answer: string; $languageId: string; $questionId: string }
 >(
-  `INSERT INTO questionTranslations (id, prompt, answer, languageCode, questionId)
-   VALUES ($id, $prompt, $answer, $languageCode, $questionId)`
+  `INSERT INTO translations (id, prompt, answer, languageId, questionId)
+   VALUES ($id, $prompt, $answer, $languageId, $questionId)`
 );
 
 const queryDeleteQuestions = db.query<{}, { $eventId: string }>(`DELETE FROM questions WHERE eventId = $eventId`);
@@ -79,12 +80,12 @@ const queryGetQuestions = db.query<
 );
 
 const queryGetQuestionTranslations = db.query<
-  { languageCode: string; prompt: string; answer: string },
+  { languageId: string; prompt: string; answer: string },
   { $questionId: string }
 >(
-  `SELECT languageCode, prompt, answer FROM questionTranslations
+  `SELECT languageId, prompt, answer FROM translations
    WHERE questionId = $questionId
-   ORDER BY languageCode ASC`
+   ORDER BY languageId ASC`
 );
 
 const queryGetEventName = db.query<{ name: string }, { $eventId: string; $userId: string }>(
@@ -102,6 +103,7 @@ const queryGetQuestionsWithTranslations = db.query<
     maxPoints: number;
     seconds: number;
     translationId: string | null;
+    translationLanguageId: string | null;
     translationLanguageCode: string | null;
     translationPrompt: string | null;
     translationAnswer: string | null;
@@ -114,20 +116,22 @@ const queryGetQuestionsWithTranslations = db.query<
     q.type,
     q.maxPoints,
     q.seconds,
-    qt.id as translationId,
-    qt.languageCode as translationLanguageCode,
-    qt.prompt as translationPrompt,
-    qt.answer as translationAnswer
+    t.id as translationId,
+    t.languageId as translationLanguageId,
+    l.code as translationLanguageCode,
+    t.prompt as translationPrompt,
+    t.answer as translationAnswer
    FROM questions q
-   LEFT JOIN questionTranslations qt ON q.id = qt.questionId
+   LEFT JOIN translations t ON q.id = t.questionId
+   LEFT JOIN languages l ON t.languageId = l.id
    WHERE q.eventId = $eventId
-   ORDER BY q.number ASC, qt.languageCode ASC`
+   ORDER BY q.number ASC, l.code ASC`
 );
 
 const queryDeleteLanguages = db.query<{}, { $eventId: string }>(`DELETE FROM languages WHERE eventId = $eventId`);
 
-const queryInsertLanguage = db.query<{}, { $code: string; $name: string; $eventId: string }>(
-  `INSERT INTO languages (code, name, eventId) VALUES ($code, $name, $eventId)`
+const queryInsertLanguage = db.query<{}, { $id: string; $code: string; $name: string; $eventId: string }>(
+  `INSERT INTO languages (id, code, name, eventId) VALUES ($id, $code, $name, $eventId)`
 );
 
 // Individual question CRUD queries
@@ -173,15 +177,15 @@ const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>
 
 // Individual question translation CRUD queries
 const queryGetSingleQuestionTranslation = db.query<
-  { id: string; prompt: string; answer: string; languageCode: string; questionId: string },
+  { id: string; prompt: string; answer: string; languageId: string; questionId: string },
   { $id: string }
->(`SELECT id, prompt, answer, languageCode, questionId FROM questionTranslations WHERE id = $id`);
+>(`SELECT id, prompt, answer, languageId, questionId FROM translations WHERE id = $id`);
 
 const queryUpdateQuestionTranslation = db.query<{}, { $id: string; $prompt: string; $answer: string }>(
-  `UPDATE questionTranslations SET prompt = $prompt, answer = $answer WHERE id = $id`
+  `UPDATE translations SET prompt = $prompt, answer = $answer WHERE id = $id`
 );
 
-const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM questionTranslations WHERE id = $id`);
+const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM translations WHERE id = $id`);
 
 /**
  * Validates the YAML structure and data
@@ -400,7 +404,11 @@ function toSafeFilename(name: string): string {
 /**
  * Imports questions from validated data into the database
  */
-function importQuestions(questions: QuestionImport[], eventId: string): number {
+function importQuestions(
+  questions: QuestionImport[],
+  eventId: string,
+  languageCodeToIdMap: Map<string, string>
+): number {
   let imported = 0;
 
   for (let i = 0; i < questions.length; i++) {
@@ -428,11 +436,16 @@ function importQuestions(questions: QuestionImport[], eventId: string): number {
       const answerValue =
         typeof translation.answer === 'boolean' ? translation.answer.toString() : translation.answer.trim();
 
+      const languageId = languageCodeToIdMap.get(translation.lang);
+      if (!languageId) {
+        throw new Error(`Language ID not found for code: ${translation.lang}`);
+      }
+
       queryInsertQuestionTranslation.run({
         $id: translationId,
         $prompt: translation.prompt.trim(),
         $answer: answerValue,
-        $languageCode: translation.lang,
+        $languageId: languageId,
         $questionId: questionId
       });
     }
@@ -672,23 +685,29 @@ export const questionsRoutes: Routes = {
       // Import questions and languages in a transaction
       try {
         db.transaction(() => {
-          // Delete existing languages (this will cascade to questionTranslations and then questions due to foreign keys)
+          // Delete existing languages (this will cascade to translations and then questions due to foreign keys)
           queryDeleteLanguages.run({ $eventId: eventId });
 
           // Delete existing questions (in case cascade didn't catch everything)
           queryDeleteQuestions.run({ $eventId: eventId });
 
-          // Insert new languages
+          // Insert new languages and create code-to-id mapping
+          const languageCodeToIdMap = new Map<string, string>();
+
           for (const lang of validation.languages!) {
+            const languageId = Bun.randomUUIDv7();
             queryInsertLanguage.run({
+              $id: languageId,
               $code: lang.code,
               $name: lang.name,
               $eventId: eventId
             });
+
+            languageCodeToIdMap.set(lang.code, languageId);
           }
 
           // Import new questions
-          importQuestions(validation.questions!, eventId);
+          importQuestions(validation.questions!, eventId, languageCodeToIdMap);
         })();
 
         return apiData({
@@ -743,6 +762,13 @@ export const questionsRoutes: Routes = {
         return apiBadRequest('Nothing to export - event has no languages or questions configured');
       }
 
+      // Create a map of language ID to language code
+      const languageIdToCodeMap = new Map<string, string>();
+
+      for (const lang of languages) {
+        languageIdToCodeMap.set(lang.id, lang.code);
+      }
+
       // Build the languages array
       const languagesExport: LanguageDefinition[] = languages.map((l) => ({
         code: l.code,
@@ -755,12 +781,20 @@ export const questionsRoutes: Routes = {
       for (const question of questions) {
         const questionTranslations = queryGetQuestionTranslations.all({ $questionId: question.id });
 
-        const translations: QuestionTranslation[] = questionTranslations.map((qt) => ({
-          lang: qt.languageCode,
-          prompt: qt.prompt,
-          // Convert string "true"/"false" back to booleans for TF questions
-          answer: question.type === 'TF' ? qt.answer === 'true' : qt.answer
-        }));
+        const translations: QuestionTranslation[] = questionTranslations.map((qt) => {
+          const langCode = languageIdToCodeMap.get(qt.languageId);
+
+          if (!langCode) {
+            throw new Error(`Language code not found for languageId: ${qt.languageId}`);
+          }
+
+          return {
+            lang: langCode,
+            prompt: qt.prompt,
+            // Convert string "true"/"false" back to booleans for TF questions
+            answer: question.type === 'TF' ? qt.answer === 'true' : qt.answer
+          };
+        });
 
         questionsExport.push({
           type: question.type as 'PG' | 'PS' | 'TF' | 'FB',
@@ -1017,6 +1051,13 @@ export const questionsRoutes: Routes = {
         return apiBadRequest(`Invalid language code "${languageCode}" for this event`);
       }
 
+      // Get the language ID from the code
+      const language = languages.find((l) => l.code === languageCode);
+
+      if (!language) {
+        return apiBadRequest(`Language not found for code "${languageCode}"`);
+      }
+
       // For TF questions, validate answer is "true" or "false"
       if (question.type === 'TF') {
         const normalizedAnswer = answer.toLowerCase().trim();
@@ -1032,7 +1073,7 @@ export const questionsRoutes: Routes = {
           $id: translationId,
           $prompt: prompt,
           $answer: answer,
-          $languageCode: languageCode,
+          $languageId: language.id,
           $questionId: questionId
         });
 
