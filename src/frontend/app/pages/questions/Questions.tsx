@@ -41,11 +41,17 @@ export const Questions = memo(() => {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
 
-    const confirmed = await confirmModal.open(
-      'Importing questions will replace all existing questions in this event. Are you sure you want to continue?'
-    );
+    if (!file) {
+      return;
+    }
+
+    const confirmed =
+      Object.entries(questionsValt.store.questions).length === 0
+        ? true
+        : await confirmModal.open(
+            'Importing questions will replace all existing questions in this event. Are you sure you want to continue?'
+          );
 
     if (confirmed) {
       await questionsValt.importQuestions(file);
