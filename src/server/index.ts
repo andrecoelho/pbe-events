@@ -1,5 +1,3 @@
-import { join } from 'path';
-
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import { authRoutes } from '@/server/routes/auth';
@@ -11,6 +9,8 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
+import { db } from '@/server/db';
+import { join } from 'path';
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
@@ -60,3 +60,14 @@ const server = Bun.serve({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
+
+// Handle graceful shutdown
+const shutdown = () => {
+  console.log('\n🛑 Shutting down server...');
+  db.close();
+  console.log('✅ Database connection closed');
+  process.exit(0);
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

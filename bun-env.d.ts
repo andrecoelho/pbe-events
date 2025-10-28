@@ -29,3 +29,11 @@ declare module "*.css" {
   const classes: { readonly [key: string]: string };
   export = classes;
 }
+
+declare module "*.sql" {
+  /**
+   * A record of SQL queries
+   */
+  const queries: string;
+  export = queries;
+}
