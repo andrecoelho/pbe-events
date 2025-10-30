@@ -1,5 +1,6 @@
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
+import { db } from '@/server/db';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { permissionRoutes } from '@/server/routes/permissions';
@@ -9,7 +10,7 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
-import { db } from '@/server/db';
+import { styleText } from 'node:util';
 import { join } from 'path';
 
 const appNounce = Bun.randomUUIDv7();
@@ -59,7 +60,7 @@ const server = Bun.serve({
   development: process.env.NODE_ENV !== 'production'
 });
 
-console.log(`🚀 Server running at ${server.url}`);
+console.log(`🚀 Server running at ${styleText('green', server.url.toString())}`);
 
 // Handle graceful shutdown
 const shutdown = () => {

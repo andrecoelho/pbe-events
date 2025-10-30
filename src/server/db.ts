@@ -1,18 +1,33 @@
 import { Database } from 'bun:sqlite';
-import { mkdir } from 'node:fs/promises';
-import { join, dirname } from 'path';
+import { exists } from 'node:fs/promises';
+import { styleText } from 'node:util';
+import { join, resolve } from 'path';
 
-const path = join(import.meta.dir, '../../data/pbe-events.sqlite');
-const dbFileExists = await Bun.file(path).exists();
+const mountPath = process.env.PBE_APP_DATA_PATH;
 
-if (!dbFileExists) {
-  console.log('🚧 Database file not found, creating new database...');
-  await mkdir(dirname(path), { recursive: true });
+console.log('🔍 Initializing database ...');
+
+if (!mountPath) {
+  console.error('🚨📂', 'Environment variable not set:', styleText(['grey'], 'PBE_APP_DATA_PATH'));
+  process.exit(0);
 }
 
-console.log(`🔗 Connecting to database at ${path}...`);
+console.log(`📂 ${styleText(['grey'], 'PBE_APP_DATA_PATH')}=${styleText(['yellow'], mountPath)}`);
 
-export const db = new Database(path);
+const dataDir = resolve(mountPath);
+const dirExists = await exists(dataDir);
+
+if (!dirExists) {
+  console.error(`🚨 PBE app data directory not found, using: ${styleText('yellow', dataDir)}`);
+  process.exit(0);
+}
+
+const dbPath = join(dataDir, 'pbe-events.sqlite');
+const dbFileExists = await exists(dbPath);
+
+console.log(`📚 Connecting to database at ${styleText('cyan', dbPath)}...`);
+
+export const db = new Database(dbPath);
 
 if (!dbFileExists) {
   console.log('🌱 Initializing database schema...');
@@ -23,4 +38,5 @@ if (!dbFileExists) {
 }
 
 // Enable foreign key constraints with CASCADE behavior
-db.query('PRAGMA foreign_keys = ON;').run();
+db.run('PRAGMA foreign_keys = ON;');
+db.run('PRAGMA journal_mode = WAL;');
