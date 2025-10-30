@@ -8,6 +8,7 @@ import { memo, useMemo, useRef } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionEditor } from './QuestionEditor';
 import { QuestionsList } from './QuestionsList';
+import { alertModal } from '@/frontend/components/AlertModal';
 
 const init = () => {
   const questionsValt = new QuestionsValt();
@@ -54,7 +55,11 @@ export const Questions = memo(() => {
           );
 
     if (confirmed) {
-      await questionsValt.importQuestions(file);
+      const result = await questionsValt.importQuestions(file);
+
+      if (result.error) {
+        alertModal.open(`Error importing questions: ${result.error}`);
+      }
     }
 
     // Reset file input

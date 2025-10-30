@@ -38,9 +38,11 @@ questions:
       - lang: en
         prompt: The Earth is flat.
         answer: false
+        clarification: The Earth is round/spherical
       - lang: es
         prompt: La Tierra es plana.
         answer: false
+        clarification: La Tierra es redonda/esférica
 
   - type: PG
     maxPoints: 20
@@ -92,9 +94,11 @@ questions:
       - lang: en
         prompt: Python is a compiled programming language.
         answer: false
+        clarification: Python is an interpreted language
       - lang: es
         prompt: Python es un lenguaje de programación compilado.
         answer: false
+        clarification: Python es un lenguaje interpretado
 
   - type: FB
     maxPoints: 10

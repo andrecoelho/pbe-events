@@ -14,10 +14,16 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);
+  const clarificationRef = useRef<HTMLInputElement>(null);
 
   const handleTranslationChange = useCallback(
     debounce(
-      async (question: Question, translation: IQuestionTranslation, field: 'prompt' | 'answer', value: string) => {
+      async (
+        question: Question,
+        translation: IQuestionTranslation,
+        field: 'prompt' | 'answer' | 'clarification',
+        value: string
+      ) => {
         await questionsValt.upsertTranslation(question, translation, { [field]: value });
       },
       500
@@ -35,6 +41,11 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
 
     questionsValt.changeStoreTranslation(question, translation, { answer: value });
     handleTranslationChange(question, translation, 'answer', value);
+  };
+
+  const handleClarificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    questionsValt.changeStoreTranslation(question, translation, { clarification: e.target.value });
+    handleTranslationChange(question, translation, 'clarification', e.target.value);
   };
 
   return (
@@ -58,32 +69,50 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
           />
         </div>
 
-        {/* Answer */}
-        <div>
-          <label className='label'>
-            <span className='label-text'>Answer</span>
-          </label>
-          {question.type === 'TF' ? (
-            <label className='label cursor-pointer justify-start gap-2 flex place-items-center mt-2'>
+        <div className='flex gap-8'>
+          {/* Answer */}
+          <div>
+            <label className='label'>
+              <span className='label-text'>Answer</span>
+            </label>
+            {question.type === 'TF' ? (
+              <label className='label cursor-pointer justify-start gap-2 flex place-items-center mt-2'>
+                <input
+                  ref={answerRef}
+                  type='checkbox'
+                  className={`toggle ${translation?.answer === 'true' ? 'toggle-success' : 'toggle-error'}`}
+                  checked={translation?.answer === 'true'}
+                  onChange={handleAnswerChange}
+                />
+                <span className={`badge ${translation?.answer === 'true' ? 'badge-success' : 'badge-error'}`}>
+                  {translation?.answer === 'true' ? 'True' : 'False'}
+                </span>
+              </label>
+            ) : (
               <input
-                ref={answerRef}
-                type='checkbox'
-                className={`toggle ${translation?.answer === 'true' ? 'toggle-success' : 'toggle-error'}`}
-                checked={translation?.answer === 'true'}
+                type='text'
+                className='input input-bordered w-full'
+                placeholder='Enter the answer...'
+                value={translation?.answer || ''}
                 onChange={handleAnswerChange}
               />
-              <span className={`text-base ${translation?.answer === 'true' ? 'text-success' : 'text-error'}`}>
-                {translation?.answer === 'true' ? 'True' : 'False'}
-              </span>
-            </label>
-          ) : (
-            <input
-              type='text'
-              className='input input-bordered w-full'
-              placeholder='Enter the answer...'
-              value={translation?.answer || ''}
-              onChange={handleAnswerChange}
-            />
+            )}
+          </div>
+
+          {/* Clarification (for TF questions only) */}
+          {question.type === 'TF' && (
+            <div>
+              <label className='label'>
+                <span className='label-text'>Clarification</span>
+              </label>
+              <input
+                ref={clarificationRef}
+                type='text'
+                className='input input-bordered w-full'
+                value={translation?.clarification || ''}
+                onChange={handleClarificationChange}
+              />
+            </div>
           )}
         </div>
       </div>

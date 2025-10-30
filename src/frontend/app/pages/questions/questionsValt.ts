@@ -8,6 +8,7 @@ export interface IQuestionTranslation {
   languageCode: string;
   prompt: string;
   answer: string;
+  clarification?: string | null; // Required for TF questions
 }
 
 export interface Question {
@@ -68,7 +69,8 @@ export class QuestionsValt {
             question.translations[languageCode] = {
               languageCode,
               prompt: '',
-              answer: ''
+              answer: '',
+              clarification: null
             };
           }
         }
@@ -101,7 +103,7 @@ export class QuestionsValt {
   changeStoreTranslation(
     question: Question,
     translation: IQuestionTranslation,
-    updates: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt'>>
+    updates: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
   ) {
     const questionInStore = this.store.questions[question.id];
 
@@ -121,6 +123,10 @@ export class QuestionsValt {
 
     if (updates.answer !== undefined) {
       translationInStore.answer = updates.answer;
+    }
+
+    if (updates.clarification !== undefined) {
+      translationInStore.clarification = updates.clarification;
     }
   }
 
@@ -143,7 +149,8 @@ export class QuestionsValt {
         translations[languageCode] = {
           languageCode,
           prompt: '',
-          answer: ''
+          answer: '',
+          clarification: null
         };
       }
 
@@ -189,7 +196,8 @@ export class QuestionsValt {
         translations[languageCode] = {
           languageCode,
           prompt: '',
-          answer: ''
+          answer: '',
+          clarification: null
         };
       }
 
@@ -323,7 +331,7 @@ export class QuestionsValt {
   async upsertTranslation(
     question: Snapshot<Question>,
     translation: IQuestionTranslation,
-    updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt'>>
+    updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
   ) {
     if (translation.id) {
       // Update existing translation
@@ -356,7 +364,8 @@ export class QuestionsValt {
       body: JSON.stringify({
         languageCode: translationInStore.languageCode,
         prompt: translationInStore.prompt,
-        answer: translationInStore.answer
+        answer: translationInStore.answer,
+        clarification: translationInStore.clarification
       })
     });
 
@@ -379,7 +388,7 @@ export class QuestionsValt {
   async updateTranslation(
     question: Snapshot<Question>,
     translation: Snapshot<IQuestionTranslation>,
-    updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt'>>
+    updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
   ) {
     const questionInStore = this.store.questions[question.id];
 

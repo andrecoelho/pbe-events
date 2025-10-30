@@ -21,6 +21,7 @@ interface QuestionTranslation {
   lang: string;
   prompt: string;
   answer: string | boolean; // boolean for TF questions, string for others
+  clarification?: string; // Required for TF questions when answer is false
 }
 
 interface QuestionImport {
@@ -62,10 +63,17 @@ const queryInsertQuestion = db.query<
 
 const queryInsertQuestionTranslation = db.query<
   {},
-  { $id: string; $prompt: string; $answer: string; $languageId: string; $questionId: string }
+  {
+    $id: string;
+    $prompt: string;
+    $answer: string;
+    $clarification: string | null;
+    $languageId: string;
+    $questionId: string;
+  }
 >(
-  `INSERT INTO translations (id, prompt, answer, languageId, questionId)
-   VALUES ($id, $prompt, $answer, $languageId, $questionId)`
+  `INSERT INTO translations (id, prompt, answer, clarification, languageId, questionId)
+   VALUES ($id, $prompt, $answer, $clarification, $languageId, $questionId)`
 );
 
 const queryDeleteQuestions = db.query<{}, { $eventId: string }>(`DELETE FROM questions WHERE eventId = $eventId`);
@@ -80,10 +88,10 @@ const queryGetQuestions = db.query<
 );
 
 const queryGetQuestionTranslations = db.query<
-  { languageId: string; prompt: string; answer: string },
+  { languageId: string; prompt: string; answer: string; clarification: string | null },
   { $questionId: string }
 >(
-  `SELECT languageId, prompt, answer FROM translations
+  `SELECT languageId, prompt, answer, clarification FROM translations
    WHERE questionId = $questionId
    ORDER BY languageId ASC`
 );
@@ -107,6 +115,7 @@ const queryGetQuestionsWithTranslations = db.query<
     translationLanguageCode: string | null;
     translationPrompt: string | null;
     translationAnswer: string | null;
+    translationClarification: string | null;
   },
   { $eventId: string }
 >(
@@ -120,7 +129,8 @@ const queryGetQuestionsWithTranslations = db.query<
     t.languageId as translationLanguageId,
     l.code as translationLanguageCode,
     t.prompt as translationPrompt,
-    t.answer as translationAnswer
+    t.answer as translationAnswer,
+    t.clarification as translationClarification
    FROM questions q
    LEFT JOIN translations t ON q.id = t.questionId
    LEFT JOIN languages l ON t.languageId = l.id
@@ -177,13 +187,14 @@ const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>
 
 // Individual question translation CRUD queries
 const queryGetSingleQuestionTranslation = db.query<
-  { id: string; prompt: string; answer: string; languageId: string; questionId: string },
+  { id: string; prompt: string; answer: string; clarification: string | null; languageId: string; questionId: string },
   { $id: string }
->(`SELECT id, prompt, answer, languageId, questionId FROM translations WHERE id = $id`);
+>(`SELECT id, prompt, answer, clarification, languageId, questionId FROM translations WHERE id = $id`);
 
-const queryUpdateQuestionTranslation = db.query<{}, { $id: string; $prompt: string; $answer: string }>(
-  `UPDATE translations SET prompt = $prompt, answer = $answer WHERE id = $id`
-);
+const queryUpdateQuestionTranslation = db.query<
+  {},
+  { $id: string; $prompt: string; $answer: string; $clarification: string | null }
+>(`UPDATE translations SET prompt = $prompt, answer = $answer, clarification = $clarification WHERE id = $id`);
 
 const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM translations WHERE id = $id`);
 
@@ -445,6 +456,7 @@ function importQuestions(
         $id: translationId,
         $prompt: translation.prompt.trim(),
         $answer: answerValue,
+        $clarification: translation.clarification ? translation.clarification.trim() : null,
         $languageId: languageId,
         $questionId: questionId
       });
@@ -502,7 +514,13 @@ export const questionsRoutes: Routes = {
           seconds: number;
           translations: Record<
             string, // key: language code
-            { id: string; languageCode: string; prompt: string | null; answer: string | null }
+            {
+              id: string;
+              languageCode: string;
+              prompt: string | null;
+              answer: string | null;
+              clarification: string | null;
+            }
           >;
         }
       >();
@@ -526,7 +544,8 @@ export const questionsRoutes: Routes = {
             id: row.translationId,
             languageCode: row.translationLanguageCode,
             prompt: row.translationPrompt,
-            answer: row.translationAnswer
+            answer: row.translationAnswer,
+            clarification: row.translationClarification
           };
         }
       }
@@ -791,12 +810,19 @@ export const questionsRoutes: Routes = {
             throw new Error(`Language code not found for languageId: ${qt.languageId}`);
           }
 
-          return {
+          const translation: QuestionTranslation = {
             lang: langCode,
             prompt: qt.prompt,
             // Convert string "true"/"false" back to booleans for TF questions
             answer: question.type === 'TF' ? qt.answer === 'true' : qt.answer
           };
+
+          // Add clarification if present
+          if (qt.clarification) {
+            translation.clarification = qt.clarification;
+          }
+
+          return translation;
         });
 
         questionsExport.push({
@@ -1036,7 +1062,7 @@ export const questionsRoutes: Routes = {
 
       // Parse request body
       const body = await req.json();
-      let { languageCode, prompt, answer } = body;
+      let { languageCode, prompt, answer, clarification } = body;
 
       // Validate required fields
       if (typeof languageCode !== 'string' || typeof prompt !== 'string' || typeof answer !== 'string') {
@@ -1045,6 +1071,7 @@ export const questionsRoutes: Routes = {
 
       prompt = prompt?.trim();
       answer = answer?.trim();
+      clarification = clarification?.trim();
 
       // Validate that the language exists for this event
       const languages = queryGetLanguages.all({ $eventId: question.eventId });
@@ -1061,9 +1088,10 @@ export const questionsRoutes: Routes = {
         return apiBadRequest(`Language not found for code "${languageCode}"`);
       }
 
-      // For TF questions, validate answer is "true" or "false"
+      // For TF questions, validate answer is "true" or "false" and require clarification
       if (question.type === 'TF') {
         const normalizedAnswer = answer.toLowerCase().trim();
+
         if (normalizedAnswer !== 'true' && normalizedAnswer !== 'false') {
           return apiBadRequest('True/False answer must be "true" or "false"');
         }
@@ -1076,12 +1104,13 @@ export const questionsRoutes: Routes = {
           $id: translationId,
           $prompt: prompt,
           $answer: answer,
+          $clarification: clarification,
           $languageId: language.id,
           $questionId: questionId
         });
 
         return apiData({
-          translation: { id: translationId, languageCode, prompt, answer }
+          translation: { id: translationId, languageCode, prompt, answer, clarification }
         });
       } catch (error) {
         console.error('Error creating question translation:', error);
@@ -1128,9 +1157,10 @@ export const questionsRoutes: Routes = {
       // Parse request body
       const body = await req.json();
 
-      const { prompt, answer } = body as {
+      const { prompt, answer, clarification } = body as {
         prompt?: string;
         answer?: string;
+        clarification?: string;
       };
 
       // Validate fields if provided
@@ -1155,7 +1185,8 @@ export const questionsRoutes: Routes = {
         queryUpdateQuestionTranslation.run({
           $id: translationId,
           $prompt: prompt !== undefined ? prompt.trim() : questionTranslation.prompt,
-          $answer: answer !== undefined ? answer.trim() : questionTranslation.answer
+          $answer: answer !== undefined ? answer.trim() : questionTranslation.answer,
+          $clarification: clarification !== undefined ? clarification.trim() : questionTranslation.clarification
         });
 
         return apiData();
