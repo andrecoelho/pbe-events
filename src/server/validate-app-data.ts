@@ -1,4 +1,4 @@
-import { exists } from 'node:fs/promises';
+import { exists, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { styleText } from 'node:util';
 
@@ -23,6 +23,6 @@ const imageDir = join(dataDir, 'user-image');
 const imageDirExists = await exists(imageDir);
 
 if (!imageDirExists) {
-  console.error(`🚨 PBE User image directory not found, using: ${styleText('yellow', imageDir)}`);
-  process.exit(0);
+  mkdir(imageDir, { recursive: true });
+  console.log(`📂 Created user image directory at ${styleText('cyan', imageDir)}`);
 }
