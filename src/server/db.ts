@@ -8,7 +8,7 @@ const dbFileExists = await exists(dbPath);
 
 export const db = new Database(dbPath);
 
-if (!dbFileExists) {
+if (!dbFileExists || global.PBE.initDB) {
   const pbeQuery = await Bun.file(join(import.meta.dir, 'pbe.sql')).text();
 
   db.run(pbeQuery);
