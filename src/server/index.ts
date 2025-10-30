@@ -1,3 +1,5 @@
+import './validate-app-data';
+
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import { db } from '@/server/db';
@@ -10,8 +12,12 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
+import { join, resolve } from 'node:path';
 import { styleText } from 'node:util';
-import { join } from 'path';
+
+const mountPath = process.env.PBE_APP_DATA_PATH!;
+const dataDir = resolve(mountPath);
+const imageDir = join(dataDir, 'user-image');
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
@@ -44,8 +50,7 @@ const server = Bun.serve({
       const userId = url.pathname.split('/')[2];
 
       if (typeof userId === 'string' && userId.length > 0) {
-        const path = join(import.meta.dir, '../../data/', `${userId}.png`);
-        const file = Bun.file(path);
+        const file = Bun.file(join(imageDir, `${userId}.png`));
 
         if (await file.exists()) {
           return new Response(file);

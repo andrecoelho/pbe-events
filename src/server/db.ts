@@ -1,27 +1,12 @@
 import { Database } from 'bun:sqlite';
 import { exists } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { styleText } from 'node:util';
-import { join, resolve } from 'path';
-
-const mountPath = process.env.PBE_APP_DATA_PATH;
 
 console.log('🔍 Initializing database ...');
 
-if (!mountPath) {
-  console.error('🚨📂', 'Environment variable not set:', styleText(['grey'], 'PBE_APP_DATA_PATH'));
-  process.exit(0);
-}
-
-console.log(`📂 ${styleText(['grey'], 'PBE_APP_DATA_PATH')}=${styleText(['yellow'], mountPath)}`);
-
+const mountPath = process.env.PBE_APP_DATA_PATH!;
 const dataDir = resolve(mountPath);
-const dirExists = await exists(dataDir);
-
-if (!dirExists) {
-  console.error(`🚨 PBE app data directory not found, using: ${styleText('yellow', dataDir)}`);
-  process.exit(0);
-}
-
 const dbPath = join(dataDir, 'pbe-events.sqlite');
 const dbFileExists = await exists(dbPath);
 
