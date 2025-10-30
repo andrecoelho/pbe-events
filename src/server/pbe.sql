@@ -93,6 +93,7 @@ CREATE TABLE translations (
   id TEXT NOT NULL,
   prompt TEXT NOT NULL,
   answer TEXT NOT NULL,
+  clarification TEXT,
   languageId TEXT NOT NULL,
   questionId TEXT NOT NULL,
   createdAt NUMERIC NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -114,3 +115,7 @@ CREATE TABLE answers (
   FOREIGN KEY (teamId) REFERENCES teams(id) ON DELETE CASCADE,
   FOREIGN KEY (translationId) REFERENCES translations(id) ON DELETE CASCADE
 );
+
+INSERT INTO roles (id, name) VALUES ('owner', 'Owner');
+INSERT INTO roles (id, name) VALUES ('admin', 'Admin');
+INSERT INTO roles (id, name) VALUES ('judge', 'Judge');
