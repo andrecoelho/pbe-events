@@ -5,11 +5,11 @@ import { styleText } from 'node:util';
 const mountPath = process.env.PBE_APP_DATA_PATH;
 
 if (!mountPath) {
-  console.error('🚨📂', 'Environment variable not set:', styleText(['grey'], 'PBE_APP_DATA_PATH'));
+  console.error('🚨📂', 'Environment variable missing:', styleText(['grey'], 'PBE_APP_DATA_PATH'));
   process.exit(0);
 }
 
-console.log(`📂 ${styleText(['grey'], 'PBE_APP_DATA_PATH')}=${styleText(['yellow'], mountPath)}`);
+console.log(`📜 ${styleText(['grey'], 'PBE_APP_DATA_PATH')}=${styleText(['yellow'], mountPath)}`);
 
 const dataDir = resolve(mountPath);
 const dataDirExists = await exists(dataDir);
@@ -19,10 +19,18 @@ if (!dataDirExists) {
   process.exit(0);
 }
 
-const imageDir = join(dataDir, 'user-image');
+console.log(`📂 ${styleText(['grey'], 'App Data')}:${styleText(['magenta'], dataDir)}`);
+
+const imageDir = join(dataDir, 'user-images');
 const imageDirExists = await exists(imageDir);
 
 if (!imageDirExists) {
   mkdir(imageDir, { recursive: true });
-  console.log(`📂 Created user image directory at ${styleText('cyan', imageDir)}`);
+  console.log(`✅ Created user images directory at ${styleText('magenta', imageDir)}`);
 }
+
+global.PBE = {
+  mountPath,
+  dataDir,
+  imageDir
+} as typeof global.PBE;

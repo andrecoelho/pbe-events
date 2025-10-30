@@ -1,4 +1,4 @@
-declare module "*.png" {
+declare module '*.png' {
   /**
    * A path to the PNG file
    */
@@ -6,7 +6,7 @@ declare module "*.png" {
   export = path;
 }
 
-declare module "*.webp" {
+declare module '*.webp' {
   /**
    * A path to the WEBP file
    */
@@ -14,7 +14,7 @@ declare module "*.webp" {
   export = path;
 }
 
-declare module "*.svg" {
+declare module '*.svg' {
   /**
    * A path to the SVG file
    */
@@ -22,7 +22,7 @@ declare module "*.svg" {
   export = path;
 }
 
-declare module "*.css" {
+declare module '*.css' {
   /**
    * A record of class names to their corresponding CSS module classes
    */
@@ -30,10 +30,16 @@ declare module "*.css" {
   export = classes;
 }
 
-declare module "*.sql" {
+declare module '*.sql' {
   /**
    * A record of SQL queries
    */
   const queries: string;
   export = queries;
 }
+
+declare var PBE: {
+  mountPath: string;
+  dataDir: string;
+  imageDir: string;
+};

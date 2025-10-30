@@ -12,12 +12,8 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { styleText } from 'node:util';
-
-const mountPath = process.env.PBE_APP_DATA_PATH!;
-const dataDir = resolve(mountPath);
-const imageDir = join(dataDir, 'user-image');
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
@@ -50,7 +46,7 @@ const server = Bun.serve({
       const userId = url.pathname.split('/')[2];
 
       if (typeof userId === 'string' && userId.length > 0) {
-        const file = Bun.file(join(imageDir, `${userId}.png`));
+        const file = Bun.file(join(global.PBE.imageDir, `${userId}.png`));
 
         if (await file.exists()) {
           return new Response(file);
