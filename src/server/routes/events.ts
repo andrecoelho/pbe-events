@@ -76,9 +76,10 @@ export const eventsRoutes: Routes = {
       const id = Bun.randomUUIDv7();
 
       try {
-        queryInsertEvent.run({ $id: id, $name: name.trim() });
-
-        queryInsertPermission.run({ $userId: session.userId, $eventId: id, $roleId: 'owner' });
+        db.transaction(() => {
+          queryInsertEvent.run({ $id: id, $name: name.trim() });
+          queryInsertPermission.run({ $userId: session.userId, $eventId: id, $roleId: 'owner' });
+        })();
       } catch (error) {
         console.error('Error creating event:', error);
 
