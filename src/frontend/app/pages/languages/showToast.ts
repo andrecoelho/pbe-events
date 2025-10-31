@@ -19,7 +19,6 @@ export function showToast(message: string) {
   alert.className = 'alert alert-error';
   alert.innerHTML = `<span>${message}</span>`;
 
-  // Insert at the beginning (bottom due to flex-direction: column)
   container.appendChild(alert);
 
   setTimeout(() => {
