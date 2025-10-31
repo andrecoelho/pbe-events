@@ -46,49 +46,53 @@ export class QuestionsValt {
   async init(eventId: string) {
     const result = await fetch(`/api/events/${eventId}/questions`);
 
-    if (result.status === 200) {
-      const response = (await result.json()) as {
-        eventName: string;
-        languages: { [code: string]: string };
-        questions: Record<string, Question>;
-      };
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to load questions' } as const;
+    }
 
-      this.store.eventId = eventId;
-      this.store.eventName = response.eventName;
+    const response = (await result.json()) as {
+      eventName: string;
+      languages: { [code: string]: string };
+      questions: Record<string, Question>;
+    };
 
-      // Convert languages array to object
-      this.store.languages = response.languages;
-      this.store.questions = response.questions;
+    this.store.eventId = eventId;
+    this.store.eventName = response.eventName;
 
-      // Ensure every question has a translation for each language
-      for (const [, question] of Object.entries(this.store.questions)) {
-        for (const languageCode of Object.keys(this.store.languages)) {
-          // Check if translation exists for this language code
-          if (!question.translations[languageCode]) {
-            // Add placeholder translation without id
-            question.translations[languageCode] = {
-              languageCode,
-              prompt: '',
-              answer: '',
-              clarification: null
-            };
-          }
-        }
-      }
+    // Convert languages array to object
+    this.store.languages = response.languages;
+    this.store.questions = response.questions;
 
-      this.store.initialized = true;
-
-      // Select first question if available (sorted by number)
-      const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
-
-      if (sortedQuestions.length > 0) {
-        const firstQuestion = sortedQuestions[0];
-
-        if (firstQuestion) {
-          this.store.selectedQuestion = firstQuestion;
+    // Ensure every question has a translation for each language
+    for (const [, question] of Object.entries(this.store.questions)) {
+      for (const languageCode of Object.keys(this.store.languages)) {
+        // Check if translation exists for this language code
+        if (!question.translations[languageCode]) {
+          // Add placeholder translation without id
+          question.translations[languageCode] = {
+            languageCode,
+            prompt: '',
+            answer: '',
+            clarification: null
+          };
         }
       }
     }
+
+    this.store.initialized = true;
+
+    // Select first question if available (sorted by number)
+    const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
+
+    if (sortedQuestions.length > 0) {
+      const firstQuestion = sortedQuestions[0];
+
+      if (firstQuestion) {
+        this.store.selectedQuestion = firstQuestion;
+      }
+    }
+
+    return { ok: true } as const;
   }
 
   setSelectedQuestion(questionNumber: number | null) {

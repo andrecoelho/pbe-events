@@ -1,14 +1,14 @@
-import './Questions.css';
-
-import { QuestionsValt, QuestionsValtContext } from '@/frontend/app/pages/questions/questionsValt';
+import { alertModal } from '@/frontend/components/AlertModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo, useRef } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionEditor } from './QuestionEditor';
+import './Questions.css';
 import { QuestionsList } from './QuestionsList';
-import { alertModal } from '@/frontend/components/AlertModal';
+import { QuestionsValt, QuestionsValtContext } from './questionsValt';
 
 const init = () => {
   const questionsValt = new QuestionsValt();
@@ -17,7 +17,11 @@ const init = () => {
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    questionsValt.init(eventId);
+    questionsValt.init(eventId).then((result) => {
+      if (!result.ok) {
+        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+      }
+    });
   }
 
   return { questionsValt };

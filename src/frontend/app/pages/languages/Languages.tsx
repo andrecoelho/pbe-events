@@ -1,10 +1,11 @@
-import { AddLanguageRow } from '@/frontend/app/pages/languages/AddLanguageRow';
-import { LanguageRow } from '@/frontend/app/pages/languages/LanguageRow';
-import { LanguagesValt } from '@/frontend/app/pages/languages/languagesValt';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
+import { AddLanguageRow } from './AddLanguageRow';
+import { LanguageRow } from './LanguageRow';
 import './Languages.css';
+import { LanguagesValt } from './languagesValt';
 
 const init = () => {
   const languagesValt = new LanguagesValt();
@@ -13,7 +14,11 @@ const init = () => {
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    languagesValt.init(eventId);
+    languagesValt.init(eventId).then((result) => {
+      if (!result.ok) {
+        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+      }
+    });
   }
 
   return { languagesValt };

@@ -22,12 +22,19 @@ export class PermissionsValt {
 
   async init(eventId: string) {
     const result = await fetch(`/api/events/${eventId}/permissions`);
+
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to load permissions' } as const;
+    }
+
     const response = (await result.json()) as { eventName: string; permissions: PermissionsStore['permissions'] };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.permissions = response.permissions;
     this.store.initialized = true;
+
+    return { ok: true } as const;
   }
 
   async addPermission(userId: string, roleId: 'admin' | 'judge', email: string, firstName: string, lastName: string) {

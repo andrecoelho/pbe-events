@@ -1,18 +1,22 @@
-import './Events.css';
-
 import { alertModal } from '@/frontend/components/AlertModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import { EventCard } from './EventCard';
 import { eventNameModal } from './EventNameModal';
+import './Events.css';
 import { EventsValt, EventsValtContext } from './eventValt';
 
 const init = () => {
   const valt = new EventsValt();
 
-  valt.init();
+  valt.init().then((result) => {
+    if (!result.ok) {
+      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+    }
+  });
 
   return valt;
 };

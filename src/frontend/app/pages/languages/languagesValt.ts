@@ -40,12 +40,19 @@ export class LanguagesValt {
 
   async init(eventId: string) {
     const result = await fetch(`/api/events/${eventId}/languages`);
+
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to load languages' } as const;
+    }
+
     const response = (await result.json()) as { eventName: string; languages: Language[] };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.languages = response.languages;
     this.store.initialized = true;
+
+    return { ok: true } as const;
   }
 
   startEdit(language: Language) {

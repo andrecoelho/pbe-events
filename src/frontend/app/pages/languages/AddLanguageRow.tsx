@@ -1,6 +1,6 @@
 import { LanguagesValt } from '@/frontend/app/pages/languages/languagesValt';
-import { showToast } from '@/frontend/app/pages/languages/showToast';
 import { Icon } from '@/frontend/components/Icon';
+import { toast } from '@/frontend/components/Toast';
 import { useState } from 'react';
 
 interface Props {
@@ -41,7 +41,7 @@ export function AddLanguageRow({ valt }: Props) {
       setName('');
       setIsAdding(false);
     } else {
-      showToast(result.error || 'Failed to add language');
+      toast.show({ message: result.error || 'Failed to add language', type: 'error' });
     }
   };
 

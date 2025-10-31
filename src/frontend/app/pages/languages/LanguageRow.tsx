@@ -1,5 +1,5 @@
 import { LanguagesValt, type Language } from '@/frontend/app/pages/languages/languagesValt';
-import { showToast } from '@/frontend/app/pages/languages/showToast';
+import { toast } from '@/frontend/components/Toast';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { useSnapshot } from 'valtio';
@@ -25,7 +25,7 @@ export function LanguageRow({ language, valt }: Props) {
     const result = await valt.saveEdit();
 
     if (!result.ok && result.error) {
-      showToast(result.error);
+      toast.show({ message: result.error, type: 'error' });
     }
   };
 
@@ -39,7 +39,7 @@ export function LanguageRow({ language, valt }: Props) {
       const result = await valt.deleteLanguage(language.id);
 
       if (!result.ok) {
-        showToast(result.error || 'Failed to delete language');
+        toast.show({ message: result.error || 'Failed to delete language', type: 'error' });
       }
     }
   };

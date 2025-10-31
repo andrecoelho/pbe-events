@@ -24,12 +24,16 @@ export class EventsValt {
   async init() {
     const result = await fetch('/api/events');
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { events: PBEEvent[] };
-
-      this.store.events = response.events;
-      this.store.initialized = true;
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to load events' } as const;
     }
+
+    const response = (await result.json()) as { events: PBEEvent[] };
+
+    this.store.events = response.events;
+    this.store.initialized = true;
+
+    return { ok: true } as const;
   }
 
   async createEvent(name: string) {

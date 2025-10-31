@@ -1,11 +1,12 @@
-import { TeamsValt } from '@/frontend/app/pages/teams/teamsValt';
-import { teamsModal } from '@/frontend/app/pages/teams/TeamsModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Teams.css';
+import { teamsModal } from './TeamsModal';
+import { TeamsValt } from './teamsValt';
 
 const init = () => {
   const teamsValt = new TeamsValt();
@@ -14,7 +15,11 @@ const init = () => {
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    teamsValt.init(eventId);
+    teamsValt.init(eventId).then((result) => {
+      if (!result.ok) {
+        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+      }
+    });
   }
 
   const handleAddTeam = async () => {

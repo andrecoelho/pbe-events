@@ -1,11 +1,12 @@
-import { permissionsModal } from '@/frontend/app/pages/permissions/PermissionsModal';
-import { PermissionsValt } from '@/frontend/app/pages/permissions/permissionsValt';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Permissions.css';
+import { permissionsModal } from './PermissionsModal';
+import { PermissionsValt } from './permissionsValt';
 
 const badgeColors = {
   owner: 'badge-success',
@@ -20,7 +21,11 @@ const init = () => {
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    permissionsValt.init(eventId);
+    permissionsValt.init(eventId).then((result) => {
+      if (!result.ok) {
+        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+      }
+    });
   }
 
   return permissionsValt;
@@ -34,7 +39,7 @@ export function Permissions() {
     permissionsModal.open(permissionsValt);
   };
 
-  const handleEditUser = (permission: typeof snap.permissions[0]) => {
+  const handleEditUser = (permission: (typeof snap.permissions)[0]) => {
     permissionsModal.open(permissionsValt, {
       userId: permission.userId,
       email: permission.email,

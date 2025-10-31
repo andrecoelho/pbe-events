@@ -22,12 +22,19 @@ export class TeamsValt {
 
   async init(eventId: string) {
     const result = await fetch(`/api/events/${eventId}/teams`);
+
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to load teams' } as const;
+    }
+
     const response = (await result.json()) as { eventName: string; teams: TeamsStore['teams'] };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.teams = response.teams;
     this.store.initialized = true;
+
+    return { ok: true } as const;
   }
 
   async addTeam(name: string) {
