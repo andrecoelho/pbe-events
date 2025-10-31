@@ -5,7 +5,7 @@ function getToastContainer(): HTMLDivElement {
     toastContainer = document.createElement('div');
     toastContainer.className = 'toast toast-bottom toast-start';
     toastContainer.style.display = 'flex';
-    toastContainer.style.flexDirection = 'column-reverse';
+    toastContainer.style.flexDirection = 'column';
     toastContainer.style.gap = '0.5rem';
     document.body.appendChild(toastContainer);
   }
@@ -19,8 +19,8 @@ export function showToast(message: string) {
   alert.className = 'alert alert-error';
   alert.innerHTML = `<span>${message}</span>`;
 
-  // Insert at the beginning (bottom due to flex-direction: column-reverse)
-  container.insertBefore(alert, container.firstChild);
+  // Insert at the beginning (bottom due to flex-direction: column)
+  container.appendChild(alert);
 
   setTimeout(() => {
     alert.remove();
