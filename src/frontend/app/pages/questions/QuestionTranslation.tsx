@@ -71,7 +71,7 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
 
         <div className='flex gap-8'>
           {/* Answer */}
-          <div>
+          <div className={question.type !== 'TF' ? 'w-full' : ''}>
             <label className='label'>
               <span className='label-text'>Answer</span>
             </label>
@@ -101,7 +101,7 @@ export const QuestionTranslation = memo(({ question, translation }: Props) => {
 
           {/* Clarification (for TF questions only) */}
           {question.type === 'TF' && (
-            <div>
+            <div className='w-full'>
               <label className='label'>
                 <span className='label-text'>Clarification</span>
               </label>
