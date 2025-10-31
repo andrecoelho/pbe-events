@@ -18,14 +18,8 @@ const querySelectEventsByUserId = db.query<
   `SELECT events.*, permissions.roleId
    FROM events
    JOIN permissions ON events.id = permissions.eventId
-   WHERE permissions.userId = $userId`
-);
-
-const querySelectEvent = db.query<PBEEvent, { $eventId: string; $userId: string }>(
-  `SELECT events.*
-   FROM events
-   JOIN permissions ON events.id = permissions.eventId
-   WHERE permissions.userId = $userId AND events.id = $eventId AND permissions.roleId IN ('owner', 'admin')`
+   WHERE permissions.userId = $userId
+   ORDER BY events.name ASC`
 );
 
 const queryInsertEvent = db.query<{}, { $id: string; $name: string }>(
