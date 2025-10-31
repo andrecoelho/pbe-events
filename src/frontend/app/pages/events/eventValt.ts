@@ -4,6 +4,7 @@ import { proxy } from 'valtio';
 export interface PBEEvent {
   id: string;
   name: string;
+  roleId: 'owner' | 'admin' | 'judge';
 }
 
 export interface EventsStore {
@@ -49,7 +50,7 @@ export class EventsValt {
       throw new Error(response.error || 'Failed to create event');
     }
 
-    this.store.events.push({ id: response.id, name: response.name });
+    this.store.events.push({ id: response.id, name: response.name, roleId: response.roleId });
   }
 
   async renameEvent(id: string, newName: string) {

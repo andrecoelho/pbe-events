@@ -11,8 +11,11 @@ import {
   apiUnauthorized
 } from '@/server/utils/responses';
 
-const querySelectEventsByUserId = db.query<PBEEvent[], { $userId: string }>(
-  `SELECT events.*
+const querySelectEventsByUserId = db.query<
+  Array<PBEEvent & { roleId: string }>,
+  { $userId: string }
+>(
+  `SELECT events.*, permissions.roleId
    FROM events
    JOIN permissions ON events.id = permissions.eventId
    WHERE permissions.userId = $userId`
@@ -86,7 +89,7 @@ export const eventsRoutes: Routes = {
         return apiServerError('Failed to create event');
       }
 
-      return apiData({ id, name: name.trim() });
+      return apiData({ id, name: name.trim(), roleId: 'owner' });
     }
   },
   '/api/events/:id': {
