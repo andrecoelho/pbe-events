@@ -51,6 +51,7 @@ export class EventsValt {
     }
 
     this.store.events.push({ id: response.id, name: response.name, roleId: response.roleId });
+    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async renameEvent(id: string, newName: string) {
@@ -73,6 +74,7 @@ export class EventsValt {
     }
 
     event.name = newName;
+    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async deleteEvent(id: string) {
