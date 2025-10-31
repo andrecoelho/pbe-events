@@ -75,9 +75,9 @@ export const Questions = memo(() => {
   return (
     <QuestionsValtContext.Provider value={questionsValt}>
       <div className='Questions bg-base-100 flex-1 relative flex flex-col overflow-hidden'>
-        <div className='flex-none p-8 pb-4'>
+        <div className='flex-none p-8 pb-1'>
           <h1 className='text-3xl font-bold mb-1 text-center'>Event Questions</h1>
-          <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
+          <h2 className='text-2xl font-bold text-center text-neutral brightness-75'>{snap.eventName}</h2>
         </div>
         <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
           {Object.keys(snap.languages).length === 0 && (
