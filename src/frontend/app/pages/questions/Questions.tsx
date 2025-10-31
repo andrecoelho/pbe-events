@@ -80,13 +80,27 @@ export const Questions = memo(() => {
           <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
         </div>
         <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
-          {Object.keys(snap.questions).length === 0 && (
+          {Object.keys(snap.languages).length === 0 && (
+            <div className='flex-1 flex items-center justify-center'>
+              <div className='text-center'>
+                <p className='text-neutral text-lg mb-4'>
+                  No languages configured for this event. Please add languages before creating questions.
+                </p>
+                <a href={`/languages/${snap.eventId}`} className='btn btn-primary'>
+                  <Icon name='language' className='size-4' />
+                  Configure Languages
+                </a>
+              </div>
+            </div>
+          )}
+
+          {Object.keys(snap.languages).length > 0 && Object.keys(snap.questions).length === 0 && (
             <div className='text-center py-8'>
               <p className='text-neutral mb-4'>No questions yet. Add your first question to get started.</p>
             </div>
           )}
 
-          {Object.keys(snap.questions).length > 0 && (
+          {Object.keys(snap.languages).length > 0 && Object.keys(snap.questions).length > 0 && (
             <div className='QuestionsEditor flex gap-6 flex-1 min-h-0'>
               {/* Question Numbers Column */}
               <QuestionsList />
@@ -108,7 +122,11 @@ export const Questions = memo(() => {
             Export
           </button>
 
-          <button className='btn btn-primary' onClick={handleAddQuestion}>
+          <button
+            className='btn btn-primary'
+            onClick={handleAddQuestion}
+            disabled={Object.keys(snap.languages).length === 0}
+          >
             <Icon name='plus' className='size-4' />
             Add Question
           </button>

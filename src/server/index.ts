@@ -5,6 +5,7 @@ import login from '@/frontend/login/login.html';
 import { db } from '@/server/db';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
+import { languagesRoutes } from '@/server/routes/languages';
 import { permissionRoutes } from '@/server/routes/permissions';
 import { questionsRoutes } from '@/server/routes/questions';
 import { sessionRoutes } from '@/server/routes/session';
@@ -27,6 +28,7 @@ const server = Bun.serve({
     ...eventsRoutes,
     ...permissionRoutes,
     ...teamsRoutes,
+    ...languagesRoutes,
     ...userRoutes,
     ...questionsRoutes
   },

@@ -1,0 +1,42 @@
+@reference '../../../base.css';
+
+.Languages {
+  .col-header {
+    @apply py-3 px-4;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+
+  .col-code,
+  .col-name,
+  .col-actions {
+    @apply py-4 px-4;
+    border-bottom: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
+  }
+
+  /* Add button row - no border */
+  .col-add-button,
+  .col-add-row {
+    border-bottom: none;
+  }
+
+  /* Add button row styling */
+  .col-add-button {
+    @apply pt-4;
+  }
+
+  .col-code {
+    @apply text-center flex flex-col items-center justify-center;
+  }
+
+  .col-name {
+    @apply flex flex-col items-start justify-center;
+  }
+
+  .col-actions {
+    @apply flex items-center justify-center gap-4;
+  }
+
+  .col-actions > button > svg {
+    @apply size-6 cursor-pointer hover:brightness-75;
+  }
+}

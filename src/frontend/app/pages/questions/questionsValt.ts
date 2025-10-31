@@ -80,8 +80,10 @@ export class QuestionsValt {
 
       // Select first question if available (sorted by number)
       const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
+
       if (sortedQuestions.length > 0) {
         const firstQuestion = sortedQuestions[0];
+
         if (firstQuestion) {
           this.store.selectedQuestion = firstQuestion;
         }

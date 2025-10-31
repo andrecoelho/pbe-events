@@ -83,6 +83,14 @@ export const EventCard = memo((props: Props) => {
         </a>
         <a
           className='tooltip tooltip-neutral'
+          data-tip='Languages'
+          href={`/languages/${props.event.id}`}
+          aria-label={`Languages for event ${props.event.name}`}
+        >
+          <Icon name='language' className='text-lime-500 hover:brightness-75' />
+        </a>
+        <a
+          className='tooltip tooltip-neutral'
           data-tip='Questions'
           href={`/questions/${props.event.id}`}
           aria-label={`Questions for event ${props.event.name}`}
