@@ -2,30 +2,30 @@
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {
-  name: "pbe";
+  name: 'pbe';
   default: true;
   prefersdark: false;
-  color-scheme: "light";
+  color-scheme: 'light';
   --color-base-100: oklch(100% 0 0);
   --color-base-200: oklch(98% 0 0);
   --color-base-300: oklch(95% 0 0);
   --color-base-content: oklch(21% 0.006 285.885);
   --color-primary: oklch(33.6% 0.139 265.2);
-  --color-primary-content: #F3F2F3;
-  --color-secondary: #D90F0A;
-  --color-secondary-content: #F3F2F3;
-  --color-accent: #EBA437;
+  --color-primary-content: #f3f2f3;
+  --color-secondary: #d90f0a;
+  --color-secondary-content: #f3f2f3;
+  --color-accent: #eba437;
   --color-accent-content: #010100;
   --color-neutral: oklch(87% 0.01 258.338);
   --color-neutral-content: oklch(10.9% 0.028 210.4);
   --color-info: oklch(75.2% 0.093 252.3);
   --color-info-content: oklch(0% 0.046 27.4);
   --color-success: oklch(57.6% 0.106 138.5);
-  --color-success-content: #F3F2F3;
+  --color-success-content: #f3f2f3;
   --color-warning: oklch(90.6% 0.162 75.8);
   --color-warning-content: oklch(10.4% 0.009 41.617);
   --color-error: oklch(63.6% 0.206 17.6);
-  --color-error-content: #F3F2F3;
+  --color-error-content: #f3f2f3;
   --radius-selector: 0.25rem;
   --radius-field: 0.25rem;
   --radius-box: 0.25rem;
@@ -46,7 +46,14 @@
   }
 
   body #root {
-    @apply absolute inset-0 bg-linear-to-br from-primary/60 to-primary;
+    @apply absolute inset-0;
+  }
+
+  body #root::before {
+    content: '';
+    @apply absolute inset-0 -z-10;
+    @apply bg-[url(@/assets/bible.jpg)] bg-cover bg-center bg-fixed;
+    @apply blur-[2px];
   }
 
   a.tooltip:focus-visible::before,

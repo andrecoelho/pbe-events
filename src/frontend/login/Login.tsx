@@ -35,8 +35,8 @@ export function Login() {
 
   return (
     <div className='absolute inset-0 flex justify-center items-center'>
-      <div className='card card-side shadow-md'>
-        <div className='card-body bg-white/10 p-12 rounded-l-lg'>
+      <div className='card card-side shadow-md overflow-hidden'>
+        <div className='card-body p-12 glass'>
           <img src={logo} className='w-96 h-64' />
         </div>
         <div className='card-body bg-base-300 place-items-center justify-center p-12 rounded-r-lg'>
