@@ -1,4 +1,3 @@
-import { Loading } from '@/frontend/components/Loading';
 import { toast } from '@/frontend/components/Toast';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
@@ -8,32 +7,28 @@ import './Languages.css';
 import { LanguagesValt } from './languagesValt';
 
 const init = () => {
-  const languagesValt = new LanguagesValt();
+  const valt = new LanguagesValt();
   const url = new URL(window.location.href);
   const match = url.pathname.match(/^\/languages\/([^/]+)$/);
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    languagesValt.init(eventId).then((result) => {
+    valt.init(eventId).then((result) => {
       if (!result.ok) {
         toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
       }
     });
   }
 
-  return { languagesValt };
+  return { valt };
 };
 
 export function Languages() {
-  const { languagesValt } = useMemo(init, []);
-  const snap = useSnapshot(languagesValt.store);
-
-  if (!snap.initialized) {
-    return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
-  }
+  const { valt } = useMemo(init, []);
+  const snap = useSnapshot(valt.store);
 
   return (
-    <div className='Languages bg-base-100 flex-1 relative flex flex-col overflow-auto'>
+    <div className='Languages bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex flex-col flex-1 overflow-auto p-8'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Languages</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
@@ -45,11 +40,11 @@ export function Languages() {
 
           {/* Language Rows */}
           {snap.languages.map((language) => (
-            <LanguageRow key={language.id} language={language} valt={languagesValt} />
+            <LanguageRow key={language.id} language={language} valt={valt} />
           ))}
 
           {/* Add Row */}
-          <AddLanguageRow valt={languagesValt} />
+          <AddLanguageRow valt={valt} />
         </div>
       </div>
     </div>

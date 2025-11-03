@@ -1,6 +1,5 @@
 import { alertModal } from '@/frontend/components/AlertModal';
 import { Icon } from '@/frontend/components/Icon';
-import { Loading } from '@/frontend/components/Loading';
 import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
@@ -41,8 +40,6 @@ export const Events = memo(() => {
     <EventsValtContext.Provider value={valt}>
       <div className='Events'>
         <div className='Events__content'>
-          {!snap.initialized && <Loading />}
-
           {snap.initialized && snap.events.length === 0 && (
             <div className='absolute inset-0 flex flex-col items-center justify-center'>
               <button className='btn btn-secondary btn-lg' onClick={handleCreateEvent}>
@@ -62,14 +59,15 @@ export const Events = memo(() => {
             </div>
           )}
         </div>
-        {snap.initialized && snap.events.length > 0 && (
-          <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-            <button className='btn btn-secondary' onClick={handleCreateEvent}>
-              <Icon name='plus' className='size-4' />
-              Add Event
-            </button>
-          </footer>
-        )}
+
+        {/* {snap.initialized && snap.events.length > 0 && ( */}
+        <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
+          <button className='btn btn-secondary' onClick={handleCreateEvent}>
+            <Icon name='plus' className='size-4' />
+            Add Event
+          </button>
+        </footer>
+        {/* )} */}
       </div>
     </EventsValtContext.Provider>
   );

@@ -17,7 +17,7 @@ export class TeamsValt {
   private copyTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
-    this.store = proxy({ initialized: false, copiedTeamIds: new Set() } as TeamsStore);
+    this.store = proxy({ initialized: false, eventId: '', eventName: '', teams: [], copiedTeamIds: new Set() });
   }
 
   async init(eventId: string) {

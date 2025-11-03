@@ -2,12 +2,14 @@ import { LanguagesValt } from '@/frontend/app/pages/languages/languagesValt';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useState } from 'react';
+import { useSnapshot } from 'valtio';
 
 interface Props {
   valt: LanguagesValt;
 }
 
 export function AddLanguageRow({ valt }: Props) {
+  const snap = useSnapshot(valt.store);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [codeError, setCodeError] = useState('');
@@ -57,7 +59,7 @@ export function AddLanguageRow({ valt }: Props) {
     return (
       <>
         <div className='col-add-button col-span-3 text-right'>
-          <button className='btn btn-primary' onClick={() => setIsAdding(true)}>
+          <button className='btn btn-primary' disabled={!snap.initialized} onClick={() => setIsAdding(true)}>
             <Icon name='plus' className='size-4' />
             Add Language
           </button>

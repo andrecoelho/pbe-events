@@ -1,6 +1,5 @@
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
-import { Loading } from '@/frontend/components/Loading';
 import { toast } from '@/frontend/components/Toast';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
@@ -32,15 +31,15 @@ const init = () => {
 };
 
 export function Permissions() {
-  const permissionsValt = useMemo(init, []);
-  const snap = useSnapshot(permissionsValt.store);
+  const valt = useMemo(init, []);
+  const snap = useSnapshot(valt.store);
 
   const handleAddUser = () => {
-    permissionsModal.open(permissionsValt);
+    permissionsModal.open(valt);
   };
 
   const handleEditUser = (permission: (typeof snap.permissions)[0]) => {
-    permissionsModal.open(permissionsValt, {
+    permissionsModal.open(valt, {
       userId: permission.userId,
       email: permission.email,
       firstName: permission.firstName,
@@ -53,16 +52,12 @@ export function Permissions() {
     const confirmation = await confirmModal.open('Are you sure you want to delete this user permission?');
 
     if (confirmation) {
-      permissionsValt.deletePermission(userId);
+      valt.deletePermission(userId);
     }
   };
 
-  if (!snap.initialized) {
-    return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
-  }
-
   return (
-    <div className='Permissions bg-base-100 flex-1 relative flex flex-col overflow-auto'>
+    <div className='Permissions bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Permissions</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
@@ -123,7 +118,7 @@ export function Permissions() {
         </div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button className='btn btn-primary' onClick={handleAddUser}>
+        <button className='btn btn-primary' disabled={!snap.initialized} onClick={handleAddUser}>
           <Icon name='plus' className='size-4' />
           Add User
         </button>

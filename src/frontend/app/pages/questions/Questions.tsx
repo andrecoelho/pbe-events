@@ -1,7 +1,6 @@
 import { alertModal } from '@/frontend/components/AlertModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
-import { Loading } from '@/frontend/components/Loading';
 import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo, useRef } from 'react';
 import { useSnapshot } from 'valtio';
@@ -11,33 +10,29 @@ import { QuestionsList } from './QuestionsList';
 import { QuestionsValt, QuestionsValtContext } from './questionsValt';
 
 const init = () => {
-  const questionsValt = new QuestionsValt();
+  const valt = new QuestionsValt();
   const url = new URL(window.location.href);
   const match = url.pathname.match(/^\/questions\/([^/]+)$/);
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    questionsValt.init(eventId).then((result) => {
+    valt.init(eventId).then((result) => {
       if (!result.ok) {
         toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
       }
     });
   }
 
-  return { questionsValt };
+  return { valt };
 };
 
 export const Questions = memo(() => {
-  const { questionsValt } = useMemo(init, []);
-  const snap = useSnapshot(questionsValt.store);
+  const { valt } = useMemo(init, []);
+  const snap = useSnapshot(valt.store);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!snap.initialized) {
-    return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
-  }
-
   const handleAddQuestion = async () => {
-    await questionsValt.addQuestion('PG', 1, 30);
+    await valt.addQuestion('PG', 1, 30);
   };
 
   const handleImportClick = () => {
@@ -52,14 +47,14 @@ export const Questions = memo(() => {
     }
 
     const confirmed =
-      Object.entries(questionsValt.store.questions).length === 0
+      Object.entries(valt.store.questions).length === 0
         ? true
         : await confirmModal.open(
             'Importing questions will replace all existing questions in this event. Are you sure you want to continue?'
           );
 
     if (confirmed) {
-      const result = await questionsValt.importQuestions(file);
+      const result = await valt.importQuestions(file);
 
       if (result.error) {
         alertModal.open(`Error importing questions: ${result.error}`);
@@ -73,18 +68,18 @@ export const Questions = memo(() => {
   };
 
   const handleExport = async () => {
-    await questionsValt.exportQuestions();
+    await valt.exportQuestions();
   };
 
   return (
-    <QuestionsValtContext.Provider value={questionsValt}>
-      <div className='Questions bg-base-100 flex-1 relative flex flex-col overflow-hidden'>
+    <QuestionsValtContext.Provider value={valt}>
+      <div className='Questions bg-base-100/95 flex-1 relative flex flex-col overflow-hidden'>
         <div className='flex-none p-8 pb-1'>
           <h1 className='text-3xl font-bold mb-1 text-center'>Event Questions</h1>
           <h2 className='text-2xl font-bold text-center text-neutral brightness-75'>{snap.eventName}</h2>
         </div>
         <div className='flex-1 overflow-hidden px-8 pb-8 flex flex-col'>
-          {Object.keys(snap.languages).length === 0 && (
+          {valt.store.initialized && Object.keys(snap.languages).length === 0 && (
             <div className='flex-1 flex items-center justify-center'>
               <div className='text-center'>
                 <p className='text-neutral text-lg mb-4'>
@@ -117,7 +112,7 @@ export const Questions = memo(() => {
 
         <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end gap-4 shadow-md-top'>
           <input ref={fileInputRef} type='file' accept='.yaml,.yml' onChange={handleFileChange} className='hidden' />
-          <button className='btn btn-secondary' onClick={handleImportClick}>
+          <button className='btn btn-secondary' disabled={!valt.store.initialized} onClick={handleImportClick}>
             <Icon name='arrow-down-tray' className='size-4' />
             Import
           </button>
@@ -129,7 +124,7 @@ export const Questions = memo(() => {
           <button
             className='btn btn-primary'
             onClick={handleAddQuestion}
-            disabled={Object.keys(snap.languages).length === 0}
+            disabled={!valt.store.initialized || Object.keys(snap.languages).length === 0}
           >
             <Icon name='plus' className='size-4' />
             Add Question

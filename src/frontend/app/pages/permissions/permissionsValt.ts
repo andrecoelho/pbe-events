@@ -17,7 +17,7 @@ export class PermissionsValt {
   store: PermissionsStore;
 
   constructor() {
-    this.store = proxy({ initialized: false } as PermissionsStore);
+    this.store = proxy({ initialized: false, eventId: '', eventName: '', permissions: [] });
   }
 
   async init(eventId: string) {

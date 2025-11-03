@@ -1,6 +1,5 @@
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
-import { Loading } from '@/frontend/components/Loading';
 import { toast } from '@/frontend/components/Toast';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
@@ -9,13 +8,13 @@ import { teamsModal } from './TeamsModal';
 import { TeamsValt } from './teamsValt';
 
 const init = () => {
-  const teamsValt = new TeamsValt();
+  const valt = new TeamsValt();
   const url = new URL(window.location.href);
   const match = url.pathname.match(/^\/teams\/([^/]+)$/);
   const eventId = match ? match[1] : undefined;
 
   if (eventId) {
-    teamsValt.init(eventId).then((result) => {
+    valt.init(eventId).then((result) => {
       if (!result.ok) {
         toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
       }
@@ -23,44 +22,40 @@ const init = () => {
   }
 
   const handleAddTeam = async () => {
-    await teamsModal.open(teamsValt);
+    await teamsModal.open(valt);
   };
 
   const handleEditTeam = async (team: { id: string; name: string; number: number }) => {
-    await teamsModal.open(teamsValt, team);
+    await teamsModal.open(valt, team);
   };
 
   const handleRemoveTeam = async (team: { id: string; name: string; number: number }) => {
     const confirmation = await confirmModal.open(`Are you sure you want to delete team "${team.name}"?`);
 
     if (confirmation) {
-      await teamsValt.deleteTeam(team.id);
+      await valt.deleteTeam(team.id);
     }
   };
 
   const handleCopyTeamLink = async (team: { id: string; name: string; number: number }) => {
-    await teamsValt.copyTeamLink(team.id);
+    await valt.copyTeamLink(team.id);
   };
 
-  return { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink };
+  return { valt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink };
 };
 
 export function Teams() {
-  const { teamsValt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink } = useMemo(init, []);
-  const snap = useSnapshot(teamsValt.store);
+  const { valt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink } = useMemo(init, []);
+  const snap = useSnapshot(valt.store);
 
   useEffect(() => {
     return () => {
-      teamsValt.cleanup();
+      valt.cleanup();
     };
-  }, [teamsValt]);
-
-  if (!snap.initialized) {
-    return <Loading backgroundColor='bg-base-100' indicatorColor='bg-primary' />;
-  }
+  }, [valt]);
 
   return (
-    <div className='Teams bg-base-100 flex-1 relative flex flex-col overflow-auto'>
+    <div className='Teams bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Teams</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
@@ -116,7 +111,7 @@ export function Teams() {
         </div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button className='btn btn-primary' onClick={handleAddTeam}>
+        <button className='btn btn-primary' disabled={!snap.initialized} onClick={handleAddTeam}>
           <Icon name='plus' className='size-4' />
           Add Team
         </button>
