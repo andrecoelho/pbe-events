@@ -23,7 +23,7 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.userId);
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -46,19 +46,19 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.userId);
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
+      const { user_id, roleId } = (await req.json()) as { user_id: string; roleId: string };
 
-      if (!userId || !roleId) {
-        return apiBadRequest('userId and roleId are required');
+      if (!user_id || !roleId) {
+        return apiBadRequest('user_id and roleId are required');
       }
 
-      await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${userId}, ${eventId}, ${roleId})`;
+      await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${user_id}, ${eventId}, ${roleId})`;
 
       return apiData();
     },
@@ -71,23 +71,23 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.userId);
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
+      const { user_id, roleId } = (await req.json()) as { user_id: string; roleId: string };
 
-      if (!userId || !roleId) {
-        return apiBadRequest('userId and roleId are required');
+      if (!user_id || !roleId) {
+        return apiBadRequest('user_id and roleId are required');
       }
 
       if (roleId === 'owner') {
         return apiBadRequest('Cannot assign owner role');
       }
 
-      await sql`UPDATE permissions SET role_id = ${roleId} WHERE user_id = ${userId} AND event_id = ${eventId}`;
+      await sql`UPDATE permissions SET role_id = ${roleId} WHERE user_id = ${user_id} AND event_id = ${eventId}`;
 
       return apiData();
     },
@@ -100,19 +100,19 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.userId);
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const { userId } = (await req.json()) as { userId: string };
+      const { user_id } = (await req.json()) as { user_id: string };
 
-      if (!userId) {
-        return apiBadRequest('userId is required');
+      if (!user_id) {
+        return apiBadRequest('user_id is required');
       }
 
-      await sql`DELETE FROM permissions WHERE user_id = ${userId} AND event_id = ${eventId}`;
+      await sql`DELETE FROM permissions WHERE user_id = ${user_id} AND event_id = ${eventId}`;
 
       return apiData();
     }

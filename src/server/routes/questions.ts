@@ -329,7 +329,7 @@ export const questionsRoutes: Routes = {
       // Check permissions - allow any user with access to the event
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -340,7 +340,7 @@ export const questionsRoutes: Routes = {
       const events: { name: string }[] = await sql`
         SELECT events.name FROM events
         JOIN permissions ON events.id = permissions.event_id
-        WHERE events.id = ${eventId} AND permissions.user_id = ${session.userId}
+        WHERE events.id = ${eventId} AND permissions.user_id = ${session.user_id}
       `;
 
       if (events.length === 0) {
@@ -456,7 +456,7 @@ export const questionsRoutes: Routes = {
       // Check permissions
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -544,7 +544,7 @@ export const questionsRoutes: Routes = {
       // Check permissions
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -631,7 +631,7 @@ export const questionsRoutes: Routes = {
       // Check permissions - allow any user with access to the event
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -642,7 +642,7 @@ export const questionsRoutes: Routes = {
       const events: { name: string }[] = await sql`
         SELECT events.name FROM events
         JOIN permissions ON events.id = permissions.event_id
-        WHERE events.id = ${eventId} AND permissions.user_id = ${session.userId}
+        WHERE events.id = ${eventId} AND permissions.user_id = ${session.user_id}
       `;
 
       if (events.length === 0) {
@@ -797,7 +797,7 @@ export const questionsRoutes: Routes = {
       // Check permissions
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -909,7 +909,7 @@ export const questionsRoutes: Routes = {
       // Check permissions
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -959,7 +959,7 @@ export const questionsRoutes: Routes = {
       // Check permissions
       const permissions: { role_id: string }[] = await sql`
         SELECT role_id FROM permissions
-        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+        WHERE user_id = ${session.user_id} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
       `;
 
       if (permissions.length === 0) {
@@ -1078,7 +1078,7 @@ export const questionsRoutes: Routes = {
       const permissions = await sql<{ role_id: string }[]>`
         SELECT role_id
         FROM permissions
-        WHERE user_id = ${session.userId}
+        WHERE user_id = ${session.user_id}
         AND event_id = ${question.eventId}
       `;
 
@@ -1176,7 +1176,7 @@ export const questionsRoutes: Routes = {
       const permissions = await sql<{ role_id: string }[]>`
         SELECT role_id
         FROM permissions
-        WHERE user_id = ${session.userId}
+        WHERE user_id = ${session.user_id}
         AND event_id = ${question.eventId}
       `;
 
