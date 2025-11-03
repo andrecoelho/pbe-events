@@ -33,10 +33,8 @@ const server = Bun.serve({
     ...questionsRoutes
   },
   async fetch(req): Promise<Response> {
-    console.log(`${req.method} ${req.url}`);
     const url = new URL(req.url);
     const session = await getSession(req);
-    console.log('Session:', session);
 
     if (!session) {
       return await fetch(`${server.url}${loginNounce}`);

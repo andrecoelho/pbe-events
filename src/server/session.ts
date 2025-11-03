@@ -34,8 +34,6 @@ export async function getSession(req: Request) {
 
   const result: Session[] = await sql`SELECT * FROM sessions WHERE id = ${sessionId}`;
 
-  console.log(sessionId, result);
-
   return result[0] || null;
 }
 
