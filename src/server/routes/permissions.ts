@@ -52,13 +52,13 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { user_id, roleId } = (await req.json()) as { user_id: string; roleId: string };
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
 
-      if (!user_id || !roleId) {
-        return apiBadRequest('user_id and roleId are required');
+      if (!userId || !roleId) {
+        return apiBadRequest('userId and roleId are required');
       }
 
-      await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${user_id}, ${eventId}, ${roleId})`;
+      await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${userId}, ${eventId}, ${roleId})`;
 
       return apiData();
     },
@@ -77,17 +77,17 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { user_id, roleId } = (await req.json()) as { user_id: string; roleId: string };
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
 
-      if (!user_id || !roleId) {
-        return apiBadRequest('user_id and roleId are required');
+      if (!userId || !roleId) {
+        return apiBadRequest('userId and roleId are required');
       }
 
       if (roleId === 'owner') {
         return apiBadRequest('Cannot assign owner role');
       }
 
-      await sql`UPDATE permissions SET role_id = ${roleId} WHERE user_id = ${user_id} AND event_id = ${eventId}`;
+      await sql`UPDATE permissions SET role_id = ${roleId} WHERE user_id = ${userId} AND event_id = ${eventId}`;
 
       return apiData();
     },
@@ -106,13 +106,13 @@ export const permissionRoutes: Routes = {
         return apiForbidden();
       }
 
-      const { user_id } = (await req.json()) as { user_id: string };
+      const { userId } = (await req.json()) as { userId: string };
 
-      if (!user_id) {
-        return apiBadRequest('user_id is required');
+      if (!userId) {
+        return apiBadRequest('userId is required');
       }
 
-      await sql`DELETE FROM permissions WHERE user_id = ${user_id} AND event_id = ${eventId}`;
+      await sql`DELETE FROM permissions WHERE user_id = ${userId} AND event_id = ${eventId}`;
 
       return apiData();
     }
