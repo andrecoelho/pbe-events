@@ -1,13 +1,6 @@
-import { db } from '@/server/db';
+import { sql } from 'bun';
 import type { Session } from '@/server/types';
 import type { BunRequest } from 'bun';
-
-const queryInsertSession = db.query<{}, { $sessionId: string; $userId: string }>(
-  'INSERT INTO sessions (id, userId) VALUES ($sessionId, $userId)'
-);
-
-const querySelectSession = db.query<Session, { $sessionId: string }>('SELECT * FROM sessions WHERE id = $sessionId');
-const queryDeleteSession = db.query<{}, { $sessionId: string }>('DELETE FROM sessions WHERE id = $sessionId');
 
 export function getSessionIdFromCookies(req: Request) {
   const cookies = req.headers.get('Cookie');
@@ -24,30 +17,34 @@ export function getSessionIdFromCookies(req: Request) {
   return sessionId ?? null;
 }
 
-export function createSession(userId: string) {
+export async function createSession(userId: string) {
   const sessionId = Bun.randomUUIDv7();
 
-  queryInsertSession.run({ $sessionId: sessionId, $userId: userId });
+  await sql`INSERT INTO sessions (id, user_id) VALUES (${sessionId}, ${userId})`;
 
   return sessionId;
 }
 
-export function getSession(req: Request) {
+export async function getSession(req: Request) {
   const sessionId = getSessionIdFromCookies(req);
 
   if (!sessionId) {
     return null;
   }
 
-  return querySelectSession.get({ $sessionId: sessionId });
+  const result: Session[] = await sql`SELECT * FROM sessions WHERE id = ${sessionId}`;
+
+  console.log(sessionId, result);
+
+  return result[0] || null;
 }
 
-export function deleteSession(req: BunRequest) {
+export async function deleteSession(req: BunRequest) {
   const sessionId = getSessionIdFromCookies(req);
 
   if (!sessionId) {
     return;
   }
 
-  queryDeleteSession.run({ $sessionId: sessionId });
+  await sql`DELETE FROM sessions WHERE id = ${sessionId}`;
 }

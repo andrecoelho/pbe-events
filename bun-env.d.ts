@@ -42,5 +42,4 @@ declare var PBE: {
   mountPath: string;
   dataDir: string;
   imageDir: string;
-  initDB: boolean;
 };

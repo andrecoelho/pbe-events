@@ -1,66 +1,52 @@
-import { db } from '@/server/db';
+import { sql } from 'bun';
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
-import type { Team, Routes } from '@/server/types';
+import type { Routes } from '@/server/types';
 import { apiData, apiForbidden, apiUnauthorized, apiBadRequest } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
 
-const querySelectTeamsByEventId = db.query<Team, { $eventId: string }>(
-  `SELECT id, name, number, eventId, createdAt FROM teams WHERE eventId = $eventId`
-);
-
-const querySelectTeamByName = db.query<{ id: string }, { $eventId: string; $name: string }>(
-  `SELECT id FROM teams WHERE eventId = $eventId AND name = $name`
-);
-
-const queryInsertTeam = db.query<{ id: string }, { $id: string; $eventId: string; $name: string; $number: number }>(
-  `INSERT INTO teams (id, eventId, name, number) VALUES ($id, $eventId, $name, $number)`
-);
-
-const queryUpdateTeam = db.query<Team, { $id: string; $name: string; $number: number }>(
-  `UPDATE teams SET name = $name, number = $number WHERE id = $id`
-);
-
-const queryDeleteTeam = db.query<{ id: string }, { $id: string }>(`DELETE FROM teams WHERE id = $id`);
-
-const querySelectTeamNumber = db.query<{ number: number }, { $id: string }>(
-  `SELECT number FROM teams WHERE id = $id`
-);
-
-const queryUpdateTeamNumbers = db.query<Team, { $eventId: string; $number: number }>(
-  `UPDATE teams SET number = number - 1 WHERE eventId = $eventId AND number > $number`
-);
+interface Team {
+  id: string;
+  name: string;
+  number: number;
+  event_id: string;
+  created_at: number;
+}
 
 export const teamsRoutes: Routes = {
   '/api/events/:id/teams': {
-    GET: (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = getSession(req);
+    GET: async (req: BunRequest<'/api/events/:id/teams'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const teams = querySelectTeamsByEventId.all({ $eventId: eventId });
+      const teams: Team[] = await sql`
+        SELECT id, name, number, event_id, created_at
+        FROM teams
+        WHERE event_id = ${eventId}
+      `;
 
       return apiData({ eventName: event.name, teams });
     },
 
     POST: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -73,34 +59,40 @@ export const teamsRoutes: Routes = {
         return apiBadRequest('Team name is required');
       }
 
-      const existingTeam = querySelectTeamByName.get({ $eventId: eventId, $name: name });
+      const existingTeams: { id: string }[] = await sql`
+        SELECT id FROM teams WHERE event_id = ${eventId} AND name = ${name}
+      `;
 
-      if (existingTeam) {
+      if (existingTeams.length > 0) {
         return apiBadRequest('A team with this name already exists');
       }
 
-      const teams = querySelectTeamsByEventId.all({ $eventId: eventId });
+      const teams: Team[] = await sql`
+        SELECT id, name, number, event_id, created_at
+        FROM teams
+        WHERE event_id = ${eventId}
+      `;
 
       const teamNumber = teams.length > 0
-        ? Math.max(...teams.map(t => t.number)) + 1
+        ? Math.max(...teams.map((t: Team) => t.number)) + 1
         : 1;
 
       const id = Bun.randomUUIDv7();
 
-      queryInsertTeam.run({ $id: id, $eventId: eventId, $name: name, $number: teamNumber });
+      await sql`INSERT INTO teams (id, event_id, name, number) VALUES (${id}, ${eventId}, ${name}, ${teamNumber})`;
 
       return apiData({ id, number: teamNumber });
     },
 
     PATCH: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -113,26 +105,28 @@ export const teamsRoutes: Routes = {
         return apiBadRequest('Team name is required');
       }
 
-      const existingTeam = querySelectTeamByName.get({ $eventId: eventId, $name: name });
+      const existingTeams: { id: string }[] = await sql`
+        SELECT id FROM teams WHERE event_id = ${eventId} AND name = ${name}
+      `;
 
-      if (existingTeam && existingTeam.id !== body.id) {
+      if (existingTeams.length > 0 && existingTeams[0]!.id !== body.id) {
         return apiBadRequest('A team with this name already exists');
       }
 
-      queryUpdateTeam.run({ $id: body.id, $name: name, $number: body.number });
+      await sql`UPDATE teams SET name = ${name}, number = ${body.number} WHERE id = ${body.id}`;
 
       return apiData();
     },
 
     DELETE: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -141,17 +135,18 @@ export const teamsRoutes: Routes = {
       const { id } = await req.json();
 
       // Get the team number before deleting
-      const teamToDelete = querySelectTeamNumber.get({ $id: id });
+      const teamResults: { number: number }[] = await sql`SELECT number FROM teams WHERE id = ${id}`;
+      const teamToDelete = teamResults[0];
 
       if (!teamToDelete) {
         return apiBadRequest('Team not found');
       }
 
       // Delete the team
-      queryDeleteTeam.run({ $id: id });
+      await sql`DELETE FROM teams WHERE id = ${id}`;
 
       // Renumber all teams with higher numbers to close the gap
-      queryUpdateTeamNumbers.run({ $eventId: eventId, $number: teamToDelete.number });
+      await sql`UPDATE teams SET number = number - 1 WHERE event_id = ${eventId} AND number > ${teamToDelete.number}`;
 
       return apiData();
     }

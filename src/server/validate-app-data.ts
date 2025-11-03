@@ -29,11 +29,8 @@ if (!imageDirExists) {
   console.log(`✅ Created user images directory at ${styleText('magenta', imageDir)}`);
 }
 
-const initDB = process.env.PBE_INIT_DB === 'true';
-
 global.PBE = {
   mountPath,
   dataDir,
-  imageDir,
-  initDB
-} as typeof global.PBE;
+  imageDir
+};

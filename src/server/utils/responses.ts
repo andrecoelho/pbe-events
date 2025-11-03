@@ -1,5 +1,9 @@
+import { keysToCamel } from './caseConversion';
+
 export function apiData(data?: object, headers?: HeadersInit) {
-  return new Response(JSON.stringify({ ...data }), {
+  // Convert all keys from snake_case to camelCase for API responses
+  const camelData = data ? keysToCamel(data) : {};
+  return new Response(JSON.stringify({ ...camelData }), {
     headers: { 'Content-Type': 'application/json', ...headers }
   });
 }

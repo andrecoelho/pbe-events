@@ -2,7 +2,6 @@ import './validate-app-data';
 
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
-import { db } from '@/server/db';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { languagesRoutes } from '@/server/routes/languages';
@@ -13,6 +12,7 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
+import { sql } from 'bun';
 import { join } from 'node:path';
 import { styleText } from 'node:util';
 
@@ -33,8 +33,10 @@ const server = Bun.serve({
     ...questionsRoutes
   },
   async fetch(req): Promise<Response> {
+    console.log(`${req.method} ${req.url}`);
     const url = new URL(req.url);
-    const session = getSession(req);
+    const session = await getSession(req);
+    console.log('Session:', session);
 
     if (!session) {
       return await fetch(`${server.url}${loginNounce}`);
@@ -68,7 +70,7 @@ console.log(`🚀 Server running at ${styleText('green', server.url.toString())}
 // Handle graceful shutdown
 const shutdown = () => {
   console.log('\n🛑 Shutting down server...');
-  db.close();
+  sql.end();
   console.log('✅ Database connection closed');
   process.exit(0);
 };

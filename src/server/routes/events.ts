@@ -1,5 +1,5 @@
-import { db } from '@/server/db';
-import type { PBEEvent, Permission, Routes } from '@/server/types';
+import { sql } from 'bun';
+import type { Routes } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
 import {
@@ -11,54 +11,39 @@ import {
   apiUnauthorized
 } from '@/server/utils/responses';
 
-const querySelectEventsByUserId = db.query<
-  Array<PBEEvent & { roleId: string }>,
-  { $userId: string }
->(
-  `SELECT events.*, permissions.roleId
-   FROM events
-   JOIN permissions ON events.id = permissions.eventId
-   WHERE permissions.userId = $userId
-   ORDER BY events.name ASC`
-);
+interface EventWithRole {
+  id: string;
+  name: string;
+  role_id: string;
+}
 
-const queryInsertEvent = db.query<{}, { $id: string; $name: string }>(
-  `INSERT INTO events (id, name) VALUES ($id, $name)`
-);
-
-const queryDeleteEvent = db.query<{}, { $eventId: string }>(`DELETE FROM events WHERE id = $eventId`);
-
-const queryUpdateEventName = db.query<{}, { $eventId: string; $name: string }>(
-  `UPDATE events SET name = $name WHERE id = $eventId`
-);
-
-const queryInsertPermission = db.query<{}, { $userId: string; $eventId: string; $roleId: string }>(
-  `INSERT INTO permissions (userId, eventId, roleId) VALUES ($userId, $eventId, $roleId)`
-);
-
-const querySelectPermissionForUpdate = db.query<Permission, { $userId: string; $eventId: string }>(
-  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId AND roleId IN ('owner', 'admin')`
-);
-
-const querySelectPermissionForDelete = db.query<Permission, { $userId: string; $eventId: string }>(
-  `SELECT * FROM permissions WHERE userId = $userId AND eventId = $eventId AND roleId = 'owner'`
-);
+interface Permission {
+  user_id: string;
+  event_id: string;
+  role_id: string;
+}
 
 export const eventsRoutes: Routes = {
   '/api/events': {
-    GET: (req) => {
-      const session = getSession(req);
+    GET: async (req) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
-      const events = querySelectEventsByUserId.all({ $userId: session.userId });
+      const events: EventWithRole[] = await sql`
+        SELECT events.id, events.name, permissions.role_id
+        FROM events
+        JOIN permissions ON events.id = permissions.event_id
+        WHERE permissions.user_id = ${session.user_id}
+        ORDER BY events.name ASC
+      `;
 
       return apiData({ events });
     },
     POST: async (req) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -73,10 +58,8 @@ export const eventsRoutes: Routes = {
       const id = Bun.randomUUIDv7();
 
       try {
-        db.transaction(() => {
-          queryInsertEvent.run({ $id: id, $name: name.trim() });
-          queryInsertPermission.run({ $userId: session.userId, $eventId: id, $roleId: 'owner' });
-        })();
+        await sql`INSERT INTO events (id, name) VALUES (${id}, ${name.trim()})`;
+        await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${session.user_id}, ${id}, ${'owner'})`;
       } catch (error) {
         console.error('Error creating event:', error);
 
@@ -88,7 +71,7 @@ export const eventsRoutes: Routes = {
   },
   '/api/events/:id': {
     PATCH: async (req: BunRequest<'/api/events/:id'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -101,31 +84,37 @@ export const eventsRoutes: Routes = {
       }
 
       const id = req.params.id;
-      const permission = querySelectPermissionForUpdate.get({ $userId: session.userId, $eventId: id });
+      const permissions: Permission[] = await sql`
+        SELECT * FROM permissions
+        WHERE user_id = ${session.user_id} AND event_id = ${id} AND role_id IN ('owner', 'admin')
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
-      queryUpdateEventName.run({ $eventId: id, $name: name.trim() });
+      await sql`UPDATE events SET name = ${name.trim()} WHERE id = ${id}`;
 
       return apiData({ id, name: name.trim() });
     },
-    DELETE: (req: BunRequest<'/api/events/:id'>) => {
-      const session = getSession(req);
+    DELETE: async (req: BunRequest<'/api/events/:id'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const id = req.params.id;
-      const permission = querySelectPermissionForDelete.get({ $userId: session.userId, $eventId: id });
+      const permissions: Permission[] = await sql`
+        SELECT * FROM permissions
+        WHERE user_id = ${session.user_id} AND event_id = ${id} AND role_id = ${'owner'}
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
-      queryDeleteEvent.run({ $eventId: id });
+      await sql`DELETE FROM events WHERE id = ${id}`;
 
       return apiData();
     }

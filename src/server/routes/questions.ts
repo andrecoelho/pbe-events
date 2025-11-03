@@ -1,4 +1,4 @@
-import { db } from '@/server/db';
+import { sql } from 'bun';
 import type { Routes } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
@@ -40,163 +40,17 @@ interface Language {
   id: string;
   code: string;
   name: string;
-  eventId: string;
+  event_id: string;
 }
 
-// Database queries
-const queryCheckPermission = db.query<{ roleId: string }, { $userId: string; $eventId: string }>(
-  `SELECT roleId FROM permissions
-   WHERE userId = $userId AND eventId = $eventId AND roleId IN ('owner', 'admin')`
-);
-
-const queryGetLanguages = db.query<Language, { $eventId: string }>(
-  `SELECT id, code, name, eventId FROM languages WHERE eventId = $eventId`
-);
-
-const queryInsertQuestion = db.query<
-  {},
-  { $id: string; $number: number; $type: string; $maxPoints: number; $seconds: number; $eventId: string }
->(
-  `INSERT INTO questions (id, number, type, maxPoints, seconds, eventId)
-   VALUES ($id, $number, $type, $maxPoints, $seconds, $eventId)`
-);
-
-const queryInsertQuestionTranslation = db.query<
-  {},
-  {
-    $id: string;
-    $prompt: string;
-    $answer: string;
-    $clarification: string | null;
-    $languageId: string;
-    $questionId: string;
-  }
->(
-  `INSERT INTO translations (id, prompt, answer, clarification, languageId, questionId)
-   VALUES ($id, $prompt, $answer, $clarification, $languageId, $questionId)`
-);
-
-const queryDeleteQuestions = db.query<{}, { $eventId: string }>(`DELETE FROM questions WHERE eventId = $eventId`);
-
-const queryGetQuestions = db.query<
-  { id: string; number: number; type: string; maxPoints: number; seconds: number },
-  { $eventId: string }
->(
-  `SELECT id, number, type, maxPoints, seconds FROM questions
-   WHERE eventId = $eventId
-   ORDER BY number ASC`
-);
-
-const queryGetQuestionTranslations = db.query<
-  { languageId: string; prompt: string; answer: string; clarification: string | null },
-  { $questionId: string }
->(
-  `SELECT languageId, prompt, answer, clarification FROM translations
-   WHERE questionId = $questionId
-   ORDER BY languageId ASC`
-);
-
-const queryGetEventName = db.query<{ name: string }, { $eventId: string; $userId: string }>(
-  `SELECT events.name FROM events
-   JOIN permissions ON events.id = permissions.eventId
-   WHERE events.id = $eventId AND permissions.userId = $userId`
-);
-
-// Optimized query to get all questions with translations in a single query
-const queryGetQuestionsWithTranslations = db.query<
-  {
-    questionId: string;
-    number: number;
-    type: string;
-    maxPoints: number;
-    seconds: number;
-    translationId: string | null;
-    translationLanguageId: string | null;
-    translationLanguageCode: string | null;
-    translationPrompt: string | null;
-    translationAnswer: string | null;
-    translationClarification: string | null;
-  },
-  { $eventId: string }
->(
-  `SELECT
-    q.id as questionId,
-    q.number,
-    q.type,
-    q.maxPoints,
-    q.seconds,
-    t.id as translationId,
-    t.languageId as translationLanguageId,
-    l.code as translationLanguageCode,
-    t.prompt as translationPrompt,
-    t.answer as translationAnswer,
-    t.clarification as translationClarification
-   FROM questions q
-   LEFT JOIN translations t ON q.id = t.questionId
-   LEFT JOIN languages l ON t.languageId = l.id
-   WHERE q.eventId = $eventId
-   ORDER BY q.number ASC, l.code ASC`
-);
-
-const queryDeleteLanguages = db.query<{}, { $eventId: string }>(`DELETE FROM languages WHERE eventId = $eventId`);
-
-const queryInsertLanguage = db.query<{}, { $id: string; $code: string; $name: string; $eventId: string }>(
-  `INSERT INTO languages (id, code, name, eventId) VALUES ($id, $code, $name, $eventId)`
-);
-
-// Individual question CRUD queries
-const queryGetQuestion = db.query<
-  { id: string; number: number; type: string; maxPoints: number; seconds: number; eventId: string },
-  { $questionId: string }
->(`SELECT id, number, type, maxPoints, seconds, eventId FROM questions WHERE id = $questionId`);
-
-const queryUpdateQuestion = db.query<
-  {},
-  { $id: string; $number: number; $type: string; $maxPoints: number; $seconds: number }
->(`UPDATE questions SET number = $number, type = $type, maxPoints = $maxPoints, seconds = $seconds WHERE id = $id`);
-
-const queryDeleteQuestion = db.query<{}, { $id: string }>(`DELETE FROM questions WHERE id = $id`);
-
-// Get the maximum question number for an event
-const queryGetMaxQuestionNumber = db.query<{ maxNumber: number | null }, { $eventId: string }>(
-  `SELECT MAX(number) as maxNumber FROM questions WHERE eventId = $eventId`
-);
-
-// Invert question numbers for reordering (shift questions up)
-const queryInvertQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
-  `UPDATE questions SET number = (number * (-1)) - 1
-   WHERE eventId = $eventId AND number >= $fromNumber`
-);
-
-// Invert question numbers back to positive for reordering (shift questions up)
-const queryInvertNegativeQuestionNumbers = db.query<{}, { $eventId: string }>(
-  `UPDATE questions SET number = number * (-1)
-   WHERE eventId = $eventId AND number < 0`
-);
-
-// Decrement question numbers for reordering (shift questions down)
-const queryDecrementQuestionNumbers = db.query<{}, { $eventId: string; $fromNumber: number }>(
-  `UPDATE questions SET number = number - 1
-   WHERE eventId = $eventId AND number > $fromNumber`
-);
-
-// Update just the question number
-const queryUpdateQuestionNumber = db.query<{}, { $id: string; $number: number }>(
-  `UPDATE questions SET number = $number WHERE id = $id`
-);
-
-// Individual question translation CRUD queries
-const queryGetSingleQuestionTranslation = db.query<
-  { id: string; prompt: string; answer: string; clarification: string | null; languageId: string; questionId: string },
-  { $id: string }
->(`SELECT id, prompt, answer, clarification, languageId, questionId FROM translations WHERE id = $id`);
-
-const queryUpdateQuestionTranslation = db.query<
-  {},
-  { $id: string; $prompt: string; $answer: string; $clarification: string | null }
->(`UPDATE translations SET prompt = $prompt, answer = $answer, clarification = $clarification WHERE id = $id`);
-
-const queryDeleteQuestionTranslation = db.query<{}, { $id: string }>(`DELETE FROM translations WHERE id = $id`);
+interface QuestionDetail {
+  id: string;
+  number: number;
+  type: string;
+  max_points: number;
+  seconds: number;
+  event_id: string;
+}
 
 /**
  * Validates the YAML structure and data
@@ -415,11 +269,11 @@ function toSafeFilename(name: string): string {
 /**
  * Imports questions from validated data into the database
  */
-function importQuestions(
+async function importQuestions(
   questions: QuestionImport[],
   eventId: string,
   languageCodeToIdMap: Map<string, string>
-): number {
+): Promise<number> {
   let imported = 0;
 
   for (let i = 0; i < questions.length; i++) {
@@ -430,14 +284,10 @@ function importQuestions(
     const questionNumber = i + 1; // Assign question number based on position (1-indexed)
 
     // Insert question
-    queryInsertQuestion.run({
-      $id: questionId,
-      $number: questionNumber,
-      $type: question.type,
-      $maxPoints: question.maxPoints,
-      $seconds: question.seconds,
-      $eventId: eventId
-    });
+    await sql`
+      INSERT INTO questions (id, number, type, max_points, seconds, event_id)
+      VALUES (${questionId}, ${questionNumber}, ${question.type}, ${question.maxPoints}, ${question.seconds}, ${eventId})
+    `;
 
     // Insert question translation for each language
     for (const translation of question.translations) {
@@ -452,14 +302,10 @@ function importQuestions(
         throw new Error(`Language ID not found for code: ${translation.lang}`);
       }
 
-      queryInsertQuestionTranslation.run({
-        $id: translationId,
-        $prompt: translation.prompt.trim(),
-        $answer: answerValue,
-        $clarification: translation.clarification ? translation.clarification.trim() : null,
-        $languageId: languageId,
-        $questionId: questionId
-      });
+      await sql`
+        INSERT INTO translations (id, prompt, answer, clarification, language_id, question_id)
+        VALUES (${translationId}, ${translation.prompt.trim()}, ${answerValue}, ${translation.clarification ? translation.clarification.trim() : null}, ${languageId}, ${questionId})
+      `;
     }
 
     imported++;
@@ -471,8 +317,8 @@ function importQuestions(
 export const questionsRoutes: Routes = {
   '/api/events/:eventId/questions': {
     // Get all questions for an event with event name
-    GET: (req: BunRequest<'/api/events/:eventId/questions'>) => {
-      const session = getSession(req);
+    GET: async (req: BunRequest<'/api/events/:eventId/questions'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -481,27 +327,62 @@ export const questionsRoutes: Routes = {
       const eventId = req.params.eventId;
 
       // Check permissions - allow any user with access to the event
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: eventId
-      });
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
       // Get event name
-      const event = queryGetEventName.get({
-        $eventId: eventId,
-        $userId: session.userId
-      });
+      const events: { name: string }[] = await sql`
+        SELECT events.name FROM events
+        JOIN permissions ON events.id = permissions.event_id
+        WHERE events.id = ${eventId} AND permissions.user_id = ${session.userId}
+      `;
 
-      if (!event) {
+      if (events.length === 0) {
         return apiNotFound('Event not found');
       }
 
+      const event = events[0]!;
+
       // Get all questions with translations in a single query (optimized)
-      const rows = queryGetQuestionsWithTranslations.all({ $eventId: eventId });
+      interface QuestionRow {
+        question_id: string;
+        number: number;
+        type: string;
+        max_points: number;
+        seconds: number;
+        translation_id: string | null;
+        translation_language_id: string | null;
+        translation_language_code: string | null;
+        translation_prompt: string | null;
+        translation_answer: string | null;
+        translation_clarification: string | null;
+      }
+
+      const rows: QuestionRow[] = await sql`
+        SELECT
+          q.id as question_id,
+          q.number,
+          q.type,
+          q.max_points,
+          q.seconds,
+          t.id as translation_id,
+          t.language_id as translation_language_id,
+          l.code as translation_language_code,
+          t.prompt as translation_prompt,
+          t.answer as translation_answer,
+          t.clarification as translation_clarification
+        FROM questions q
+        LEFT JOIN translations t ON q.id = t.question_id
+        LEFT JOIN languages l ON t.language_id = l.id
+        WHERE q.event_id = ${eventId}
+        ORDER BY q.number ASC, l.code ASC
+      `;
 
       // Group translations by question
       const questionsMap = new Map<
@@ -526,12 +407,12 @@ export const questionsRoutes: Routes = {
       >();
 
       for (const row of rows) {
-        if (!questionsMap.has(row.questionId)) {
-          questionsMap.set(row.questionId, {
-            id: row.questionId,
+        if (!questionsMap.has(row.question_id)) {
+          questionsMap.set(row.question_id, {
+            id: row.question_id,
             number: row.number,
             type: row.type,
-            maxPoints: row.maxPoints,
+            maxPoints: row.max_points,
             seconds: row.seconds,
             translations: {}
           });
@@ -539,30 +420,32 @@ export const questionsRoutes: Routes = {
 
         // Add translation if it exists (LEFT JOIN may return null for questions without translations)
         // Index by languageCode instead of translationId
-        if (row.translationId && row.translationLanguageCode) {
-          questionsMap.get(row.questionId)!.translations[row.translationLanguageCode] = {
-            id: row.translationId,
-            languageCode: row.translationLanguageCode,
-            prompt: row.translationPrompt,
-            answer: row.translationAnswer,
-            clarification: row.translationClarification
+        if (row.translation_id && row.translation_language_code) {
+          questionsMap.get(row.question_id)!.translations[row.translation_language_code] = {
+            id: row.translation_id,
+            languageCode: row.translation_language_code,
+            prompt: row.translation_prompt,
+            answer: row.translation_answer,
+            clarification: row.translation_clarification
           };
         }
       }
 
       // Get event languages
-      const languages = queryGetLanguages.all({ $eventId: eventId });
+      const languages: Language[] = await sql`
+        SELECT id, code, name, event_id FROM languages WHERE event_id = ${eventId}
+      `;
 
       return apiData({
         eventName: event.name,
-        languages: Object.fromEntries(languages.map((l) => [l.code, l.name])),
+        languages: Object.fromEntries(languages.map((l: Language) => [l.code, l.name])),
         questions: Object.fromEntries(questionsMap)
       });
     },
 
     // Add a new question (without info)
     POST: async (req: BunRequest<'/api/events/:eventId/questions'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -571,12 +454,12 @@ export const questionsRoutes: Routes = {
       const eventId = req.params.eventId;
 
       // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: eventId
-      });
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
@@ -611,38 +494,34 @@ export const questionsRoutes: Routes = {
 
         if (insertBefore !== undefined) {
           // Insert before specific question: increment all questions >= insertBefore
-          db.transaction(() => {
-            queryInvertQuestionNumbers.run({
-              $eventId: eventId,
-              $fromNumber: insertBefore
-            });
+          await sql`
+            UPDATE questions SET number = (number * (-1)) - 1
+            WHERE event_id = ${eventId} AND number >= ${insertBefore}
+          `;
 
-            queryInvertNegativeQuestionNumbers.run({ $eventId: eventId });
+          await sql`
+            UPDATE questions SET number = number * (-1)
+            WHERE event_id = ${eventId} AND number < 0
+          `;
 
-            questionNumber = insertBefore;
+          questionNumber = insertBefore;
 
-            queryInsertQuestion.run({
-              $id: questionId,
-              $number: questionNumber,
-              $type: type,
-              $maxPoints: maxPoints,
-              $seconds: seconds,
-              $eventId: eventId
-            });
-          })();
+          await sql`
+            INSERT INTO questions (id, number, type, max_points, seconds, event_id)
+            VALUES (${questionId}, ${questionNumber}, ${type}, ${maxPoints}, ${seconds}, ${eventId})
+          `;
         } else {
           // Append to end: get the next available question number
-          const maxNumberResult = queryGetMaxQuestionNumber.get({ $eventId: eventId });
-          questionNumber = (maxNumberResult?.maxNumber ?? 0) + 1;
+          const maxResults: { max_number: number | null }[] = await sql`
+            SELECT MAX(number) as max_number FROM questions WHERE event_id = ${eventId}
+          `;
+          const maxNumberResult = maxResults[0];
+          questionNumber = (maxNumberResult?.max_number ?? 0) + 1;
 
-          queryInsertQuestion.run({
-            $id: questionId,
-            $number: questionNumber,
-            $type: type,
-            $maxPoints: maxPoints,
-            $seconds: seconds,
-            $eventId: eventId
-          });
+          await sql`
+            INSERT INTO questions (id, number, type, max_points, seconds, event_id)
+            VALUES (${questionId}, ${questionNumber}, ${type}, ${maxPoints}, ${seconds}, ${eventId})
+          `;
         }
 
         return apiData({ question: { id: questionId, number: questionNumber, type, maxPoints, seconds } });
@@ -654,7 +533,7 @@ export const questionsRoutes: Routes = {
   },
   '/api/events/:eventId/questions/import': {
     POST: async (req: BunRequest<'/api/events/:eventId/questions/import'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -663,12 +542,12 @@ export const questionsRoutes: Routes = {
       const eventId = req.params.eventId;
 
       // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: eventId
-      });
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
@@ -704,33 +583,29 @@ export const questionsRoutes: Routes = {
         return apiBadRequest(validation.error || 'Invalid data');
       }
 
-      // Import questions and languages in a transaction
+      // Import questions and languages
       try {
-        db.transaction(() => {
-          // Delete existing languages (this will cascade to translations and then questions due to foreign keys)
-          queryDeleteLanguages.run({ $eventId: eventId });
+        // Delete existing languages (this will cascade to translations and then questions due to foreign keys)
+        await sql`DELETE FROM languages WHERE event_id = ${eventId}`;
 
-          // Delete existing questions (in case cascade didn't catch everything)
-          queryDeleteQuestions.run({ $eventId: eventId });
+        // Delete existing questions (in case cascade didn't catch everything)
+        await sql`DELETE FROM questions WHERE event_id = ${eventId}`;
 
-          // Insert new languages and create code-to-id mapping
-          const languageCodeToIdMap = new Map<string, string>();
+        // Insert new languages and create code-to-id mapping
+        const languageCodeToIdMap = new Map<string, string>();
 
-          for (const lang of validation.languages!) {
-            const languageId = Bun.randomUUIDv7();
-            queryInsertLanguage.run({
-              $id: languageId,
-              $code: lang.code,
-              $name: lang.name,
-              $eventId: eventId
-            });
+        for (const lang of validation.languages!) {
+          const languageId = Bun.randomUUIDv7();
+          await sql`
+            INSERT INTO languages (id, code, name, event_id)
+            VALUES (${languageId}, ${lang.code}, ${lang.name}, ${eventId})
+          `;
 
-            languageCodeToIdMap.set(lang.code, languageId);
-          }
+          languageCodeToIdMap.set(lang.code, languageId);
+        }
 
-          // Import new questions
-          importQuestions(validation.questions!, eventId, languageCodeToIdMap);
-        })();
+        // Import new questions
+        await importQuestions(validation.questions!, eventId, languageCodeToIdMap);
 
         return apiData({
           message: 'Questions and languages imported successfully',
@@ -744,8 +619,8 @@ export const questionsRoutes: Routes = {
     }
   },
   '/api/events/:eventId/questions/export': {
-    GET: (req: BunRequest<'/api/events/:eventId/questions/export'>) => {
-      const session = getSession(req);
+    GET: async (req: BunRequest<'/api/events/:eventId/questions/export'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -754,30 +629,46 @@ export const questionsRoutes: Routes = {
       const eventId = req.params.eventId;
 
       // Check permissions - allow any user with access to the event
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: eventId
-      });
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+      `;
 
-      if (!permission) {
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
       // Get event name for filename
-      const event = queryGetEventName.get({
-        $eventId: eventId,
-        $userId: session.userId
-      });
+      const events: { name: string }[] = await sql`
+        SELECT events.name FROM events
+        JOIN permissions ON events.id = permissions.event_id
+        WHERE events.id = ${eventId} AND permissions.user_id = ${session.userId}
+      `;
 
-      if (!event) {
+      if (events.length === 0) {
         return apiNotFound('Event not found');
       }
 
+      const event = events[0]!;
+
       // Get all languages for this event
-      const languages = queryGetLanguages.all({ $eventId: eventId });
+      const languages: Language[] = await sql`
+        SELECT id, code, name, event_id FROM languages WHERE event_id = ${eventId}
+      `;
 
       // Get all questions for this event
-      const questions = queryGetQuestions.all({ $eventId: eventId });
+      interface QuestionExport {
+        id: string;
+        number: number;
+        type: string;
+        max_points: number;
+        seconds: number;
+      }
+      const questions: QuestionExport[] = await sql`
+        SELECT id, number, type, max_points, seconds FROM questions
+        WHERE event_id = ${eventId}
+        ORDER BY number ASC
+      `;
 
       // Check if there's anything to export
       if (languages.length === 0 || questions.length === 0) {
@@ -792,7 +683,7 @@ export const questionsRoutes: Routes = {
       }
 
       // Build the languages array
-      const languagesExport: LanguageDefinition[] = languages.map((l) => ({
+      const languagesExport: LanguageDefinition[] = languages.map((l: Language) => ({
         code: l.code,
         name: l.name
       }));
@@ -801,13 +692,23 @@ export const questionsRoutes: Routes = {
       const questionsExport: QuestionImport[] = [];
 
       for (const question of questions) {
-        const questionTranslations = queryGetQuestionTranslations.all({ $questionId: question.id });
+        interface QuestionTranslationRow {
+          language_id: string;
+          prompt: string;
+          answer: string;
+          clarification: string | null;
+        }
+        const questionTranslations: QuestionTranslationRow[] = await sql`
+          SELECT language_id, prompt, answer, clarification FROM translations
+          WHERE question_id = ${question.id}
+          ORDER BY language_id ASC
+        `;
 
-        const translations: QuestionTranslation[] = questionTranslations.map((qt) => {
-          const langCode = languageIdToCodeMap.get(qt.languageId);
+        const translations: QuestionTranslation[] = questionTranslations.map((qt: QuestionTranslationRow) => {
+          const langCode = languageIdToCodeMap.get(qt.language_id);
 
           if (!langCode) {
-            throw new Error(`Language code not found for languageId: ${qt.languageId}`);
+            throw new Error(`Language code not found for languageId: ${qt.language_id}`);
           }
 
           const translation: QuestionTranslation = {
@@ -827,7 +728,7 @@ export const questionsRoutes: Routes = {
 
         questionsExport.push({
           type: question.type as 'PG' | 'PS' | 'TF' | 'FB',
-          maxPoints: question.maxPoints,
+          maxPoints: question.max_points,
           seconds: question.seconds,
           translations
         });
@@ -866,7 +767,7 @@ export const questionsRoutes: Routes = {
   // Update a question
   '/api/questions/:questionId': {
     PATCH: async (req: BunRequest<'/api/questions/:questionId'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -875,19 +776,31 @@ export const questionsRoutes: Routes = {
       const questionId = req.params.questionId;
 
       // Get the question to verify it exists and get eventId
-      const question = queryGetQuestion.get({ $questionId: questionId });
+      interface QuestionDetail {
+        id: string;
+        number: number;
+        type: string;
+        max_points: number;
+        seconds: number;
+        event_id: string;
+      }
+      const questions: QuestionDetail[] = await sql`
+        SELECT id, number, type, max_points, seconds, event_id FROM questions WHERE id = ${questionId}
+      `;
 
-      if (!question) {
+      if (questions.length === 0) {
         return apiNotFound('Question not found');
       }
 
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: question.eventId
-      });
+      const question = questions[0]!;
 
-      if (!permission) {
+      // Check permissions
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+      `;
+
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
@@ -927,55 +840,43 @@ export const questionsRoutes: Routes = {
           const oldNumber = question.number;
           const newNumber = number; // TypeScript knows this is a number due to validation above
 
-          // Use a transaction to handle the reordering atomically
-          db.transaction(() => {
-            // Step 1: Move current question to a temporary position (negative number)
-            // This prevents conflicts with the UNIQUE constraint
-            queryUpdateQuestionNumber.run({
-              $id: questionId,
-              $number: -1
-            });
+          // Step 1: Move current question to a temporary position (negative number)
+          // This prevents conflicts with the UNIQUE constraint
+          await sql`UPDATE questions SET number = ${-1} WHERE id = ${questionId}`;
 
-            if (newNumber < oldNumber) {
-              // Moving question to an earlier position (e.g., from 5 to 2)
-              // Increment all questions from newNumber to oldNumber-1
-              // Questions 2,3,4 become 3,4,5
-              db.query(
-                `
-                UPDATE questions
-                SET number = number + 1
-                WHERE eventId = ? AND number >= ? AND number < ?
-              `
-              ).run(question.eventId, newNumber, oldNumber);
-            } else {
-              // Moving question to a later position (e.g., from 2 to 5)
-              // Decrement all questions from oldNumber+1 to newNumber
-              // Questions 3,4,5 become 2,3,4
-              db.query(
-                `
-                UPDATE questions
-                SET number = number - 1
-                WHERE eventId = ? AND number > ? AND number <= ?
-              `
-              ).run(question.eventId, oldNumber, newNumber);
-            }
+          if (newNumber < oldNumber) {
+            // Moving question to an earlier position (e.g., from 5 to 2)
+            // Increment all questions from newNumber to oldNumber-1
+            // Questions 2,3,4 become 3,4,5
+            await sql`
+              UPDATE questions
+              SET number = number + 1
+              WHERE event_id = ${question.event_id} AND number >= ${newNumber} AND number < ${oldNumber}
+            `;
+          } else {
+            // Moving question to a later position (e.g., from 2 to 5)
+            // Decrement all questions from oldNumber+1 to newNumber
+            // Questions 3,4,5 become 2,3,4
+            await sql`
+              UPDATE questions
+              SET number = number - 1
+              WHERE event_id = ${question.event_id} AND number > ${oldNumber} AND number <= ${newNumber}
+            `;
+          }
 
-            // Step 2: Move current question to its new position
-            queryUpdateQuestionNumber.run({
-              $id: questionId,
-              $number: newNumber
-            });
-          })();
+          // Step 2: Move current question to its new position
+          await sql`UPDATE questions SET number = ${newNumber} WHERE id = ${questionId}`;
         }
 
         // Update other fields (type, maxPoints, seconds)
-        queryUpdateQuestion.run({
-          $id: questionId,
-          $number: number ?? question.number,
-          $type: type ?? question.type,
-          $maxPoints: maxPoints ?? question.maxPoints,
-          $seconds: seconds ?? question.seconds
-        });
+        await sql`
+          UPDATE questions
+          SET number = ${number ?? question.number},
+              type = ${type ?? question.type},
+              max_points = ${maxPoints ?? question.max_points},
+              seconds = ${seconds ?? question.seconds}
+          WHERE id = ${questionId}
+        `;
 
         return apiData();
       } catch (error) {
@@ -985,8 +886,8 @@ export const questionsRoutes: Routes = {
     },
 
     // Delete a question
-    DELETE: (req: BunRequest<'/api/questions/:questionId'>) => {
-      const session = getSession(req);
+    DELETE: async (req: BunRequest<'/api/questions/:questionId'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -995,34 +896,35 @@ export const questionsRoutes: Routes = {
       const questionId = req.params.questionId;
 
       // Get the question to verify it exists and get eventId
-      const question = queryGetQuestion.get({ $questionId: questionId });
+      const questions: QuestionDetail[] = await sql`
+        SELECT id, number, type, max_points, seconds, event_id FROM questions WHERE id = ${questionId}
+      `;
 
-      if (!question) {
+      if (questions.length === 0) {
         return apiNotFound('Question not found');
       }
 
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: question.eventId
-      });
+      const question = questions[0]!;
 
-      if (!permission) {
+      // Check permissions
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+      `;
+
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
       try {
-        // Use a transaction to delete the question and shift numbers down atomically
-        db.transaction(() => {
-          // Delete the question
-          queryDeleteQuestion.run({ $id: questionId });
+        // Delete the question
+        await sql`DELETE FROM questions WHERE id = ${questionId}`;
 
-          // Shift all questions after this one down by decrementing their numbers
-          queryDecrementQuestionNumbers.run({
-            $eventId: question.eventId,
-            $fromNumber: question.number
-          });
-        })();
+        // Shift all questions after this one down by decrementing their numbers
+        await sql`
+          UPDATE questions SET number = number - 1
+          WHERE event_id = ${question.event_id} AND number > ${question.number}
+        `;
 
         return apiData();
       } catch (error) {
@@ -1035,7 +937,7 @@ export const questionsRoutes: Routes = {
   // Add question translation
   '/api/questions/:questionId/translations': {
     POST: async (req: BunRequest<'/api/questions/:questionId/translations'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -1044,19 +946,23 @@ export const questionsRoutes: Routes = {
       const questionId = req.params.questionId;
 
       // Get the question to verify it exists and get eventId
-      const question = queryGetQuestion.get({ $questionId: questionId });
+      const questions: QuestionDetail[] = await sql`
+        SELECT id, number, type, max_points, seconds, event_id FROM questions WHERE id = ${questionId}
+      `;
 
-      if (!question) {
+      if (questions.length === 0) {
         return apiNotFound('Question not found');
       }
 
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: question.eventId
-      });
+      const question = questions[0]!;
 
-      if (!permission) {
+      // Check permissions
+      const permissions: { role_id: string }[] = await sql`
+        SELECT role_id FROM permissions
+        WHERE user_id = ${session.userId} AND event_id = ${question.event_id} AND role_id IN ('owner', 'admin')
+      `;
+
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
@@ -1074,15 +980,17 @@ export const questionsRoutes: Routes = {
       clarification = clarification?.trim();
 
       // Validate that the language exists for this event
-      const languages = queryGetLanguages.all({ $eventId: question.eventId });
-      const validLanguages = new Set(languages.map((l) => l.code));
+      const languages: Language[] = await sql`
+        SELECT id, code, name, event_id FROM languages WHERE event_id = ${question.event_id}
+      `;
+      const validLanguages = new Set(languages.map((l: Language) => l.code));
 
       if (!validLanguages.has(languageCode)) {
         return apiBadRequest(`Invalid language code "${languageCode}" for this event`);
       }
 
       // Get the language ID from the code
-      const language = languages.find((l) => l.code === languageCode);
+      const language = languages.find((l: Language) => l.code === languageCode);
 
       if (!language) {
         return apiBadRequest(`Language not found for code "${languageCode}"`);
@@ -1100,14 +1008,10 @@ export const questionsRoutes: Routes = {
       try {
         const translationId = Bun.randomUUIDv7();
 
-        queryInsertQuestionTranslation.run({
-          $id: translationId,
-          $prompt: prompt,
-          $answer: answer,
-          $clarification: clarification,
-          $languageId: language.id,
-          $questionId: questionId
-        });
+        await sql`
+          INSERT INTO translations (id, prompt, answer, clarification, language_id, question_id)
+          VALUES (${translationId}, ${prompt}, ${answer}, ${clarification}, ${language.id}, ${questionId})
+        `;
 
         return apiData({
           translation: { id: translationId, languageCode, prompt, answer, clarification }
@@ -1122,7 +1026,7 @@ export const questionsRoutes: Routes = {
   // Update question translation
   '/api/questions/translations/:translationId': {
     PATCH: async (req: BunRequest<'/api/questions/translations/:translationId'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -1131,26 +1035,54 @@ export const questionsRoutes: Routes = {
       const translationId = req.params.translationId;
 
       // Get the question translation to verify it exists
-      const questionTranslation = queryGetSingleQuestionTranslation.get({ $id: translationId });
+      const translations = await sql<{ id: string; prompt: string; answer: string; clarification: string; language_id: string; question_id: string }[]>`
+        SELECT id, prompt, answer, clarification, language_id, question_id
+        FROM translations
+        WHERE id = ${translationId}
+      `;
 
-      if (!questionTranslation) {
+      if (translations.length === 0) {
         return apiNotFound('Question translation not found');
       }
 
-      // Get the parent question to check permissions
-      const question = queryGetQuestion.get({ $questionId: questionTranslation.questionId });
+      const questionTranslation = {
+        id: translations[0]!.id,
+        prompt: translations[0]!.prompt,
+        answer: translations[0]!.answer,
+        clarification: translations[0]!.clarification,
+        languageId: translations[0]!.language_id,
+        questionId: translations[0]!.question_id
+      };
 
-      if (!question) {
+      // Get the parent question to check permissions
+      const questions = await sql<{ id: string; number: number; type: string; max_points: number; seconds: number; event_id: string }[]>`
+        SELECT id, number, type, max_points, seconds, event_id
+        FROM questions
+        WHERE id = ${questionTranslation.questionId}
+      `;
+
+      if (questions.length === 0) {
         return apiNotFound('Parent question not found');
       }
 
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: question.eventId
-      });
+      const question = {
+        id: questions[0]!.id,
+        number: questions[0]!.number,
+        type: questions[0]!.type,
+        maxPoints: questions[0]!.max_points,
+        seconds: questions[0]!.seconds,
+        eventId: questions[0]!.event_id
+      };
 
-      if (!permission) {
+      // Check permissions
+      const permissions = await sql<{ role_id: string }[]>`
+        SELECT role_id
+        FROM permissions
+        WHERE user_id = ${session.userId}
+        AND event_id = ${question.eventId}
+      `;
+
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
@@ -1182,12 +1114,13 @@ export const questionsRoutes: Routes = {
       }
 
       try {
-        queryUpdateQuestionTranslation.run({
-          $id: translationId,
-          $prompt: prompt !== undefined ? prompt.trim() : questionTranslation.prompt,
-          $answer: answer !== undefined ? answer.trim() : questionTranslation.answer,
-          $clarification: clarification !== undefined ? clarification.trim() : questionTranslation.clarification
-        });
+        await sql`
+          UPDATE translations
+          SET prompt = ${prompt !== undefined ? prompt.trim() : questionTranslation.prompt},
+              answer = ${answer !== undefined ? answer.trim() : questionTranslation.answer},
+              clarification = ${clarification !== undefined ? clarification.trim() : questionTranslation.clarification}
+          WHERE id = ${translationId}
+        `;
 
         return apiData();
       } catch (error) {
@@ -1197,8 +1130,8 @@ export const questionsRoutes: Routes = {
     },
 
     // Delete question translation
-    DELETE: (req: BunRequest<'/api/questions/translations/:translationId'>) => {
-      const session = getSession(req);
+    DELETE: async (req: BunRequest<'/api/questions/translations/:translationId'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -1207,31 +1140,52 @@ export const questionsRoutes: Routes = {
       const translationId = req.params.translationId;
 
       // Get the question translation to verify it exists
-      const questionTranslation = queryGetSingleQuestionTranslation.get({ $id: translationId });
+      const translations = await sql<{ id: string; language_id: string; question_id: string }[]>`
+        SELECT id, language_id, question_id
+        FROM translations
+        WHERE id = ${translationId}
+      `;
 
-      if (!questionTranslation) {
+      if (translations.length === 0) {
         return apiNotFound('Question translation not found');
       }
 
-      // Get the parent question to check permissions
-      const question = queryGetQuestion.get({ $questionId: questionTranslation.questionId });
+      const questionTranslation = {
+        id: translations[0]!.id,
+        languageId: translations[0]!.language_id,
+        questionId: translations[0]!.question_id
+      };
 
-      if (!question) {
+      // Get the parent question to check permissions
+      const questions = await sql<{ id: string; event_id: string }[]>`
+        SELECT id, event_id
+        FROM questions
+        WHERE id = ${questionTranslation.questionId}
+      `;
+
+      if (questions.length === 0) {
         return apiNotFound('Parent question not found');
       }
 
-      // Check permissions
-      const permission = queryCheckPermission.get({
-        $userId: session.userId,
-        $eventId: question.eventId
-      });
+      const question = {
+        id: questions[0]!.id,
+        eventId: questions[0]!.event_id
+      };
 
-      if (!permission) {
+      // Check permissions
+      const permissions = await sql<{ role_id: string }[]>`
+        SELECT role_id
+        FROM permissions
+        WHERE user_id = ${session.userId}
+        AND event_id = ${question.eventId}
+      `;
+
+      if (permissions.length === 0) {
         return apiForbidden();
       }
 
       try {
-        queryDeleteQuestionTranslation.run({ $id: translationId });
+        await sql`DELETE FROM translations WHERE id = ${translationId}`;
         return apiData();
       } catch (error) {
         console.error('Error deleting question translation:', error);

@@ -1,4 +1,4 @@
-import { db } from '@/server/db';
+import { sql } from 'bun';
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
@@ -9,58 +9,45 @@ interface Language {
   id: string;
   code: string;
   name: string;
-  eventId: string;
-  createdAt: number;
+  event_id: string;
+  created_at: number;
 }
-
-const querySelectLanguagesByEventId = db.query<Language, { $eventId: string }>(
-  `SELECT id, code, name, eventId, createdAt FROM languages WHERE eventId = $eventId ORDER BY code`
-);
-
-const querySelectLanguageByCode = db.query<{ id: string }, { $eventId: string; $code: string }>(
-  `SELECT id FROM languages WHERE eventId = $eventId AND code = $code`
-);
-
-const queryInsertLanguage = db.query<{ id: string }, { $id: string; $eventId: string; $code: string; $name: string }>(
-  `INSERT INTO languages (id, eventId, code, name) VALUES ($id, $eventId, $code, $name)`
-);
-
-const queryUpdateLanguage = db.query<Language, { $id: string; $code: string; $name: string }>(
-  `UPDATE languages SET code = $code, name = $name WHERE id = $id`
-);
-
-const queryDeleteLanguage = db.query<{ id: string }, { $id: string }>(`DELETE FROM languages WHERE id = $id`);
 
 export const languagesRoutes: Routes = {
   '/api/events/:id/languages': {
-    GET: (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = getSession(req);
+    GET: async (req: BunRequest<'/api/events/:id/languages'>) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const languages = querySelectLanguagesByEventId.all({ $eventId: eventId });
+      const languages: Language[] = await sql`
+        SELECT id, code, name, event_id, created_at
+        FROM languages
+        WHERE event_id = ${eventId}
+        ORDER BY code
+      `;
 
       return apiData({ eventName: event.name, languages });
     },
 
     POST: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -78,28 +65,30 @@ export const languagesRoutes: Routes = {
         return apiBadRequest('Language name is required');
       }
 
-      const existingLanguage = querySelectLanguageByCode.get({ $eventId: eventId, $code: code });
+      const existingLanguages: { id: string }[] = await sql`
+        SELECT id FROM languages WHERE event_id = ${eventId} AND code = ${code}
+      `;
 
-      if (existingLanguage) {
+      if (existingLanguages.length > 0) {
         return apiBadRequest('A language with this code already exists');
       }
 
       const id = Bun.randomUUIDv7();
 
-      queryInsertLanguage.run({ $id: id, $eventId: eventId, $code: code, $name: name });
+      await sql`INSERT INTO languages (id, event_id, code, name) VALUES (${id}, ${eventId}, ${code}, ${name})`;
 
       return apiData({ id });
     },
 
     PATCH: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -117,26 +106,28 @@ export const languagesRoutes: Routes = {
         return apiBadRequest('Language name is required');
       }
 
-      const existingLanguage = querySelectLanguageByCode.get({ $eventId: eventId, $code: code });
+      const existingLanguages: { id: string }[] = await sql`
+        SELECT id FROM languages WHERE event_id = ${eventId} AND code = ${code}
+      `;
 
-      if (existingLanguage && existingLanguage.id !== body.id) {
+      if (existingLanguages.length > 0 && existingLanguages[0]!.id !== body.id) {
         return apiBadRequest('A language with this code already exists');
       }
 
-      queryUpdateLanguage.run({ $id: body.id, $code: code, $name: name });
+      await sql`UPDATE languages SET code = ${code}, name = ${name} WHERE id = ${body.id}`;
 
       return apiData();
     },
 
     DELETE: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = getSession(req);
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
       }
 
       const eventId = req.params.id;
-      const event = querySelectEvent.get({ $eventId: eventId, $userId: session.userId });
+      const event = await querySelectEvent(eventId, session.user_id);
 
       if (!event) {
         return apiForbidden();
@@ -144,7 +135,7 @@ export const languagesRoutes: Routes = {
 
       const { id } = await req.json();
 
-      queryDeleteLanguage.run({ $id: id });
+      await sql`DELETE FROM languages WHERE id = ${id}`;
 
       return apiData();
     }

@@ -1,19 +1,13 @@
-import { db } from '@/server/db';
+import { sql } from 'bun';
 import { getSession } from '@/server/session';
 import type { Routes, User } from '@/server/types';
 import { apiBadRequest, apiData, apiNotFound, apiUnauthorized } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
 
-const querySelectUserByEmail = db.query<User, { $email: string }>(
-  `SELECT id, firstName, lastName
-   FROM users
-   WHERE email = $email`
-);
-
 export const userRoutes: Routes = {
   '/api/users': {
-    GET: (req: BunRequest) => {
-      const session = getSession(req);
+    GET: async (req: BunRequest) => {
+      const session = await getSession(req);
 
       if (!session) {
         return apiUnauthorized();
@@ -26,7 +20,12 @@ export const userRoutes: Routes = {
         return apiBadRequest('Email parameter required');
       }
 
-      const user = querySelectUserByEmail.get({ $email: email });
+      const users: User[] = await sql`
+        SELECT id, first_name, last_name
+        FROM users
+        WHERE email = ${email}
+      `;
+      const user = users[0];
 
       if (!user) {
         return apiNotFound('User not found');

@@ -16,17 +16,10 @@ export const NavBar = memo(() => {
 
     event.preventDefault();
 
-    const result = await fetch('/api/logout', {
-      method: 'POST'
-    });
+    const result = await appValt.logout();
 
-    if (result.status === 200) {
-      window.location.href = '/';
-      window.location.reload();
-    } else {
-      const response = await result.json();
-
-      alertModal.open(response.error || 'Logout failed');
+    if (!result.ok) {
+      alertModal.open('Logout failed');
     }
   };
 

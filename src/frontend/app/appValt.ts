@@ -4,8 +4,8 @@ import { proxy } from 'valtio';
 interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
 }
 
 interface AppStore {
@@ -22,9 +22,25 @@ export class AppValt {
 
   async init() {
     const result = await fetch('/api/session');
-    const response = (await result.json()) as { user: User };
-    this.store.user = response.user;
-    this.store.init = true;
+
+    if (result.status === 200) {
+      const response = (await result.json()) as { user: User };
+      this.store.user = response.user;
+      this.store.init = true;
+    }
+  }
+
+  async logout() {
+    const result = await fetch('/api/logout', { method: 'POST' });
+
+    if (result.status === 200) {
+      window.location.href = '/';
+      window.location.reload();
+
+      return { ok: true };
+    }
+
+    return { ok: false };
   }
 }
 
