@@ -1,9 +1,9 @@
-version: '3.8'
 services:
   postgres:
-    image: postgres
+    image: ghcr.io/railwayapp-templates/postgres-ssl:17
     restart: always
     environment:
-      POSTGRES_PASSWORD: your_secure_password # <-- Add this line
+      POSTGRES_PASSWORD: postgres
     ports:
       - '5432:5432'
+    container_name: postgres-pbe-manager
