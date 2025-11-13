@@ -36,6 +36,7 @@ export interface Team {
   name: string;
   number: number;
   eventId: string;
+  languageId: string | null;
   createdAt: string;
 }
 
@@ -57,3 +58,118 @@ export interface QuestionInfo {
   questionId: string;
   createdAt: string;
 }
+
+export interface Run {
+  id: string;
+  eventId: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  gracePeriod: number;
+  startedAt: string | null;
+  hasTimer: boolean;
+  activeQuestionId: string | null;
+  questionStartTime: string | null;
+  createdAt: string;
+}
+
+export interface ActiveQuestionCache {
+  questionId: string;
+  seconds: number;
+  startTime: string; // ISO string from database
+}
+
+export interface Answer {
+  id: string;
+  answer: string;
+  autoPointsAwarded: number | null;
+  pointsAwarded: number | null;
+  runId: string;
+  teamId: string;
+  translationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Translation {
+  id: string;
+  prompt: string;
+  answer: string;
+  clarification: string | null;
+  languageId: string;
+  questionId: string;
+  createdAt: string;
+}
+
+export interface Language {
+  id: string;
+  code: string;
+  name: string;
+  eventId: string;
+  createdAt: string;
+}
+
+export interface Slide {
+  id: string;
+  eventId: string;
+  number: number;
+  content: string;
+  createdAt: string;
+}
+
+// WebSocket Message Types
+export type ErrorCode =
+  | 'NO_ACTIVE_RUN'
+  | 'HOST_ALREADY_CONNECTED'
+  | 'INVALID_TEAM'
+  | 'UNAUTHORIZED'
+  | 'RUN_ALREADY_STARTED'
+  | 'NO_LANGUAGE_SELECTED'
+  | 'NO_ACTIVE_QUESTION'
+  | 'DEADLINE_EXCEEDED'
+  | 'TRANSLATION_NOT_FOUND'
+  | 'SLIDE_NOT_FOUND'
+  | 'INVALID_ROLE';
+
+export type HostMessage =
+  | { type: 'START_RUN' }
+  | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
+  | { type: 'PAUSE' }
+  | { type: 'END_QUESTION' }
+  | { type: 'COMPLETE_RUN' }
+  | { type: 'SHOW_SLIDE'; slideNumber: number };
+
+export type TeamMessage =
+  | { type: 'SELECT_LANGUAGE'; languageId: string }
+  | { type: 'SUBMIT_ANSWER'; answer: string }
+  | { type: 'UPDATE_ANSWER'; answerId: string; answer: string };
+
+export type ServerMessage =
+  | { type: 'RUN_STARTED'; run: Run }
+  | {
+      type: 'QUESTION_STARTED';
+      translation: {
+        id: string;
+        prompt: string;
+        clarification: string | null;
+        languageId: string;
+        questionId: string;
+      };
+      startTime: number;
+      seconds: number;
+      hasTimer: boolean;
+      gracePeriod: number;
+    }
+  | { type: 'QUESTION_ENDED' }
+  | { type: 'SLIDE_SHOWN'; slide: Slide }
+  | {
+      type: 'TEAM_CONNECTED';
+      teamId: string;
+      teamName: string;
+      teamNumber: number;
+      languageCode: string | null;
+    }
+  | { type: 'TEAM_DISCONNECTED'; teamId: string }
+  | { type: 'ANSWER_RECEIVED'; teamId: string; hasAnswer: boolean }
+  | { type: 'YOUR_ANSWER'; answerId: string; answer: string }
+  | { type: 'GRACE_PERIOD_UPDATED'; gracePeriod: number }
+  | { type: 'RUN_COMPLETED'; scores: Array<{ teamId: string; teamName: string; teamNumber: number; total: number }> }
+  | { type: 'ERROR'; code: ErrorCode; message: string };

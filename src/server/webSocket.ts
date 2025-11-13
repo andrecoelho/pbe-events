@@ -1,0 +1,763 @@
+import { sql, type ServerWebSocket } from 'bun';
+import type { Session, Run, ActiveQuestionCache } from '@/server/types';
+
+export interface WebsocketData {
+  session: Session | null;
+  eventId: string | null;
+  teamId: string | null;
+  role: 'host' | 'team';
+  languageId: string | null;
+  languageCode: string | null;
+}
+
+export interface EventConnection {
+  host: Set<ServerWebSocket<WebsocketData>>;
+  teams: Map<string, ServerWebSocket<WebsocketData>>;
+  run: Run | null;
+  activeQuestion: ActiveQuestionCache | null;
+}
+
+export class WebSocketServer {
+  private eventConnections: Map<string, EventConnection>;
+  private server: any = null;
+
+  constructor(eventConnections: Map<string, EventConnection>) {
+    this.eventConnections = eventConnections;
+  }
+
+  setServer(server: any) {
+    this.server = server;
+  }
+
+  createHandlers() {
+    return {
+      data: {} as WebsocketData,
+      open: this.handleOpen,
+      close: this.handleClose,
+      message: this.handleMessage
+    };
+  }
+
+  async upgradeWebSocket(req: Request, server: any, session: Session | null): Promise<Response | undefined> {
+    const url = new URL(req.url);
+    const eventId = url.searchParams.get('eventId');
+    const teamId = url.searchParams.get('teamId');
+
+    if (!eventId || !teamId) {
+      return new Response('Missing eventId or teamId', { status: 400 });
+    }
+
+    try {
+      // Check if there's an active run for this event
+      const runs: {
+        id: string;
+        status: string;
+      }[] = await sql`
+        SELECT id, status FROM runs
+        WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+      `;
+
+      if (runs.length === 0) {
+        return new Response('No active run for this event', { status: 400 });
+      }
+
+      const role = session ? 'host' : 'team';
+
+      if (role === 'host') {
+        // Check if host is already connected
+        if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host.size > 0) {
+          return new Response('Host already connected', { status: 400 });
+        }
+
+        // Validate session and permissions for host
+        const permissions: { role_id: string }[] = await sql`
+          SELECT role_id FROM permissions
+          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        `;
+
+        if (permissions.length === 0) {
+          return new Response('Unauthorized - requires owner or admin role', { status: 400 });
+        }
+      } else {
+        // Validate team exists for team role
+        const teams: { id: string }[] = await sql`
+          SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}
+        `;
+
+        if (teams.length === 0) {
+          return new Response('Invalid team', { status: 400 });
+        }
+      }
+
+      const upgraded = server.upgrade(req, {
+        data: {
+          session,
+          eventId,
+          teamId,
+          role,
+          languageId: null,
+          languageCode: null
+        }
+      });
+
+      if (upgraded) {
+        return;
+      }
+
+      return new Response('WebSocket upgrade failed', { status: 400 });
+    } catch (error) {
+      console.error('Error during WebSocket upgrade:', error);
+      return new Response('WebSocket upgrade failed', { status: 400 });
+    }
+  }
+
+  private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
+    const { eventId, teamId, role } = ws.data;
+
+    if (!eventId || !teamId) {
+      ws.close();
+      return;
+    }
+
+    try {
+      // Initialize connection tracking if needed
+      if (!this.eventConnections.has(eventId)) {
+        this.eventConnections.set(eventId, {
+          host: new Set(),
+          teams: new Map(),
+          run: null,
+          activeQuestion: null
+        });
+      }
+
+      const connection = this.eventConnections.get(eventId)!;
+
+      // Query and cache run
+      const runs: {
+        id: string;
+        event_id: string;
+        status: string;
+        grace_period: number;
+        started_at: string | null;
+        has_timer: boolean;
+        active_question_id: string | null;
+        question_start_time: string | null;
+        created_at: string;
+      }[] = await sql`
+        SELECT id, event_id, status, grace_period, started_at, has_timer,
+               active_question_id, question_start_time, created_at
+        FROM runs
+        WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+      `;
+
+      if (runs.length > 0) {
+        const run = runs[0]!;
+
+        connection.run = {
+          id: run.id,
+          eventId: run.event_id,
+          status: run.status as 'not_started' | 'in_progress' | 'completed',
+          gracePeriod: run.grace_period,
+          startedAt: run.started_at,
+          hasTimer: run.has_timer,
+          activeQuestionId: run.active_question_id,
+          questionStartTime: run.question_start_time,
+          createdAt: run.created_at
+        };
+
+        // Cache active question if exists
+        if (run.active_question_id) {
+          const questions: { seconds: number }[] = await sql`
+            SELECT seconds FROM questions WHERE id = ${run.active_question_id}
+          `;
+
+          if (questions.length > 0) {
+            connection.activeQuestion = {
+              questionId: run.active_question_id,
+              seconds: questions[0]!.seconds,
+              startTime: run.question_start_time!
+            };
+          }
+        }
+      }
+
+      if (role === 'host') {
+        connection.host.add(ws);
+        console.log(`Host connected to event ${eventId}`);
+      } else {
+        // Close existing connection if team reconnecting
+        if (connection.teams.has(teamId)) {
+          connection.teams.get(teamId)?.close();
+        }
+
+        connection.teams.set(teamId, ws);
+
+        // Get team details including language
+        const teams: {
+          language_id: string | null;
+          code: string | null;
+          name: string;
+          number: number;
+        }[] = await sql`
+          SELECT t.language_id, l.code, t.name, t.number
+          FROM teams t
+          LEFT JOIN languages l ON l.id = t.language_id
+          WHERE t.id = ${teamId}
+        `;
+
+        if (teams.length > 0) {
+          const team = teams[0]!;
+
+          ws.data.languageId = team.language_id;
+          ws.data.languageCode = team.code;
+
+          // Subscribe to language channel if language selected
+          if (team.code) {
+            ws.subscribe(`${eventId}:${team.code}`);
+          }
+
+          // Send TEAM_CONNECTED to host
+          const message = JSON.stringify({
+            type: 'TEAM_CONNECTED',
+            teamId,
+            teamName: team.name,
+            teamNumber: team.number,
+            languageCode: team.code
+          });
+
+          connection.host.forEach((hostWs: ServerWebSocket<WebsocketData>) => {
+            hostWs.send(message);
+          });
+
+          // Send existing answer if active question and team has language
+          if (connection.activeQuestion && ws.data.languageId) {
+            await this.sendExistingAnswerToTeam(ws, connection);
+          }
+        }
+
+        console.log(`Team ${teamId} connected to event ${eventId}`);
+      }
+    } catch (error) {
+      console.error('Error in WebSocket open handler:', error);
+      ws.close();
+    }
+  };
+
+  private handleClose = async (ws: ServerWebSocket<WebsocketData>, code: number, reason: string) => {
+    const { eventId, teamId, role, languageCode } = ws.data;
+
+    if (!eventId) {
+      return;
+    }
+
+    const connection = this.eventConnections.get(eventId);
+    if (!connection) {
+      return;
+    }
+
+    try {
+      if (role === 'host') {
+        connection.host.delete(ws);
+        console.log(`Host disconnected from event ${eventId}`);
+      } else if (teamId) {
+        connection.teams.delete(teamId);
+
+        // Unsubscribe from language channel
+        if (languageCode) {
+          ws.unsubscribe(`${eventId}:${languageCode}`);
+        }
+
+        // Notify host
+        const message = JSON.stringify({
+          type: 'TEAM_DISCONNECTED',
+          teamId
+        });
+
+        connection.host.forEach((hostWs: ServerWebSocket<WebsocketData>) => {
+          hostWs.send(message);
+        });
+
+        console.log(`Team ${teamId} disconnected from event ${eventId}`);
+      }
+
+      // Clean up empty connections
+      if (connection.host.size === 0 && connection.teams.size === 0) {
+        this.eventConnections.delete(eventId);
+        console.log(`Event connection ${eventId} cleaned up`);
+      }
+    } catch (error) {
+      console.error('Error in WebSocket close handler:', error);
+    }
+  };
+
+  private handleMessage = async (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
+    const { eventId, teamId, role, session } = ws.data;
+
+    if (!eventId) {
+      return;
+    }
+
+    const connection = this.eventConnections.get(eventId);
+    if (!connection) {
+      return;
+    }
+
+    try {
+      const msg = JSON.parse(message as string);
+
+      // Handle team messages
+      if (role === 'team' && teamId) {
+        if (msg.type === 'SELECT_LANGUAGE') {
+          await this.handleSELECT_LANGUAGE(ws, connection, msg.languageId);
+        } else if (msg.type === 'SUBMIT_ANSWER' || msg.type === 'UPDATE_ANSWER') {
+          await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+        }
+      }
+
+      // Handle host messages
+      if (role === 'host' && session) {
+        if (msg.type === 'START_QUESTION') {
+          await this.handleSTART_QUESTION(ws, connection, msg.questionId, msg.hasTimer);
+        } else if (msg.type === 'PAUSE') {
+          await this.handlePAUSE(connection);
+        } else if (msg.type === 'SHOW_SLIDE') {
+          await this.handleSHOW_SLIDE(connection, msg.slideNumber);
+        } else if (msg.type === 'COMPLETE_RUN') {
+          await this.handleCOMPLETE_RUN(connection);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+
+      const errorMsg = JSON.stringify({
+        type: 'ERROR',
+        code: 'INVALID_ROLE',
+        message: 'Error processing message'
+      });
+
+      ws.send(errorMsg);
+    }
+  };
+
+  private async sendExistingAnswerToTeam(
+    ws: ServerWebSocket<WebsocketData>,
+    connection: EventConnection
+  ): Promise<void> {
+    if (!connection.activeQuestion || !ws.data.languageId || !ws.data.teamId) return;
+
+    try {
+      const answers: { id: string; answer: string }[] = await sql`
+        SELECT a.id, a.answer
+        FROM answers a
+        JOIN translations t ON t.id = a.translation_id
+        WHERE a.run_id = ${connection.run!.id}
+          AND a.team_id = ${ws.data.teamId}
+          AND t.question_id = ${connection.activeQuestion.questionId}
+          AND t.language_id = ${ws.data.languageId}
+      `;
+
+      if (answers.length > 0) {
+        const answer = answers[0]!;
+        ws.send(
+          JSON.stringify({
+            type: 'YOUR_ANSWER',
+            answerId: answer.id,
+            answer: answer.answer
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error sending existing answer:', error);
+    }
+  }
+
+  private async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
+    try {
+      const languages: { code: string }[] = await sql`
+        SELECT DISTINCT code FROM languages WHERE event_id = ${eventId}
+      `;
+
+      const messageStr = JSON.stringify(message);
+      languages.forEach((lang) => {
+        this.server.publish(`${eventId}:${lang.code}`, messageStr);
+      });
+    } catch (error) {
+      console.error('Error broadcasting to language channels:', error);
+    }
+  }
+
+  private async handleSELECT_LANGUAGE(
+    ws: ServerWebSocket<WebsocketData>,
+    connection: EventConnection,
+    languageId: string
+  ): Promise<void> {
+    const { eventId, teamId } = ws.data;
+
+    if (!teamId) return;
+
+    // Check if run has started
+    if (connection.run?.startedAt !== null) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'RUN_ALREADY_STARTED',
+          message: 'Cannot change language after run has started'
+        })
+      );
+      return;
+    }
+
+    try {
+      // Update team language
+      await sql`
+        UPDATE teams SET language_id = ${languageId} WHERE id = ${teamId}
+      `;
+
+      // Get language code and team details
+      const results: { code: string; name: string; number: number }[] = await sql`
+        SELECT l.code, t.name, t.number
+        FROM languages l
+        JOIN teams t ON t.id = ${teamId}
+        WHERE l.id = ${languageId}
+      `;
+
+      if (results.length > 0) {
+        const { code, name, number } = results[0]!;
+
+        ws.data.languageId = languageId;
+        ws.data.languageCode = code;
+
+        // Subscribe to language channel
+        ws.subscribe(`${eventId}:${code}`);
+
+        // Notify host
+        const message = JSON.stringify({
+          type: 'TEAM_CONNECTED',
+          teamId,
+          teamName: name,
+          teamNumber: number,
+          languageCode: code
+        });
+
+        connection.host.forEach((hostWs) => {
+          hostWs.send(message);
+        });
+
+        // Send existing answer if active question
+        if (connection.activeQuestion) {
+          await this.sendExistingAnswerToTeam(ws, connection);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling SELECT_LANGUAGE:', error);
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'INVALID_ROLE',
+          message: 'Error selecting language'
+        })
+      );
+    }
+  }
+
+  private async handleSUBMIT_ANSWER(
+    ws: ServerWebSocket<WebsocketData>,
+    connection: EventConnection,
+    answer: string
+  ): Promise<void> {
+    const { teamId, languageId } = ws.data;
+
+    if (!teamId) return;
+
+    // Validate language selected
+    if (!languageId) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'NO_LANGUAGE_SELECTED',
+          message: 'Please select a language first'
+        })
+      );
+      return;
+    }
+
+    // Validate active question
+    if (!connection.activeQuestion) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'NO_ACTIVE_QUESTION',
+          message: 'No active question'
+        })
+      );
+      return;
+    }
+
+    // Validate deadline if timer enabled
+    if (connection.run!.hasTimer) {
+      const now = Date.now();
+      const startTime = new Date(connection.activeQuestion.startTime).getTime();
+      const deadline = startTime + connection.activeQuestion.seconds * 1000 + connection.run!.gracePeriod * 1000;
+
+      if (now > deadline) {
+        ws.send(
+          JSON.stringify({
+            type: 'ERROR',
+            code: 'DEADLINE_EXCEEDED',
+            message: 'Answer submitted after deadline'
+          })
+        );
+        return;
+      }
+    }
+
+    try {
+      // Get translation ID
+      const translations: { id: string }[] = await sql`
+        SELECT id FROM translations
+        WHERE question_id = ${connection.activeQuestion.questionId}
+          AND language_id = ${languageId}
+      `;
+
+      if (translations.length === 0) {
+        ws.send(
+          JSON.stringify({
+            type: 'ERROR',
+            code: 'TRANSLATION_NOT_FOUND',
+            message: 'Translation not found'
+          })
+        );
+        return;
+      }
+
+      const translationId = translations[0]!.id;
+      const answerId = Bun.randomUUIDv7();
+
+      // Upsert answer
+      await sql`
+        INSERT INTO answers (id, answer, run_id, team_id, translation_id, created_at, updated_at)
+        VALUES (${answerId}, ${answer}, ${
+        connection.run!.id
+      }, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (run_id, team_id, translation_id)
+        DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
+      `;
+
+      // Notify host
+      const message = JSON.stringify({
+        type: 'ANSWER_RECEIVED',
+        teamId,
+        hasAnswer: true
+      });
+
+      connection.host.forEach((hostWs) => {
+        hostWs.send(message);
+      });
+    } catch (error) {
+      console.error('Error handling SUBMIT_ANSWER:', error);
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'INVALID_ROLE',
+          message: 'Error submitting answer'
+        })
+      );
+    }
+  }
+
+  private async handleSTART_QUESTION(
+    ws: ServerWebSocket<WebsocketData>,
+    connection: EventConnection,
+    questionId: string,
+    hasTimer: boolean
+  ): Promise<void> {
+    const { eventId } = ws.data;
+
+    try {
+      // Update run
+      await sql`
+        UPDATE runs
+        SET active_question_id = ${questionId},
+            question_start_time = CURRENT_TIMESTAMP,
+            has_timer = ${hasTimer}
+        WHERE id = ${connection.run!.id}
+      `;
+
+      // Re-query run to get exact timestamp
+      const runs: {
+        active_question_id: string | null;
+        question_start_time: string | null;
+        has_timer: boolean;
+      }[] = await sql`
+        SELECT active_question_id, question_start_time, has_timer
+        FROM runs
+        WHERE id = ${connection.run!.id}
+      `;
+
+      if (runs.length > 0) {
+        const run = runs[0]!;
+        connection.run!.activeQuestionId = run.active_question_id;
+        connection.run!.questionStartTime = run.question_start_time;
+        connection.run!.hasTimer = run.has_timer;
+      }
+
+      // Get question seconds
+      const questions: { seconds: number }[] = await sql`
+        SELECT seconds FROM questions WHERE id = ${questionId}
+      `;
+
+      if (questions.length > 0) {
+        connection.activeQuestion = {
+          questionId,
+          seconds: questions[0]!.seconds,
+          startTime: connection.run!.questionStartTime!
+        };
+      }
+
+      // Get all translations
+      const translations: {
+        id: string;
+        prompt: string;
+        clarification: string | null;
+        language_id: string;
+        code: string;
+      }[] = await sql`
+        SELECT t.id, t.prompt, t.clarification, t.language_id, l.code
+        FROM translations t
+        JOIN languages l ON l.id = t.language_id
+        WHERE t.question_id = ${questionId}
+      `;
+
+      // Group by language and broadcast
+      const languageMap = new Map<string, any>();
+      translations.forEach((t) => {
+        languageMap.set(t.code, {
+          type: 'QUESTION_STARTED',
+          translation: {
+            id: t.id,
+            prompt: t.prompt,
+            clarification: t.clarification,
+            languageId: t.language_id,
+            questionId
+          },
+          startTime: Date.now(),
+          seconds: connection.activeQuestion!.seconds,
+          hasTimer,
+          gracePeriod: connection.run!.gracePeriod
+        });
+      });
+
+      // Broadcast to each language channel
+      languageMap.forEach((message, code) => {
+        this.server.publish(`${eventId}:${code}`, JSON.stringify(message));
+      });
+
+      // Send existing answers to teams
+      connection.teams.forEach(async (teamWs) => {
+        await this.sendExistingAnswerToTeam(teamWs, connection);
+      });
+    } catch (error) {
+      console.error('Error handling START_QUESTION:', error);
+    }
+  }
+
+  private async handlePAUSE(connection: EventConnection): Promise<void> {
+    try {
+      // Update run
+      await sql`
+        UPDATE runs
+        SET active_question_id = NULL, question_start_time = NULL
+        WHERE id = ${connection.run!.id}
+      `;
+
+      connection.run!.activeQuestionId = null;
+      connection.run!.questionStartTime = null;
+      connection.activeQuestion = null;
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+        type: 'QUESTION_ENDED'
+      });
+    } catch (error) {
+      console.error('Error handling PAUSE:', error);
+    }
+  }
+
+  private async handleSHOW_SLIDE(connection: EventConnection, slideNumber: number): Promise<void> {
+    try {
+      const slides: {
+        id: string;
+        event_id: string;
+        number: number;
+        content: string;
+        created_at: string;
+      }[] = await sql`
+        SELECT id, event_id, number, content, created_at
+        FROM slides
+        WHERE event_id = ${connection.run!.eventId} AND number = ${slideNumber}
+      `;
+
+      if (slides.length > 0) {
+        const slide = slides[0]!;
+        await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+          type: 'SLIDE_SHOWN',
+          slide: {
+            id: slide.id,
+            eventId: slide.event_id,
+            number: slide.number,
+            content: slide.content,
+            createdAt: slide.created_at
+          }
+        });
+      }
+      // Silently ignore if slide not found (don't send error to teams)
+    } catch (error) {
+      console.error('Error handling SHOW_SLIDE:', error);
+    }
+  }
+
+  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
+    try {
+      // Update run status
+      await sql`
+        UPDATE runs SET status = 'completed' WHERE id = ${connection.run!.id}
+      `;
+
+      // Get final scores
+      const scores: {
+        id: string;
+        name: string;
+        number: number;
+        total: number | null;
+      }[] = await sql`
+        SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
+        FROM teams t
+        LEFT JOIN answers a ON a.team_id = t.id AND a.run_id = ${connection.run!.id}
+        WHERE t.event_id = ${connection.run!.eventId}
+        GROUP BY t.id, t.name, t.number
+        ORDER BY total DESC
+      `;
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+        type: 'RUN_COMPLETED',
+        scores: scores.map((s) => ({
+          teamId: s.id,
+          teamName: s.name,
+          teamNumber: s.number,
+          total: s.total || 0
+        }))
+      });
+
+      // Close all connections
+      connection.teams.forEach((teamWs) => {
+        teamWs.close();
+      });
+      connection.host.forEach((hostWs) => {
+        hostWs.close();
+      });
+    } catch (error) {
+      console.error('Error handling COMPLETE_RUN:', error);
+    }
+  }
+}
