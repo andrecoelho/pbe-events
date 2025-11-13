@@ -43,6 +43,10 @@ export function apiServerError(message: string = 'Internal Server Error') {
   });
 }
 
+export function badRequest(message: string = 'Bad Request') {
+  return new Response(message, { status: 400 });
+}
+
 export function textNotFound() {
   return new Response('Not Found', { status: 404 });
 }

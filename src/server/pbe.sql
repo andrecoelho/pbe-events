@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS teams CASCADE;
 DROP TABLE IF EXISTS languages CASCADE;
 DROP TABLE IF EXISTS permissions CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS runs CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS sessions CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -85,11 +86,25 @@ CREATE TABLE translations (
   UNIQUE (language_id, question_id)
 );
 
+CREATE TABLE runs (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('not_started', 'in_progress', 'completed')) DEFAULT 'not_started',
+  grace_period INTEGER NOT NULL DEFAULT 2, -- in seconds
+  active_question_id TEXT REFERENCES questions(id) ON DELETE SET NULL,
+  question_start_time TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Only one active run per event
+CREATE UNIQUE INDEX unique_in_progress_per_event ON runs (event_id, status) WHERE status = 'in_progress';
+
 CREATE TABLE answers (
   id TEXT PRIMARY KEY,
   answer TEXT NOT NULL,
   auto_points_awarded NUMERIC,
   points_awarded NUMERIC,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   translation_id TEXT NOT NULL REFERENCES translations(id) ON DELETE CASCADE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

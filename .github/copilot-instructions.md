@@ -8,7 +8,7 @@ This is a **full-stack monolithic Bun application** with integrated frontend and
 - **Runtime**: Bun (replaces Node.js)
 - **Backend**: Bun HTTP server with custom routing pattern
 - **Frontend**: React 19 with Valtio state management
-- **Database**: SQLite via `bun:sqlite`
+- **Database**: Postgres via import {sql } from `bun`
 - **Styling**: Tailwind CSS v4 + DaisyUI
 - **Build**: Bun bundler with `bun-plugin-tailwind`
 
@@ -35,7 +35,7 @@ export const eventsRoutes: Routes = {
 - Use `BunRequest<'/path'>` type for route param typing
 - All route handlers return `Response` objects (use helpers from `src/server/utils/responses.ts`)
 
-### 2. Database Queries with Bun SQLite
+### 2. Database Queries with Bun SQL
 Pre-compile queries at module level for performance:
 
 ```typescript
@@ -81,7 +81,7 @@ export const useEventsValt = () => useContext(EventsValtContext);
 ### 4. Session Management
 Session uses cookie-based authentication:
 - `getSession(req)` returns `Session | null`
-- Sessions stored in SQLite, validated on each request
+- Sessions stored in Postgres, validated on each request
 - Most routes should check `if (!session) return apiUnauthorized()`
 
 ### 5. HTML Entry Points

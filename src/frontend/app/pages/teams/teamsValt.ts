@@ -114,7 +114,7 @@ export class TeamsValt {
 
   async copyTeamLink(teamId: string) {
     // TODO: Update this URL once the team event route is determined
-    const teamEventUrl = `${window.location.origin}/team-event/${this.store.eventId}/${teamId}`;
+    const teamEventUrl = `${window.location.origin}/event-run/team/${this.store.eventId}/${teamId}`;
 
     try {
       await navigator.clipboard.writeText(teamEventUrl);

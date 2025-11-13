@@ -65,7 +65,7 @@ export const EventCard = memo((props: Props) => {
         {canEdit && (
           <div className='absolute top-2 left-6 flex gap-2'>
             <button
-              className='tooltip tooltip-neutral'
+              className='tooltip tooltip-neutral opacity-20'
               data-tip='Duplicate'
               aria-label={`Duplicate event ${props.event.name}`}
             >
@@ -119,7 +119,7 @@ export const EventCard = memo((props: Props) => {
               <Icon name='light-bulb' className='text-yellow-500 hover:brightness-75' />
             </a>
             <button
-              className='tooltip tooltip-neutral'
+              className='tooltip tooltip-neutral opacity-20'
               data-tip='Intro Slides'
               aria-label={`Intro slides for event ${props.event.name}`}
             >
@@ -130,18 +130,23 @@ export const EventCard = memo((props: Props) => {
 
         <div className='absolute bottom-2 left-6 flex gap-2'>
           {canEdit && (
-            <button className='tooltip tooltip-neutral' data-tip='Run' aria-label={`Run event ${props.event.name}`}>
+            <a
+              className='tooltip tooltip-neutral'
+              data-tip='Run'
+              href={`/runs/${props.event.id}`}
+              aria-label={`Run event ${props.event.name}`}
+            >
               <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
-            </button>
+            </a>
           )}
           {canGrade && (
-            <button className='tooltip tooltip-neutral' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
+            <button className='tooltip tooltip-neutral opacity-20' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
               <Icon name='scale' className='text-amber-600 hover:brightness-75' />
             </button>
           )}
           {canEdit && (
             <button
-              className='tooltip tooltip-neutral'
+              className='tooltip tooltip-neutral opacity-20'
               data-tip='Results'
               aria-label={`Results for event ${props.event.name}`}
             >
