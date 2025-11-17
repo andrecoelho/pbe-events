@@ -71,8 +71,8 @@ CREATE TABLE questions (
   number INTEGER NOT NULL,
   -- PG = Points General, PS = Points Specific, TF = True/False, FB = Fill in the Blank
   type TEXT NOT NULL CHECK (type IN ('PG', 'PS', 'TF', 'FB')),
-  max_points NUMERIC NOT NULL,
-  seconds NUMERIC NOT NULL CHECK (seconds = FLOOR(seconds)),
+  max_points INTEGER NOT NULL,
+  seconds INTEGER NOT NULL,
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (event_id, number)
@@ -116,8 +116,8 @@ CREATE TABLE slides (
 CREATE TABLE answers (
   id TEXT PRIMARY KEY,
   answer TEXT NOT NULL,
-  auto_points_awarded NUMERIC,
-  points_awarded NUMERIC,
+  auto_points_awarded INTEGER,
+  points_awarded INTEGER,
   run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   translation_id TEXT NOT NULL REFERENCES translations(id) ON DELETE CASCADE,
