@@ -3,6 +3,7 @@ import type { Routes, Run } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
 import type { ServerWebSocket } from 'bun';
+import type { WebSocketServer } from '@/server/webSocket';
 import {
   apiBadRequest,
   apiData,
@@ -12,7 +13,7 @@ import {
   apiUnauthorized
 } from '@/server/utils/responses';
 
-export function createRunsRoutes(eventConnections: Map<string, any>): Routes {
+export function createRunsRoutes(wsServer: WebSocketServer): Routes {
   return {
   '/api/events/:eventId/runs': {
     POST: async (req: BunRequest<'/api/events/:eventId/runs'>) => {
@@ -269,9 +270,10 @@ export function createRunsRoutes(eventConnections: Map<string, any>): Routes {
         `;
 
         // Update cache and broadcast to host if connection exists
-        if (eventConnections && eventConnections.has(eventId)) {
-          const connection = eventConnections.get(eventId);
-          if (connection.run) {
+        if (wsServer.hasConnection(eventId)) {
+          const connection = wsServer.getConnection(eventId);
+
+          if (connection && connection.run) {
             connection.run.gracePeriod = gracePeriod;
           }
 
@@ -281,9 +283,11 @@ export function createRunsRoutes(eventConnections: Map<string, any>): Routes {
             gracePeriod
           });
 
-          connection.host.forEach((hostWs: any) => {
-            hostWs.send(message);
-          });
+          if (connection) {
+            connection.host.forEach((hostWs: any) => {
+              hostWs.send(message);
+            });
+          }
         }
 
         return apiData({ ok: true });

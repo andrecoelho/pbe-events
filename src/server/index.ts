@@ -14,16 +14,15 @@ import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
 import { apiNotFound, badRequest, textNotFound } from '@/server/utils/responses';
-import { WebSocketServer, type EventConnection } from '@/server/webSocket';
+import { WebSocketServer } from '@/server/webSocket';
 import { sql } from 'bun';
 import { join } from 'node:path';
 import { styleText } from 'node:util';
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
-const eventConnections = new Map<string, EventConnection>();
 
-const wsServer = new WebSocketServer(eventConnections);
+const wsServer = new WebSocketServer();
 
 const server = Bun.serve({
   routes: {
@@ -38,7 +37,7 @@ const server = Bun.serve({
     ...userRoutes,
     ...questionsRoutes,
     ...slidesRoutes,
-    ...createRunsRoutes(eventConnections)
+    ...createRunsRoutes(wsServer)
   },
   async fetch(req): Promise<Response | undefined> {
     const url = new URL(req.url);

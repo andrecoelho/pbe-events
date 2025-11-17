@@ -21,12 +21,20 @@ export class WebSocketServer {
   private eventConnections: Map<string, EventConnection>;
   private server: any = null;
 
-  constructor(eventConnections: Map<string, EventConnection>) {
-    this.eventConnections = eventConnections;
+  constructor() {
+    this.eventConnections = new Map();
   }
 
   setServer(server: any) {
     this.server = server;
+  }
+
+  hasConnection(eventId: string): boolean {
+    return this.eventConnections.has(eventId);
+  }
+
+  getConnection(eventId: string): EventConnection | undefined {
+    return this.eventConnections.get(eventId);
   }
 
   createHandlers() {
