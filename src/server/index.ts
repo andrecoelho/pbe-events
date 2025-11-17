@@ -13,7 +13,7 @@ import { slidesRoutes } from '@/server/routes/slides';
 import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
 import { getSession } from '@/server/session';
-import { apiNotFound, badRequest, textNotFound } from '@/server/utils/responses';
+import { apiNotFound, textNotFound } from '@/server/utils/responses';
 import { WebSocketServer } from '@/server/webSocket';
 import { sql } from 'bun';
 import { join } from 'node:path';
