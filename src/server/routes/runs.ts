@@ -17,7 +17,10 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
     '/api/events/:eventId/runs': {
       POST: async (req: BunRequest<'/api/events/:eventId/runs'>) => {
         const session = await getSession(req);
-        if (!session) return apiUnauthorized();
+
+        if (!session) {
+          return apiUnauthorized();
+        }
 
         const { eventId } = req.params;
 
@@ -31,9 +34,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
-          WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+          `;
 
           if (permissions.length === 0) {
             return apiForbidden();
@@ -41,9 +44,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check if there's already an active run for this event
           const existingRuns: { id: string }[] = await sql`
-          SELECT id FROM runs
-          WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
-        `;
+            SELECT id FROM runs
+            WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+          `;
 
           if (existingRuns.length > 0) {
             return apiBadRequest('An active run already exists for this event');
@@ -61,16 +64,17 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             question_start_time: string | null;
             created_at: string;
           }[] = await sql`
-          INSERT INTO runs (id, event_id, status, grace_period, started_at, has_timer)
-          VALUES (${runId}, ${eventId}, 'not_started', ${gracePeriod}, NULL, true)
-          RETURNING id, event_id, status, grace_period, started_at, has_timer, active_question_id, question_start_time, created_at
-        `;
+            INSERT INTO runs (id, event_id, status, grace_period, started_at, has_timer)
+            VALUES (${runId}, ${eventId}, 'not_started', ${gracePeriod}, NULL, true)
+            RETURNING id, event_id, status, grace_period, started_at, has_timer, active_question_id, question_start_time, created_at
+          `;
 
           if (result.length === 0) {
             return apiServerError();
           }
 
           const run = result[0]!;
+
           return apiData({
             run: {
               id: run.id,
@@ -95,7 +99,10 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
     '/api/runs/:runId': {
       GET: async (req: BunRequest<'/api/runs/:runId'>) => {
         const session = await getSession(req);
-        if (!session) return apiUnauthorized();
+
+        if (!session) {
+          return apiUnauthorized();
+        }
 
         const { runId } = req.params;
 
@@ -111,11 +118,10 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             question_start_time: string | null;
             created_at: string;
           }[] = await sql`
-          SELECT id, event_id, status, grace_period, started_at, has_timer,
-                 active_question_id, question_start_time, created_at
-          FROM runs
-          WHERE id = ${runId}
-        `;
+            SELECT id, event_id, status, grace_period, started_at, has_timer, active_question_id, question_start_time, created_at
+            FROM runs
+            WHERE id = ${runId}
+          `;
 
           if (runs.length === 0) {
             return apiNotFound();
@@ -125,9 +131,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
-          WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin', 'judge')
-        `;
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin', 'judge')
+          `;
 
           if (permissions.length === 0) {
             return apiForbidden();
@@ -135,6 +141,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Get active question details if exists
           let activeQuestion = null;
+
           if (run.active_question_id) {
             const questions: {
               id: string;
@@ -143,13 +150,14 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               max_points: number;
               seconds: number;
             }[] = await sql`
-            SELECT id, number, type, max_points, seconds
-            FROM questions
-            WHERE id = ${run.active_question_id}
-          `;
+              SELECT id, number, type, max_points, seconds
+              FROM questions
+              WHERE id = ${run.active_question_id}
+            `;
 
             if (questions.length > 0) {
               const q = questions[0]!;
+
               activeQuestion = {
                 id: q.id,
                 number: q.number,
@@ -184,15 +192,17 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
     '/api/runs/:runId/start': {
       PATCH: async (req: BunRequest<'/api/runs/:runId/start'>) => {
         const session = await getSession(req);
-        if (!session) return apiUnauthorized();
+
+        if (!session) {
+          return apiUnauthorized();
+        }
 
         const { runId } = req.params;
 
         try {
           // Get run and check permissions
-          const runs: { event_id: string; status: string }[] = await sql`
-          SELECT event_id, status FROM runs WHERE id = ${runId}
-        `;
+          const runs: { event_id: string; status: string }[] =
+            await sql`SELECT event_id, status FROM runs WHERE id = ${runId}`;
 
           if (runs.length === 0) {
             return apiNotFound();
@@ -206,19 +216,19 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
-          WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
-        `;
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
+          `;
 
           if (permissions.length === 0) {
             return apiForbidden();
           }
 
           await sql`
-          UPDATE runs
-          SET status = 'in_progress', started_at = CURRENT_TIMESTAMP
-          WHERE id = ${runId}
-        `;
+            UPDATE runs
+            SET status = 'in_progress', started_at = CURRENT_TIMESTAMP
+            WHERE id = ${runId}
+          `;
 
           return apiData({ ok: true });
         } catch (error) {
@@ -231,7 +241,10 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
     '/api/runs/:runId/grace-period': {
       PATCH: async (req: BunRequest<'/api/runs/:runId/grace-period'>) => {
         const session = await getSession(req);
-        if (!session) return apiUnauthorized();
+
+        if (!session) {
+          return apiUnauthorized();
+        }
 
         const { runId } = req.params;
 
@@ -244,9 +257,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           }
 
           // Get run and check permissions
-          const runs: { event_id: string }[] = await sql`
-          SELECT event_id FROM runs WHERE id = ${runId}
-        `;
+          const runs: { event_id: string }[] = await sql`SELECT event_id FROM runs WHERE id = ${runId}`;
 
           if (runs.length === 0) {
             return apiNotFound();
@@ -256,17 +267,15 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
-          WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+          `;
 
           if (permissions.length === 0) {
             return apiForbidden();
           }
 
-          await sql`
-          UPDATE runs SET grace_period = ${gracePeriod} WHERE id = ${runId}
-        `;
+          await sql`UPDATE runs SET grace_period = ${gracePeriod} WHERE id = ${runId}`;
 
           // Update cache and broadcast to host if connection exists
           if (wsServer.hasConnection(eventId)) {
@@ -300,15 +309,17 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
     '/api/runs/:runId/complete': {
       PATCH: async (req: BunRequest<'/api/runs/:runId/complete'>) => {
         const session = await getSession(req);
-        if (!session) return apiUnauthorized();
+
+        if (!session) {
+          return apiUnauthorized();
+        }
 
         const { runId } = req.params;
 
         try {
           // Get run and check permissions
-          const runs: { event_id: string; status: string }[] = await sql`
-          SELECT event_id, status FROM runs WHERE id = ${runId}
-        `;
+          const runs: { event_id: string; status: string }[] =
+            await sql`SELECT event_id, status FROM runs WHERE id = ${runId}`;
 
           if (runs.length === 0) {
             return apiNotFound();
@@ -322,17 +333,15 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
-          WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
-        `;
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
+          `;
 
           if (permissions.length === 0) {
             return apiForbidden();
           }
 
-          await sql`
-          UPDATE runs SET status = 'completed' WHERE id = ${runId}
-        `;
+          await sql`UPDATE runs SET status = 'completed' WHERE id = ${runId}`;
 
           return apiData({ ok: true });
         } catch (error) {
