@@ -3,6 +3,7 @@ import { keysToCamel } from './caseConversion';
 export function apiData(data?: object, headers?: HeadersInit) {
   // Convert all keys from snake_case to camelCase for API responses
   const camelData = data ? keysToCamel(data) : {};
+
   return new Response(JSON.stringify({ ...camelData }), {
     headers: { 'Content-Type': 'application/json', ...headers }
   });
@@ -43,10 +44,22 @@ export function apiServerError(message: string = 'Internal Server Error') {
   });
 }
 
-export function badRequest(message: string = 'Bad Request') {
+export function textBadRequest(message: string = 'Bad Request') {
   return new Response(message, { status: 400 });
 }
 
-export function textNotFound() {
-  return new Response('Not Found', { status: 404 });
+export function textUnauthorized(message: string = 'Unauthorized') {
+  return new Response(message, { status: 401 });
+}
+
+export function textForbidden(message: string = 'Forbidden') {
+  return new Response(message, { status: 403 });
+}
+
+export function textNotFound(message: string = 'Not Found') {
+  return new Response(message, { status: 404 });
+}
+
+export function textServerError(message: string = 'Internal Server Error') {
+  return new Response(message, { status: 500 });
 }

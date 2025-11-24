@@ -1,5 +1,6 @@
 import { sql, type ServerWebSocket } from 'bun';
 import type { Session, Run, ActiveQuestionCache } from '@/server/types';
+import { textBadRequest, textForbidden, textServerError, textUnauthorized } from '@/server/utils/responses';
 
 export interface WebsocketData {
   session: Session | null;
@@ -25,7 +26,7 @@ export class WebSocketServer {
     this.eventConnections = new Map();
   }
 
-  setServer(server: any) {
+  setServer(server: Bun.Server<WebsocketData>) {
     this.server = server;
   }
 
@@ -46,13 +47,18 @@ export class WebSocketServer {
     };
   }
 
-  async upgradeWebSocket(req: Request, server: any, session: Session | null): Promise<Response | undefined> {
+  async upgradeWebSocket(req: Request, session: Session | null): Promise<Response | undefined> {
     const url = new URL(req.url);
+    const role = url.searchParams.get('role');
     const eventId = url.searchParams.get('eventId');
     const teamId = url.searchParams.get('teamId');
 
-    if (!eventId || !teamId) {
-      return new Response('Missing eventId or teamId', { status: 400 });
+    if (!eventId || !teamId || !role) {
+      return textBadRequest('Missing eventId, teamId, or role');
+    }
+
+    if (role !== 'host' && role !== 'team') {
+      return textBadRequest('Invalid role, must be host or team');
     }
 
     try {
@@ -61,30 +67,34 @@ export class WebSocketServer {
         id: string;
         status: string;
       }[] = await sql`
-        SELECT id, status FROM runs
+        SELECT id, status
+        FROM runs
         WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
       `;
 
       if (runs.length === 0) {
-        return new Response('No active run for this event', { status: 400 });
+        return textBadRequest('No active run for this event');
       }
 
-      const role = session ? 'host' : 'team';
-
       if (role === 'host') {
+        if (!session) {
+          return textUnauthorized();
+        }
+
         // Check if host is already connected
         if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host.size > 0) {
-          return new Response('Host already connected', { status: 400 });
+          return textBadRequest('Host already connected');
         }
 
         // Validate session and permissions for host
         const permissions: { role_id: string }[] = await sql`
-          SELECT role_id FROM permissions
+          SELECT role_id
+          FROM permissions
           WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
         `;
 
         if (permissions.length === 0) {
-          return new Response('Unauthorized - requires owner or admin role', { status: 400 });
+          return textForbidden('Unauthorized - requires owner or admin role to host event');
         }
       } else {
         // Validate team exists for team role
@@ -93,11 +103,11 @@ export class WebSocketServer {
         `;
 
         if (teams.length === 0) {
-          return new Response('Invalid team', { status: 400 });
+          return textBadRequest('Invalid team ID');
         }
       }
 
-      const upgraded = server.upgrade(req, {
+      const upgraded = this.server.upgrade(req, {
         data: {
           session,
           eventId,
@@ -112,10 +122,10 @@ export class WebSocketServer {
         return;
       }
 
-      return new Response('WebSocket upgrade failed', { status: 400 });
+      return textServerError('WebSocket upgrade failed');
     } catch (error) {
       console.error('Error during WebSocket upgrade:', error);
-      return new Response('WebSocket upgrade failed', { status: 400 });
+      return textServerError('WebSocket upgrade failed');
     }
   }
 

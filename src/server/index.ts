@@ -44,7 +44,7 @@ const server = Bun.serve({
     const session = await getSession(req);
 
     if (url.pathname === '/event-run/ws') {
-      return wsServer.upgradeWebSocket(req, server, session);
+      return wsServer.upgradeWebSocket(req, session);
     }
 
     if (!session) {
