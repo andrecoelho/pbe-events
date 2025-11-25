@@ -65,11 +65,11 @@ export const EventCard = memo((props: Props) => {
         {canEdit && (
           <div className='absolute top-2 left-6 flex gap-2'>
             <button
-              className='tooltip tooltip-neutral opacity-20'
+              className='tooltip tooltip-neutral'
               data-tip='Duplicate'
               aria-label={`Duplicate event ${props.event.name}`}
             >
-              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75' />
+              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75 opacity-20' />
             </button>
             {canDelete && (
               <button
@@ -119,11 +119,11 @@ export const EventCard = memo((props: Props) => {
               <Icon name='light-bulb' className='text-yellow-500 hover:brightness-75' />
             </a>
             <button
-              className='tooltip tooltip-neutral opacity-20'
+              className='tooltip tooltip-neutral'
               data-tip='Intro Slides'
               aria-label={`Intro slides for event ${props.event.name}`}
             >
-              <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
+              <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75 opacity-20' />
             </button>
           </div>
         )}
@@ -132,25 +132,25 @@ export const EventCard = memo((props: Props) => {
           {canEdit && (
             <a
               className='tooltip tooltip-neutral'
-              data-tip='Run'
+              data-tip='Runs'
               href={`/runs/${props.event.id}`}
-              aria-label={`Run event ${props.event.name}`}
+              aria-label={`Event runs for ${props.event.name}`}
             >
               <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
             </a>
           )}
           {canGrade && (
-            <button className='tooltip tooltip-neutral opacity-20' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
-              <Icon name='scale' className='text-amber-600 hover:brightness-75' />
+            <button className='tooltip tooltip-neutral' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
+              <Icon name='scale' className='text-amber-600 hover:brightness-75 opacity-20' />
             </button>
           )}
           {canEdit && (
             <button
-              className='tooltip tooltip-neutral opacity-20'
+              className='tooltip tooltip-neutral'
               data-tip='Results'
               aria-label={`Results for event ${props.event.name}`}
             >
-              <Icon name='chart-bar' className='text-cyan-600 hover:brightness-75' />
+              <Icon name='chart-bar' className='text-cyan-600 hover:brightness-75 opacity-20' />
             </button>
           )}
         </div>
