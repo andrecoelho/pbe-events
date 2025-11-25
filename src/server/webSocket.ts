@@ -12,7 +12,7 @@ export interface WebsocketData {
 }
 
 export interface EventConnection {
-  host: Set<ServerWebSocket<WebsocketData>>;
+  host: ServerWebSocket<WebsocketData> | null;
   teams: Map<string, ServerWebSocket<WebsocketData>>;
   run: Run | null;
   activeQuestion: ActiveQuestionCache | null;
@@ -82,7 +82,7 @@ export class WebSocketServer {
         }
 
         // Check if host is already connected
-        if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host.size > 0) {
+        if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
           return textBadRequest('Host already connected');
         }
 
@@ -140,67 +140,13 @@ export class WebSocketServer {
     try {
       // Initialize connection tracking if needed
       if (!this.eventConnections.has(eventId)) {
-        this.eventConnections.set(eventId, {
-          host: new Set(),
-          teams: new Map(),
-          run: null,
-          activeQuestion: null
-        });
+        await this.initializeEventConnection(eventId);
       }
 
       const connection = this.eventConnections.get(eventId)!;
 
-      // Query and cache run
-      const runs: {
-        id: string;
-        event_id: string;
-        status: string;
-        grace_period: number;
-        started_at: string | null;
-        has_timer: boolean;
-        active_question_id: string | null;
-        question_start_time: string | null;
-        created_at: string;
-      }[] = await sql`
-        SELECT id, event_id, status, grace_period, started_at, has_timer,
-               active_question_id, question_start_time, created_at
-        FROM runs
-        WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
-      `;
-
-      if (runs.length > 0) {
-        const run = runs[0]!;
-
-        connection.run = {
-          id: run.id,
-          eventId: run.event_id,
-          status: run.status as 'not_started' | 'in_progress' | 'completed',
-          gracePeriod: run.grace_period,
-          startedAt: run.started_at,
-          hasTimer: run.has_timer,
-          activeQuestionId: run.active_question_id,
-          questionStartTime: run.question_start_time,
-          createdAt: run.created_at
-        };
-
-        // Cache active question if exists
-        if (run.active_question_id) {
-          const questions: { seconds: number }[] = await sql`
-            SELECT seconds FROM questions WHERE id = ${run.active_question_id}
-          `;
-
-          if (questions.length > 0) {
-            connection.activeQuestion = {
-              questionId: run.active_question_id,
-              seconds: questions[0]!.seconds,
-              startTime: run.question_start_time!
-            };
-          }
-        }
-      }
-
       if (role === 'host') {
-        connection.host.add(ws);
+        connection.host = ws;
         console.log(`Host connected to event ${eventId}`);
       } else {
         // Close existing connection if team reconnecting
@@ -243,9 +189,7 @@ export class WebSocketServer {
             languageCode: team.code
           });
 
-          connection.host.forEach((hostWs: ServerWebSocket<WebsocketData>) => {
-            hostWs.send(message);
-          });
+          connection.host?.send(message);
 
           // Send existing answer if active question and team has language
           if (connection.activeQuestion && ws.data.languageId) {
@@ -269,13 +213,14 @@ export class WebSocketServer {
     }
 
     const connection = this.eventConnections.get(eventId);
+
     if (!connection) {
       return;
     }
 
     try {
       if (role === 'host') {
-        connection.host.delete(ws);
+        connection.host = null;
         console.log(`Host disconnected from event ${eventId}`);
       } else if (teamId) {
         connection.teams.delete(teamId);
@@ -291,15 +236,12 @@ export class WebSocketServer {
           teamId
         });
 
-        connection.host.forEach((hostWs: ServerWebSocket<WebsocketData>) => {
-          hostWs.send(message);
-        });
-
+        connection.host?.send(message);
         console.log(`Team ${teamId} disconnected from event ${eventId}`);
       }
 
       // Clean up empty connections
-      if (connection.host.size === 0 && connection.teams.size === 0) {
+      if (!connection.host && connection.teams.size === 0) {
         this.eventConnections.delete(eventId);
         console.log(`Event connection ${eventId} cleaned up`);
       }
@@ -356,6 +298,64 @@ export class WebSocketServer {
       ws.send(errorMsg);
     }
   };
+
+  private async initializeEventConnection(eventId: string): Promise<void> {
+    this.eventConnections.set(eventId, {
+      host: null,
+      teams: new Map(),
+      run: null,
+      activeQuestion: null
+    });
+
+    // Query and cache run
+    const [run]: {
+      id: string;
+      event_id: string;
+      status: string;
+      grace_period: number;
+      started_at: string | null;
+      has_timer: boolean;
+      active_question_id: string | null;
+      question_start_time: string | null;
+      created_at: string;
+    }[] = await sql`
+      SELECT id, event_id, status, grace_period, started_at, has_timer,
+             active_question_id, question_start_time, created_at
+      FROM runs
+      WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+    `;
+
+    if (run) {
+      const connection = this.eventConnections.get(eventId)!;
+
+      connection.run = {
+        id: run.id,
+        eventId: run.event_id,
+        status: run.status as 'not_started' | 'in_progress' | 'completed',
+        gracePeriod: run.grace_period,
+        startedAt: run.started_at,
+        hasTimer: run.has_timer,
+        activeQuestionId: run.active_question_id,
+        questionStartTime: run.question_start_time,
+        createdAt: run.created_at
+      };
+
+      // Cache active question if exists
+      if (run.active_question_id) {
+        const [question]: { seconds: number }[] = await sql`
+          SELECT seconds FROM questions WHERE id = ${run.active_question_id}
+        `;
+
+        if (question) {
+          connection.activeQuestion = {
+            questionId: run.active_question_id,
+            seconds: question.seconds,
+            startTime: run.question_start_time!
+          };
+        }
+      }
+    }
+  }
 
   private async sendExistingAnswerToTeam(
     ws: ServerWebSocket<WebsocketData>,
@@ -457,9 +457,7 @@ export class WebSocketServer {
           languageCode: code
         });
 
-        connection.host.forEach((hostWs) => {
-          hostWs.send(message);
-        });
+        connection.host?.send(message);
 
         // Send existing answer if active question
         if (connection.activeQuestion) {
@@ -568,9 +566,7 @@ export class WebSocketServer {
         hasAnswer: true
       });
 
-      connection.host.forEach((hostWs) => {
-        hostWs.send(message);
-      });
+      connection.host?.send(message);
     } catch (error) {
       console.error('Error handling SUBMIT_ANSWER:', error);
       ws.send(
@@ -771,9 +767,8 @@ export class WebSocketServer {
       connection.teams.forEach((teamWs) => {
         teamWs.close();
       });
-      connection.host.forEach((hostWs) => {
-        hostWs.close();
-      });
+
+      connection.host?.close();
     } catch (error) {
       console.error('Error handling COMPLETE_RUN:', error);
     }

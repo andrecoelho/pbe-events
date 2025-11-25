@@ -291,11 +291,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               gracePeriod
             });
 
-            if (connection) {
-              connection.host.forEach((hostWs: any) => {
-                hostWs.send(message);
-              });
-            }
+            connection?.host?.send(message);
           }
 
           return apiData({ ok: true });
