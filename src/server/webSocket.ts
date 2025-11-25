@@ -79,9 +79,7 @@ export class WebSocketServer {
 
     try {
       // Check if event exists
-      const events: { id: string }[] = await sql`
-        SELECT id FROM events WHERE id = ${eventId}
-      `;
+      const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
 
       if (events.length === 0) {
         return textBadRequest('Event not found');
@@ -109,9 +107,7 @@ export class WebSocketServer {
         }
       } else {
         // Validate team exists for team role
-        const teams: { id: string }[] = await sql`
-          SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}
-        `;
+        const teams: { id: string }[] = await sql`SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
 
         if (teams.length === 0) {
           return textBadRequest('Invalid team ID');
@@ -168,13 +164,8 @@ export class WebSocketServer {
         console.log(`Host connected to event ${eventId}`);
 
         // Get all teams for this event
-        const allTeams: {
-          id: string;
-          name: string;
-          number: number;
-        }[] = await sql`
-          SELECT id, name, number FROM teams WHERE event_id = ${eventId}
-        `;
+        const allTeams: { id: string; name: string; number: number }[] =
+          await sql`SELECT id, name, number FROM teams WHERE event_id = ${eventId}`;
 
         // Build status array for all teams
         const teamStatuses = allTeams.map((team) => {
@@ -213,14 +204,8 @@ export class WebSocketServer {
         });
 
         // Send team status message to the newly connected host
-        ws.send(
-          JSON.stringify({
-            type: 'TEAM_STATUS',
-            teams: teamStatuses
-          })
-        );
+        ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
       } else if (this.isTeamWebSocket(ws)) {
-        // TypeScript now knows ws is ServerWebSocket<TeamWebsocketData>
         const { teamId } = ws.data;
 
         // Close existing connection if team reconnecting
@@ -252,18 +237,28 @@ export class WebSocketServer {
           // Subscribe to language channel if language selected
           if (team.code) {
             ws.subscribe(`${eventId}:${team.code}`);
+
+            // Send TEAM_CONNECTED to host
+            connection.host?.send(
+              JSON.stringify({
+                type: 'TEAM_READY',
+                teamId,
+                teamName: team.name,
+                teamNumber: team.number,
+                languageCode: team.code
+              })
+            );
+          } else {
+            connection.host?.send(
+              JSON.stringify({
+                type: 'TEAM_CONNECTED',
+                teamId,
+                teamName: team.name,
+                teamNumber: team.number,
+                languageCode: null
+              })
+            );
           }
-
-          // Send TEAM_CONNECTED to host
-          const message = JSON.stringify({
-            type: 'TEAM_CONNECTED',
-            teamId,
-            teamName: team.name,
-            teamNumber: team.number,
-            languageCode: team.code
-          });
-
-          connection.host?.send(message);
 
           // Send existing answer if active question and team has language
           if (connection.activeQuestion && ws.data.languageId) {
@@ -416,8 +411,7 @@ export class WebSocketServer {
       active_question_id: string | null;
       question_start_time: string | null;
     }[] = await sql`
-      SELECT event_id, status, grace_period, has_timer,
-             active_question_id, question_start_time
+      SELECT event_id, status, grace_period, has_timer, active_question_id, question_start_time
       FROM runs
       WHERE event_id = ${eventId}
     `;
@@ -527,9 +521,7 @@ export class WebSocketServer {
 
     try {
       // Update team language
-      await sql`
-        UPDATE teams SET language_id = ${languageId} WHERE id = ${teamId}
-      `;
+      await sql`UPDATE teams SET language_id = ${languageId} WHERE id = ${teamId}`;
 
       // Get language code and team details
       const results: { code: string; name: string; number: number }[] = await sql`
@@ -844,9 +836,7 @@ export class WebSocketServer {
 
     try {
       // Update run status
-      await sql`
-        UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}
-      `;
+      await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
 
       // Get final scores
       const scores: {
