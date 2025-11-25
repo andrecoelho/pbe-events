@@ -68,7 +68,9 @@ const init = () => {
   };
 
   const handleDeleteRun = async (run: { id: string }) => {
-    const confirmation = await confirmModal.open('Are you sure you want to delete this run? This action cannot be undone.');
+    const confirmation = await confirmModal.open(
+      'Are you sure you want to delete this run? This action cannot be undone.'
+    );
 
     if (confirmation) {
       const result = await valt.deleteRun(run.id);
@@ -156,60 +158,47 @@ export function Runs() {
                         onClick={() => handleStartRun(run)}
                         aria-label='Start run'
                       >
-                        <Icon
-                          name='presentation-chart-bar'
-                          className='text-success cursor-pointer hover:brightness-75'
-                        />
+                        <Icon name='play' className='text-success cursor-pointer hover:brightness-75' />
                       </button>
                     )}
                     {run.status === 'in_progress' && (
                       <>
                         <button
                           className='tooltip tooltip-neutral'
-                          data-tip='Complete Run'
+                          data-tip='End Run'
                           onClick={() => handleCompleteRun(run)}
-                          aria-label='Complete run'
+                          aria-label='End run'
                         >
-                          <Icon name='check' className='text-success cursor-pointer hover:brightness-75' />
+                          <Icon name='stop' className='text-success cursor-pointer hover:brightness-75' />
                         </button>
-                        <button
-                          className='tooltip tooltip-neutral'
-                          data-tip='Host Run'
-                          onClick={() => handleHostRun(run)}
-                          aria-label='Host run'
-                        >
+                        <button className='tooltip tooltip-neutral' data-tip='Host Run' aria-label='Host run' disabled>
                           <Icon
                             name='presentation-chart-bar'
-                            className='text-info cursor-pointer hover:brightness-75'
+                            className='text-info cursor-pointer hover:brightness-75 opacity-20'
                           />
                         </button>
                       </>
                     )}
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip='Update Grace Period'
-                      onClick={() => handleUpdateGracePeriod(run)}
-                      aria-label='Update grace period'
-                      disabled={run.status === 'completed'}
-                    >
-                      <Icon
-                        name='scale'
-                        className={
-                          run.status === 'completed'
-                            ? 'text-neutral cursor-not-allowed opacity-50'
-                            : 'text-accent cursor-pointer hover:brightness-75'
-                        }
-                      />
-                    </button>
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip='View Results'
-                      onClick={() => handleViewResults(run)}
-                      aria-label='View results'
-                      disabled
-                    >
-                      <Icon name='chart-bar' className='text-neutral cursor-not-allowed opacity-50' />
-                    </button>
+                    {run.status !== 'completed' && (
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip='Update Grace Period'
+                        onClick={() => handleUpdateGracePeriod(run)}
+                        aria-label='Update grace period'
+                      >
+                        <Icon name='clock' className='text-accent cursor-pointer hover:brightness-75' />
+                      </button>
+                    )}
+                    {run.status === 'completed' && (
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip='View Results'
+                        aria-label='View results'
+                        disabled
+                      >
+                        <Icon name='chart-bar' className='text-cyan-600 cursor-not-allowed opacity-20' />
+                      </button>
+                    )}
                     <button
                       className='tooltip tooltip-neutral'
                       data-tip='Delete Run'
