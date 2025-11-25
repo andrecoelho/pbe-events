@@ -199,14 +199,16 @@ export function Runs() {
                         <Icon name='chart-bar' className='text-cyan-600 cursor-not-allowed opacity-20' />
                       </button>
                     )}
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip='Delete Run'
-                      onClick={() => handleDeleteRun(run)}
-                      aria-label='Delete run'
-                    >
-                      <Icon name='trash' className='text-error cursor-pointer hover:brightness-75' />
-                    </button>
+                    {run.status !== 'in_progress' && (
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip='Delete Run'
+                        onClick={() => handleDeleteRun(run)}
+                        aria-label='Delete run'
+                      >
+                        <Icon name='trash' className='text-error cursor-pointer hover:brightness-75' />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
