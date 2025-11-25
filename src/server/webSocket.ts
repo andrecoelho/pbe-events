@@ -12,6 +12,7 @@ export interface WebsocketData {
 }
 
 export interface EventConnection {
+  eventId: string;
   host: ServerWebSocket<WebsocketData> | null;
   teams: Map<string, ServerWebSocket<WebsocketData>>;
   run: Run | null;
@@ -129,6 +130,7 @@ export class WebSocketServer {
     }
   }
 
+  // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
     const { eventId, teamId, role } = ws.data;
 
@@ -205,6 +207,7 @@ export class WebSocketServer {
     }
   };
 
+  // Called when a WebSocket connection is closed
   private handleClose = async (ws: ServerWebSocket<WebsocketData>, code: number, reason: string) => {
     const { eventId, teamId, role, languageCode } = ws.data;
 
@@ -221,6 +224,7 @@ export class WebSocketServer {
     try {
       if (role === 'host') {
         connection.host = null;
+        await this.handlePAUSE(connection);
         console.log(`Host disconnected from event ${eventId}`);
       } else if (teamId) {
         connection.teams.delete(teamId);
@@ -250,40 +254,60 @@ export class WebSocketServer {
     }
   };
 
+  // Called when a WebSocket message is received
   private handleMessage = async (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
-    const { eventId, teamId, role, session } = ws.data;
+    const { eventId, role } = ws.data;
 
     if (!eventId) {
       return;
     }
 
     const connection = this.eventConnections.get(eventId);
+
     if (!connection) {
       return;
     }
 
     try {
-      const msg = JSON.parse(message as string);
-
       // Handle team messages
-      if (role === 'team' && teamId) {
-        if (msg.type === 'SELECT_LANGUAGE') {
-          await this.handleSELECT_LANGUAGE(ws, connection, msg.languageId);
-        } else if (msg.type === 'SUBMIT_ANSWER' || msg.type === 'UPDATE_ANSWER') {
-          await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+      if (role === 'team') {
+        const msg = JSON.parse(message as string) as
+          | { type: 'SELECT_LANGUAGE'; languageId: string }
+          | { type: 'SUBMIT_ANSWER'; answer: string }
+          | { type: 'UPDATE_ANSWER'; answer: string };
+
+        switch (msg.type) {
+          case 'SELECT_LANGUAGE':
+            await this.handleSELECT_LANGUAGE(ws, connection, msg.languageId);
+            break;
+          case 'SUBMIT_ANSWER':
+          case 'UPDATE_ANSWER':
+            await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+            break;
         }
       }
 
       // Handle host messages
-      if (role === 'host' && session) {
-        if (msg.type === 'START_QUESTION') {
-          await this.handleSTART_QUESTION(ws, connection, msg.questionId, msg.hasTimer);
-        } else if (msg.type === 'PAUSE') {
-          await this.handlePAUSE(connection);
-        } else if (msg.type === 'SHOW_SLIDE') {
-          await this.handleSHOW_SLIDE(connection, msg.slideNumber);
-        } else if (msg.type === 'COMPLETE_RUN') {
-          await this.handleCOMPLETE_RUN(connection);
+      if (role === 'host') {
+        const msg = JSON.parse(message as string) as
+          | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
+          | { type: 'PAUSE' }
+          | { type: 'SHOW_SLIDE'; slideNumber: number }
+          | { type: 'COMPLETE_RUN' };
+
+        switch (msg.type) {
+          case 'START_QUESTION':
+            await this.handleSTART_QUESTION(connection, msg.questionId, msg.hasTimer);
+            break;
+          case 'PAUSE':
+            await this.handlePAUSE(connection);
+            break;
+          case 'SHOW_SLIDE':
+            await this.handleSHOW_SLIDE(connection, msg.slideNumber);
+            break;
+          case 'COMPLETE_RUN':
+            await this.handleCOMPLETE_RUN(connection);
+            break;
         }
       }
     } catch (error) {
@@ -301,6 +325,7 @@ export class WebSocketServer {
 
   private async initializeEventConnection(eventId: string): Promise<void> {
     this.eventConnections.set(eventId, {
+      eventId,
       host: null,
       teams: new Map(),
       run: null,
@@ -411,7 +436,9 @@ export class WebSocketServer {
   ): Promise<void> {
     const { eventId, teamId } = ws.data;
 
-    if (!teamId) return;
+    if (!teamId) {
+      return;
+    }
 
     // Check if run has started
     if (connection.run?.startedAt !== null) {
@@ -422,6 +449,7 @@ export class WebSocketServer {
           message: 'Cannot change language after run has started'
         })
       );
+
       return;
     }
 
@@ -450,7 +478,7 @@ export class WebSocketServer {
 
         // Notify host
         const message = JSON.stringify({
-          type: 'TEAM_CONNECTED',
+          type: 'TEAM_READY',
           teamId,
           teamName: name,
           teamNumber: number,
@@ -483,7 +511,9 @@ export class WebSocketServer {
   ): Promise<void> {
     const { teamId, languageId } = ws.data;
 
-    if (!teamId) return;
+    if (!teamId) {
+      return;
+    }
 
     // Validate language selected
     if (!languageId) {
@@ -494,6 +524,7 @@ export class WebSocketServer {
           message: 'Please select a language first'
         })
       );
+
       return;
     }
 
@@ -506,6 +537,7 @@ export class WebSocketServer {
           message: 'No active question'
         })
       );
+
       return;
     }
 
@@ -523,6 +555,7 @@ export class WebSocketServer {
             message: 'Answer submitted after deadline'
           })
         );
+
         return;
       }
     }
@@ -543,6 +576,7 @@ export class WebSocketServer {
             message: 'Translation not found'
           })
         );
+
         return;
       }
 
@@ -569,6 +603,7 @@ export class WebSocketServer {
       connection.host?.send(message);
     } catch (error) {
       console.error('Error handling SUBMIT_ANSWER:', error);
+
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -580,51 +615,43 @@ export class WebSocketServer {
   }
 
   private async handleSTART_QUESTION(
-    ws: ServerWebSocket<WebsocketData>,
     connection: EventConnection,
     questionId: string,
     hasTimer: boolean
   ): Promise<void> {
-    const { eventId } = ws.data;
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
 
     try {
+      // Generate timestamp
+      const questionStartTime = new Date().toISOString();
+
       // Update run
       await sql`
         UPDATE runs
         SET active_question_id = ${questionId},
-            question_start_time = CURRENT_TIMESTAMP,
+            question_start_time = ${questionStartTime},
             has_timer = ${hasTimer}
-        WHERE id = ${connection.run!.id}
+        WHERE id = ${connection.run.id}
       `;
 
-      // Re-query run to get exact timestamp
-      const runs: {
-        active_question_id: string | null;
-        question_start_time: string | null;
-        has_timer: boolean;
-      }[] = await sql`
-        SELECT active_question_id, question_start_time, has_timer
-        FROM runs
-        WHERE id = ${connection.run!.id}
-      `;
-
-      if (runs.length > 0) {
-        const run = runs[0]!;
-        connection.run!.activeQuestionId = run.active_question_id;
-        connection.run!.questionStartTime = run.question_start_time;
-        connection.run!.hasTimer = run.has_timer;
-      }
+      // Update connection cache
+      connection.run.activeQuestionId = questionId;
+      connection.run.questionStartTime = questionStartTime;
+      connection.run.hasTimer = hasTimer;
 
       // Get question seconds
-      const questions: { seconds: number }[] = await sql`
+      const [question]: { seconds: number }[] = await sql`
         SELECT seconds FROM questions WHERE id = ${questionId}
       `;
 
-      if (questions.length > 0) {
+      if (question) {
         connection.activeQuestion = {
           questionId,
-          seconds: questions[0]!.seconds,
-          startTime: connection.run!.questionStartTime!
+          seconds: question.seconds,
+          startTime: connection.run.questionStartTime
         };
       }
 
@@ -644,7 +671,8 @@ export class WebSocketServer {
 
       // Group by language and broadcast
       const languageMap = new Map<string, any>();
-      translations.forEach((t) => {
+
+      for (const t of translations) {
         languageMap.set(t.code, {
           type: 'QUESTION_STARTED',
           translation: {
@@ -657,19 +685,19 @@ export class WebSocketServer {
           startTime: Date.now(),
           seconds: connection.activeQuestion!.seconds,
           hasTimer,
-          gracePeriod: connection.run!.gracePeriod
+          gracePeriod: connection.run.gracePeriod
         });
-      });
+      }
 
       // Broadcast to each language channel
-      languageMap.forEach((message, code) => {
-        this.server.publish(`${eventId}:${code}`, JSON.stringify(message));
-      });
+      for (const [code, message] of languageMap) {
+        this.server.publish(`${connection.eventId}:${code}`, JSON.stringify(message));
+      }
 
       // Send existing answers to teams
-      connection.teams.forEach(async (teamWs) => {
+      for (const teamWs of connection.teams.values()) {
         await this.sendExistingAnswerToTeam(teamWs, connection);
-      });
+      }
     } catch (error) {
       console.error('Error handling START_QUESTION:', error);
     }
@@ -689,7 +717,7 @@ export class WebSocketServer {
       connection.activeQuestion = null;
 
       // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
         type: 'QUESTION_ENDED'
       });
     } catch (error) {
@@ -708,12 +736,12 @@ export class WebSocketServer {
       }[] = await sql`
         SELECT id, event_id, number, content, created_at
         FROM slides
-        WHERE event_id = ${connection.run!.eventId} AND number = ${slideNumber}
+        WHERE event_id = ${connection.eventId} AND number = ${slideNumber}
       `;
 
       if (slides.length > 0) {
         const slide = slides[0]!;
-        await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+        await this.broadcastToAllLanguageChannels(connection.eventId, {
           type: 'SLIDE_SHOWN',
           slide: {
             id: slide.id,
@@ -747,13 +775,13 @@ export class WebSocketServer {
         SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
         FROM teams t
         LEFT JOIN answers a ON a.team_id = t.id AND a.run_id = ${connection.run!.id}
-        WHERE t.event_id = ${connection.run!.eventId}
+        WHERE t.event_id = ${connection.eventId}
         GROUP BY t.id, t.name, t.number
         ORDER BY total DESC
       `;
 
       // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.run!.eventId, {
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
         type: 'RUN_COMPLETED',
         scores: scores.map((s) => ({
           teamId: s.id,
