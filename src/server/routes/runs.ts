@@ -329,7 +329,23 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
               await sql`UPDATE runs SET status = 'completed' WHERE id = ${runId}`;
 
-              return apiData({ ok: true });
+              // Send RUN_COMPLETED message to all teams before closing connections
+              if (wsServer.hasConnection(run.event_id)) {
+                const connection = wsServer.getConnection(run.event_id);
+
+                if (connection) {
+                  const message = JSON.stringify({
+                    type: 'RUN_COMPLETED'
+                  });
+
+                  for (const teamWs of connection.teams.values()) {
+                    teamWs.send(message);
+                    teamWs.close();
+                  }
+                }
+              }
+
+              return apiData();
 
             case 'updateGracePeriod':
               if (typeof gracePeriod !== 'number' || gracePeriod < 0) {
@@ -355,7 +371,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
                 connection?.host?.send(message);
               }
 
-              return apiData({ ok: true });
+              return apiData();
 
             default:
               return apiBadRequest('Invalid action');
@@ -377,13 +393,19 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
         try {
           // Get run and check permissions
-          const runs: { event_id: string }[] = await sql`SELECT event_id FROM runs WHERE id = ${runId}`;
+          const runs: { event_id: string; status: string }[] =
+            await sql`SELECT event_id, status FROM runs WHERE id = ${runId}`;
 
           if (runs.length === 0) {
             return apiNotFound();
           }
 
           const run = runs[0]!;
+
+          // Prevent deleting a run that is in progress
+          if (run.status === 'in_progress') {
+            return apiBadRequest('Cannot delete a run that is in progress');
+          }
 
           // Check permissions (only owner or admin can delete)
           const permissions: { role_id: string }[] = await sql`

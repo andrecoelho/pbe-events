@@ -170,7 +170,10 @@ Host completes the entire run.
 **Process**:
 1. Updates run status to `completed`
 2. Calculates final scores for all teams
-3. Broadcasts `RUN_COMPLETED` to all language channels with scores
+3. Broadcasts `RUN_COMPLETED` to all language channels
+4. Closes all team connections
+
+**Note**: The WebSocket handler version includes scores in the `RUN_COMPLETED` message, while the REST API version sends a simplified message without scores
 
 ---
 
@@ -236,21 +239,17 @@ A slide is being displayed.
 ---
 
 #### `RUN_COMPLETED`
-Run finished with final scores.
+Run finished. Sent to all teams when the run is completed.
 
 ```typescript
 {
-  type: 'RUN_COMPLETED',
-  scores: Array<{
-    teamId: string,
-    teamName: string,
-    teamNumber: number,
-    total: number           // Total points earned
-  }>
+  type: 'RUN_COMPLETED'
 }
 ```
 
-**Team Action**: Display final leaderboard
+**Team Action**: Display run completion message. Connection will be closed immediately after this message.
+
+**Note**: This message is sent to teams both when the host sends the `COMPLETE_RUN` WebSocket message AND when an admin completes the run via the REST API (`PATCH /api/runs/:runId` with `action: 'complete'`)
 
 ---
 
@@ -486,6 +485,7 @@ The WebSocket system integrates with REST endpoints:
 - **Update Run**: `PATCH /api/runs/:runId`
   - Actions: `start`, `complete`, `updateGracePeriod`
   - `updateGracePeriod` broadcasts to host via WebSocket
+  - `complete` sends `RUN_COMPLETED` to all teams and closes their connections
 
 - **Get Run**: `GET /api/runs/:runId`
   - Fetches current run state including active question
