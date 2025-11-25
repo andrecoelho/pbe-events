@@ -294,7 +294,6 @@ export class WebSocketServer {
         await this.handlePAUSE(connection);
         console.log(`Host disconnected from event ${eventId}`);
       } else {
-        // TypeScript now knows ws.data is the team variant
         const { teamId, languageCode } = ws.data;
 
         connection.teams.delete(teamId);
@@ -467,6 +466,7 @@ export class WebSocketServer {
 
       if (answers.length > 0) {
         const answer = answers[0]!;
+
         ws.send(
           JSON.stringify({
             type: 'YOUR_ANSWER',
