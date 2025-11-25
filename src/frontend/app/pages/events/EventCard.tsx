@@ -132,9 +132,9 @@ export const EventCard = memo((props: Props) => {
           {canEdit && (
             <a
               className='tooltip tooltip-neutral'
-              data-tip='Runs'
-              href={`/runs/${props.event.id}`}
-              aria-label={`Event runs for ${props.event.name}`}
+              data-tip='Host Event'
+              href={`/host/${props.event.id}`}
+              aria-label={`Host event ${props.event.name}`}
             >
               <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
             </a>

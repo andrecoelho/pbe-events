@@ -78,18 +78,13 @@ export class WebSocketServer {
     }
 
     try {
-      // Check if there's an active run for this event
-      const runs: {
-        id: string;
-        status: string;
-      }[] = await sql`
-        SELECT id, status
-        FROM runs
-        WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+      // Check if event exists
+      const events: { id: string }[] = await sql`
+        SELECT id FROM events WHERE id = ${eventId}
       `;
 
-      if (runs.length === 0) {
-        return textBadRequest('No active run for this event');
+      if (events.length === 0) {
+        return textBadRequest('Event not found');
       }
 
       if (role === 'host') {
@@ -218,10 +213,12 @@ export class WebSocketServer {
         });
 
         // Send team status message to the newly connected host
-        ws.send(JSON.stringify({
-          type: 'TEAM_STATUS',
-          teams: teamStatuses
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'TEAM_STATUS',
+            teams: teamStatuses
+          })
+        );
       } else if (this.isTeamWebSocket(ws)) {
         // TypeScript now knows ws is ServerWebSocket<TeamWebsocketData>
         const { teamId } = ws.data;
@@ -412,35 +409,29 @@ export class WebSocketServer {
 
     // Query and cache run
     const [run]: {
-      id: string;
       event_id: string;
       status: string;
       grace_period: number;
-      started_at: string | null;
       has_timer: boolean;
       active_question_id: string | null;
       question_start_time: string | null;
-      created_at: string;
     }[] = await sql`
-      SELECT id, event_id, status, grace_period, started_at, has_timer,
-             active_question_id, question_start_time, created_at
+      SELECT event_id, status, grace_period, has_timer,
+             active_question_id, question_start_time
       FROM runs
-      WHERE event_id = ${eventId} AND status IN ('not_started', 'in_progress')
+      WHERE event_id = ${eventId}
     `;
 
     if (run) {
       const connection = this.eventConnections.get(eventId)!;
 
       connection.run = {
-        id: run.id,
         eventId: run.event_id,
         status: run.status as 'not_started' | 'in_progress' | 'completed',
         gracePeriod: run.grace_period,
-        startedAt: run.started_at,
         hasTimer: run.has_timer,
         activeQuestionId: run.active_question_id,
-        questionStartTime: run.question_start_time,
-        createdAt: run.created_at
+        questionStartTime: run.question_start_time
       };
 
       // Cache active question if exists
@@ -475,9 +466,8 @@ export class WebSocketServer {
         SELECT a.id, a.answer
         FROM answers a
         JOIN translations t ON t.id = a.translation_id
-        WHERE a.run_id = ${connection.run!.id}
+        WHERE a.question_id = ${connection.activeQuestion.questionId}
           AND a.team_id = ${teamId}
-          AND t.question_id = ${connection.activeQuestion.questionId}
           AND t.language_id = ${languageId}
       `;
 
@@ -523,7 +513,7 @@ export class WebSocketServer {
     const { teamId } = ws.data;
 
     // Check if run has started
-    if (connection.run?.startedAt !== null) {
+    if (connection.run?.status !== 'not_started') {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -669,11 +659,9 @@ export class WebSocketServer {
 
       // Upsert answer
       await sql`
-        INSERT INTO answers (id, answer, run_id, team_id, translation_id, created_at, updated_at)
-        VALUES (${answerId}, ${answer}, ${
-        connection.run!.id
-      }, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (run_id, team_id, translation_id)
+        INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
+        VALUES (${answerId}, ${answer}, ${connection.activeQuestion.questionId}, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (question_id, team_id)
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
       `;
 
@@ -718,7 +706,7 @@ export class WebSocketServer {
         SET active_question_id = ${questionId},
             question_start_time = ${questionStartTime},
             has_timer = ${hasTimer}
-        WHERE id = ${connection.run.id}
+        WHERE event_id = ${connection.eventId}
       `;
 
       // Update connection cache
@@ -798,7 +786,7 @@ export class WebSocketServer {
       await sql`
         UPDATE runs
         SET active_question_id = NULL, question_start_time = NULL
-        WHERE id = ${connection.run!.id}
+        WHERE event_id = ${connection.eventId}
       `;
 
       connection.run.activeQuestionId = null;
@@ -857,7 +845,7 @@ export class WebSocketServer {
     try {
       // Update run status
       await sql`
-        UPDATE runs SET status = 'completed' WHERE id = ${connection.run.id}
+        UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}
       `;
 
       // Get final scores
@@ -869,7 +857,8 @@ export class WebSocketServer {
       }[] = await sql`
         SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
         FROM teams t
-        LEFT JOIN answers a ON a.team_id = t.id AND a.run_id = ${connection.run.id}
+        LEFT JOIN answers a ON a.team_id = t.id
+        LEFT JOIN questions q ON q.id = a.question_id
         WHERE t.event_id = ${connection.eventId}
         GROUP BY t.id, t.name, t.number
         ORDER BY total DESC

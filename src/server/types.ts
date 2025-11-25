@@ -60,15 +60,12 @@ export interface QuestionInfo {
 }
 
 export interface Run {
-  id: string;
   eventId: string;
   status: 'not_started' | 'in_progress' | 'completed';
   gracePeriod: number;
-  startedAt: string | null;
   hasTimer: boolean;
   activeQuestionId: string | null;
   questionStartTime: string | null;
-  createdAt: string;
 }
 
 export interface ActiveQuestionCache {
@@ -82,7 +79,7 @@ export interface Answer {
   answer: string;
   autoPointsAwarded: number | null;
   pointsAwarded: number | null;
-  runId: string;
+  questionId: string;
   teamId: string;
   translationId: string;
   createdAt: string;

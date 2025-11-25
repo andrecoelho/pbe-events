@@ -90,19 +90,13 @@ CREATE TABLE translations (
 );
 
 CREATE TABLE runs (
-  id TEXT PRIMARY KEY,
-  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('not_started', 'in_progress', 'completed')) DEFAULT 'not_started',
   grace_period INTEGER NOT NULL DEFAULT 2, -- in seconds
-  started_at TIMESTAMPTZ,
   has_timer BOOLEAN NOT NULL DEFAULT true,
   active_question_id TEXT REFERENCES questions(id) ON DELETE SET NULL,
-  question_start_time TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  question_start_time TIMESTAMPTZ
 );
-
--- Only one active run per event
-CREATE UNIQUE INDEX unique_active_per_event ON runs (event_id) WHERE status IN ('not_started', 'in_progress');
 
 CREATE TABLE slides (
   id TEXT PRIMARY KEY,
@@ -118,12 +112,12 @@ CREATE TABLE answers (
   answer TEXT NOT NULL,
   auto_points_awarded INTEGER,
   points_awarded INTEGER,
-  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   translation_id TEXT NOT NULL REFERENCES translations(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (run_id, team_id)
+  UNIQUE (question_id, team_id)
 );
 
 INSERT INTO roles (id, name) VALUES ('owner', 'Owner');
