@@ -53,6 +53,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           }
 
           const runId = Bun.randomUUIDv7();
+
           const result: {
             id: string;
             event_id: string;
@@ -86,8 +87,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               activeQuestionId: run.active_question_id,
               questionStartTime: run.question_start_time,
               createdAt: run.created_at
-            },
-            ok: true
+            }
           });
         } catch (error) {
           console.error('Error creating run:', error);
@@ -186,60 +186,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           console.error('Error fetching run:', error);
           return apiServerError();
         }
-      }
-    },
+      },
 
-    '/api/runs/:runId/start': {
-      PATCH: async (req: BunRequest<'/api/runs/:runId/start'>) => {
-        const session = await getSession(req);
-
-        if (!session) {
-          return apiUnauthorized();
-        }
-
-        const { runId } = req.params;
-
-        try {
-          // Get run and check permissions
-          const runs: { event_id: string; status: string }[] =
-            await sql`SELECT event_id, status FROM runs WHERE id = ${runId}`;
-
-          if (runs.length === 0) {
-            return apiNotFound();
-          }
-
-          const run = runs[0]!;
-
-          if (run.status !== 'not_started') {
-            return apiBadRequest('Run has already been started');
-          }
-
-          // Check permissions
-          const permissions: { role_id: string }[] = await sql`
-            SELECT role_id FROM permissions
-            WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
-          `;
-
-          if (permissions.length === 0) {
-            return apiForbidden();
-          }
-
-          await sql`
-            UPDATE runs
-            SET status = 'in_progress', started_at = CURRENT_TIMESTAMP
-            WHERE id = ${runId}
-          `;
-
-          return apiData({ ok: true });
-        } catch (error) {
-          console.error('Error starting run:', error);
-          return apiServerError();
-        }
-      }
-    },
-
-    '/api/runs/:runId/grace-period': {
-      PATCH: async (req: BunRequest<'/api/runs/:runId/grace-period'>) => {
+      PATCH: async (req: BunRequest<'/api/runs/:runId'>) => {
         const session = await getSession(req);
 
         if (!session) {
@@ -250,69 +199,12 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
         try {
           const body = await req.json();
-          const { gracePeriod } = body;
+          const { action, gracePeriod } = body;
 
-          if (typeof gracePeriod !== 'number' || gracePeriod < 0) {
-            return apiBadRequest('Grace period must be a non-negative number');
+          if (!action || !['start', 'complete', 'updateGracePeriod'].includes(action)) {
+            return apiBadRequest('Invalid action. Must be one of: start, complete, updateGracePeriod');
           }
 
-          // Get run and check permissions
-          const runs: { event_id: string }[] = await sql`SELECT event_id FROM runs WHERE id = ${runId}`;
-
-          if (runs.length === 0) {
-            return apiNotFound();
-          }
-
-          const eventId = runs[0]!.event_id;
-
-          // Check permissions
-          const permissions: { role_id: string }[] = await sql`
-            SELECT role_id FROM permissions
-            WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-          `;
-
-          if (permissions.length === 0) {
-            return apiForbidden();
-          }
-
-          await sql`UPDATE runs SET grace_period = ${gracePeriod} WHERE id = ${runId}`;
-
-          // Update cache and broadcast to host if connection exists
-          if (wsServer.hasConnection(eventId)) {
-            const connection = wsServer.getConnection(eventId);
-
-            if (connection && connection.run) {
-              connection.run.gracePeriod = gracePeriod;
-            }
-
-            // Send to host only
-            const message = JSON.stringify({
-              type: 'GRACE_PERIOD_UPDATED',
-              gracePeriod
-            });
-
-            connection?.host?.send(message);
-          }
-
-          return apiData({ ok: true });
-        } catch (error) {
-          console.error('Error updating grace period:', error);
-          return apiServerError();
-        }
-      }
-    },
-
-    '/api/runs/:runId/complete': {
-      PATCH: async (req: BunRequest<'/api/runs/:runId/complete'>) => {
-        const session = await getSession(req);
-
-        if (!session) {
-          return apiUnauthorized();
-        }
-
-        const { runId } = req.params;
-
-        try {
           // Get run and check permissions
           const runs: { event_id: string; status: string }[] =
             await sql`SELECT event_id, status FROM runs WHERE id = ${runId}`;
@@ -321,11 +213,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             return apiNotFound();
           }
 
-          const run = runs[0];
-
-          if (!run || run.status === 'completed') {
-            return apiBadRequest('Run is already completed');
-          }
+          const run = runs[0]!;
 
           // Check permissions
           const permissions: { role_id: string }[] = await sql`
@@ -337,11 +225,57 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             return apiForbidden();
           }
 
-          await sql`UPDATE runs SET status = 'completed' WHERE id = ${runId}`;
+          // Handle different actions
+          switch (action) {
+            case 'start':
+              if (run.status !== 'not_started') {
+                return apiBadRequest('Run has already been started');
+              }
+
+              await sql`
+                UPDATE runs
+                SET status = 'in_progress', started_at = CURRENT_TIMESTAMP
+                WHERE id = ${runId}
+              `;
+              break;
+
+            case 'complete':
+              if (run.status === 'completed') {
+                return apiBadRequest('Run is already completed');
+              }
+
+              await sql`UPDATE runs SET status = 'completed' WHERE id = ${runId}`;
+              break;
+
+            case 'updateGracePeriod':
+              if (typeof gracePeriod !== 'number' || gracePeriod < 0) {
+                return apiBadRequest('Grace period must be a non-negative number');
+              }
+
+              await sql`UPDATE runs SET grace_period = ${gracePeriod} WHERE id = ${runId}`;
+
+              // Update cache and broadcast to host if connection exists
+              if (wsServer.hasConnection(run.event_id)) {
+                const connection = wsServer.getConnection(run.event_id);
+
+                if (connection && connection.run) {
+                  connection.run.gracePeriod = gracePeriod;
+                }
+
+                // Send to host only
+                const message = JSON.stringify({
+                  type: 'GRACE_PERIOD_UPDATED',
+                  gracePeriod
+                });
+
+                connection?.host?.send(message);
+              }
+              break;
+          }
 
           return apiData({ ok: true });
         } catch (error) {
-          console.error('Error completing run:', error);
+          console.error('Error updating run:', error);
           return apiServerError();
         }
       }
