@@ -2,24 +2,26 @@ import { sql, type ServerWebSocket } from 'bun';
 import type { Session, Run, ActiveQuestionCache } from '@/server/types';
 import { textBadRequest, textForbidden, textServerError, textUnauthorized } from '@/server/utils/responses';
 
-export type WebsocketData =
-  | {
-      role: 'host';
-      session: Session;
-      eventId: string;
-    }
-  | {
-      role: 'team';
-      eventId: string;
-      teamId: string;
-      languageId: string | null;
-      languageCode: string | null;
-    };
+export type TeamWebsocketData = {
+  role: 'team';
+  eventId: string;
+  teamId: string;
+  languageId: string | null;
+  languageCode: string | null;
+};
+
+export type HostWebsocketData = {
+  role: 'host';
+  session: Session;
+  eventId: string;
+};
+
+export type WebsocketData = HostWebsocketData | TeamWebsocketData;
 
 export interface EventConnection {
   eventId: string;
   host: ServerWebSocket<WebsocketData> | null;
-  teams: Map<string, ServerWebSocket<WebsocketData>>;
+  teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
   activeQuestion: ActiveQuestionCache | null;
 }
@@ -51,6 +53,14 @@ export class WebSocketServer {
       close: this.handleClose,
       message: this.handleMessage
     };
+  }
+
+  private isTeamWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<TeamWebsocketData> {
+    return ws.data.role === 'team';
+  }
+
+  private isHostWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<HostWebsocketData> {
+    return ws.data.role === 'host';
   }
 
   async upgradeWebSocket(req: Request, session: Session | null): Promise<Response | undefined> {
@@ -158,11 +168,62 @@ export class WebSocketServer {
 
       const connection = this.eventConnections.get(eventId)!;
 
-      if (role === 'host') {
+      if (this.isHostWebSocket(ws)) {
         connection.host = ws;
         console.log(`Host connected to event ${eventId}`);
-      } else {
-        // TypeScript now knows ws.data is the team variant
+
+        // Get all teams for this event
+        const allTeams: {
+          id: string;
+          name: string;
+          number: number;
+        }[] = await sql`
+          SELECT id, name, number FROM teams WHERE event_id = ${eventId}
+        `;
+
+        // Build status array for all teams
+        const teamStatuses = allTeams.map((team) => {
+          const teamWs = connection.teams.get(team.id);
+
+          if (!teamWs) {
+            // Team is not connected
+            return {
+              teamId: team.id,
+              teamName: team.name,
+              teamNumber: team.number,
+              status: 'TEAM_OFFLINE',
+              languageCode: null
+            };
+          }
+
+          // Team is connected - check if they have selected a language
+          if (teamWs.data.languageCode) {
+            return {
+              teamId: team.id,
+              teamName: team.name,
+              teamNumber: team.number,
+              status: 'TEAM_READY',
+              languageCode: teamWs.data.languageCode
+            };
+          }
+
+          // Team is connected but no language selected
+          return {
+            teamId: team.id,
+            teamName: team.name,
+            teamNumber: team.number,
+            status: 'TEAM_CONNECTED',
+            languageCode: null
+          };
+        });
+
+        // Send team status message to the newly connected host
+        ws.send(JSON.stringify({
+          type: 'TEAM_STATUS',
+          teams: teamStatuses
+        }));
+      } else if (this.isTeamWebSocket(ws)) {
+        // TypeScript now knows ws is ServerWebSocket<TeamWebsocketData>
         const { teamId } = ws.data;
 
         // Close existing connection if team reconnecting
