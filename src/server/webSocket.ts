@@ -2,14 +2,19 @@ import { sql, type ServerWebSocket } from 'bun';
 import type { Session, Run, ActiveQuestionCache } from '@/server/types';
 import { textBadRequest, textForbidden, textServerError, textUnauthorized } from '@/server/utils/responses';
 
-export interface WebsocketData {
-  session: Session | null;
-  eventId: string | null;
-  teamId: string | null;
-  role: 'host' | 'team';
-  languageId: string | null;
-  languageCode: string | null;
-}
+export type WebsocketData =
+  | {
+      role: 'host';
+      session: Session;
+      eventId: string;
+    }
+  | {
+      role: 'team';
+      eventId: string;
+      teamId: string;
+      languageId: string | null;
+      languageCode: string | null;
+    };
 
 export interface EventConnection {
   eventId: string;
@@ -109,14 +114,20 @@ export class WebSocketServer {
       }
 
       const upgraded = this.server.upgrade(req, {
-        data: {
-          session,
-          eventId,
-          teamId,
-          role,
-          languageId: null,
-          languageCode: null
-        }
+        data:
+          role === 'host'
+            ? {
+                role: 'host',
+                session: session!,
+                eventId
+              }
+            : {
+                role: 'team',
+                eventId,
+                teamId,
+                languageId: null,
+                languageCode: null
+              }
       });
 
       if (upgraded) {
@@ -132,9 +143,9 @@ export class WebSocketServer {
 
   // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
-    const { eventId, teamId, role } = ws.data;
+    const { eventId, role } = ws.data;
 
-    if (!eventId || !teamId) {
+    if (!eventId) {
       ws.close();
       return;
     }
@@ -151,6 +162,9 @@ export class WebSocketServer {
         connection.host = ws;
         console.log(`Host connected to event ${eventId}`);
       } else {
+        // TypeScript now knows ws.data is the team variant
+        const { teamId } = ws.data;
+
         // Close existing connection if team reconnecting
         if (connection.teams.has(teamId)) {
           connection.teams.get(teamId)?.close();
@@ -209,7 +223,7 @@ export class WebSocketServer {
 
   // Called when a WebSocket connection is closed
   private handleClose = async (ws: ServerWebSocket<WebsocketData>, code: number, reason: string) => {
-    const { eventId, teamId, role, languageCode } = ws.data;
+    const { eventId, role } = ws.data;
 
     if (!eventId) {
       return;
@@ -226,7 +240,10 @@ export class WebSocketServer {
         connection.host = null;
         await this.handlePAUSE(connection);
         console.log(`Host disconnected from event ${eventId}`);
-      } else if (teamId) {
+      } else {
+        // TypeScript now knows ws.data is the team variant
+        const { teamId, languageCode } = ws.data;
+
         connection.teams.delete(teamId);
 
         // Unsubscribe from language channel
@@ -386,7 +403,11 @@ export class WebSocketServer {
     ws: ServerWebSocket<WebsocketData>,
     connection: EventConnection
   ): Promise<void> {
-    if (!connection.activeQuestion || !ws.data.languageId || !ws.data.teamId) return;
+    if (!connection.activeQuestion || ws.data.role !== 'team' || !ws.data.languageId) {
+      return;
+    }
+
+    const { teamId, languageId } = ws.data;
 
     try {
       const answers: { id: string; answer: string }[] = await sql`
@@ -394,9 +415,9 @@ export class WebSocketServer {
         FROM answers a
         JOIN translations t ON t.id = a.translation_id
         WHERE a.run_id = ${connection.run!.id}
-          AND a.team_id = ${ws.data.teamId}
+          AND a.team_id = ${teamId}
           AND t.question_id = ${connection.activeQuestion.questionId}
-          AND t.language_id = ${ws.data.languageId}
+          AND t.language_id = ${languageId}
       `;
 
       if (answers.length > 0) {
@@ -434,11 +455,11 @@ export class WebSocketServer {
     connection: EventConnection,
     languageId: string
   ): Promise<void> {
-    const { eventId, teamId } = ws.data;
-
-    if (!teamId) {
+    if (ws.data.role !== 'team') {
       return;
     }
+
+    const { teamId } = ws.data;
 
     // Check if run has started
     if (connection.run?.startedAt !== null) {
@@ -470,11 +491,12 @@ export class WebSocketServer {
       if (results.length > 0) {
         const { code, name, number } = results[0]!;
 
+        // TypeScript knows ws.data is team type here
         ws.data.languageId = languageId;
         ws.data.languageCode = code;
 
         // Subscribe to language channel
-        ws.subscribe(`${eventId}:${code}`);
+        ws.subscribe(`${connection.eventId}:${code}`);
 
         // Notify host
         const message = JSON.stringify({
@@ -494,6 +516,7 @@ export class WebSocketServer {
       }
     } catch (error) {
       console.error('Error handling SELECT_LANGUAGE:', error);
+
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -509,11 +532,11 @@ export class WebSocketServer {
     connection: EventConnection,
     answer: string
   ): Promise<void> {
-    const { teamId, languageId } = ws.data;
-
-    if (!teamId) {
+    if (ws.data.role !== 'team') {
       return;
     }
+
+    const { teamId, languageId } = ws.data;
 
     // Validate language selected
     if (!languageId) {
