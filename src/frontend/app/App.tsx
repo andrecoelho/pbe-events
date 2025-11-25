@@ -6,7 +6,7 @@ import { Events } from '@/frontend/app/pages/events/Events';
 import { Languages } from '@/frontend/app/pages/languages/Languages';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
 import { Questions } from '@/frontend/app/pages/questions/Questions';
-import { RunHost } from '@/frontend/app/pages/runs/RunHost';
+import { Runs } from '@/frontend/app/pages/runs/Runs';
 import { Teams } from '@/frontend/app/pages/teams/Teams';
 import { Loading } from '@/frontend/components/Loading';
 import { useRouter, type Routes } from '@/frontend/utils/useRouter';
@@ -18,7 +18,7 @@ const routes: Routes = new Map([
   [/^\/teams/, Teams],
   [/^\/languages/, Languages],
   [/^\/questions/, Questions],
-  [/^\/runs/, RunHost],
+  [/^\/runs/, Runs],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 

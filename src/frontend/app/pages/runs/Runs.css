@@ -1,0 +1,35 @@
+@reference '../../../base.css';
+
+.Runs {
+  .shadow-md-top {
+    @apply shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1),0_-2px_4px_-2px_rgba(0,0,0,0.1)];
+  }
+
+  .col-date {
+    @apply text-sm;
+  }
+
+  .col-question {
+    @apply text-center;
+  }
+
+  .col-grace {
+    @apply text-center;
+  }
+
+  .col-status {
+    @apply text-center;
+  }
+
+  .col-actions {
+    @apply flex justify-center gap-4;
+  }
+
+  td.col-actions > button > svg {
+    @apply size-6 cursor-pointer hover:brightness-75;
+  }
+
+  td.col-actions > button:disabled > svg {
+    @apply cursor-not-allowed;
+  }
+}

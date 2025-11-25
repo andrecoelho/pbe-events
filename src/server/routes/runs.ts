@@ -15,6 +15,89 @@ import {
 export function createRunsRoutes(wsServer: WebSocketServer): Routes {
   return {
     '/api/events/:eventId/runs': {
+      GET: async (req: BunRequest<'/api/events/:eventId/runs'>) => {
+        const session = await getSession(req);
+
+        if (!session) {
+          return apiUnauthorized();
+        }
+
+        const { eventId } = req.params;
+
+        try {
+          // Check permissions
+          const permissions: { role_id: string }[] = await sql`
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin', 'judge')
+          `;
+
+          if (permissions.length === 0) {
+            return apiForbidden();
+          }
+
+          // Get event name
+          const events: { name: string }[] = await sql`SELECT name FROM events WHERE id = ${eventId}`;
+
+          if (events.length === 0) {
+            return apiNotFound();
+          }
+
+          const eventName = events[0]!.name;
+
+          // Get all runs for this event
+          const runs: {
+            id: string;
+            status: string;
+            grace_period: number;
+            started_at: string | null;
+            has_timer: boolean;
+            active_question_id: string | null;
+            created_at: string;
+          }[] = await sql`
+            SELECT id, status, grace_period, started_at, has_timer, active_question_id, created_at
+            FROM runs
+            WHERE event_id = ${eventId}
+            ORDER BY created_at DESC
+          `;
+
+          // Get active question numbers for runs that have them
+          const runsWithQuestions = await Promise.all(
+            runs.map(async (run) => {
+              let activeQuestionNumber: number | undefined = undefined;
+
+              if (run.active_question_id) {
+                const questions: { number: number }[] = await sql`
+                  SELECT number FROM questions WHERE id = ${run.active_question_id}
+                `;
+
+                if (questions.length > 0) {
+                  activeQuestionNumber = questions[0]!.number;
+                }
+              }
+
+              return {
+                id: run.id,
+                status: run.status,
+                gracePeriod: run.grace_period,
+                startedAt: run.started_at,
+                hasTimer: run.has_timer,
+                activeQuestionId: run.active_question_id,
+                createdAt: run.created_at,
+                activeQuestionNumber
+              };
+            })
+          );
+
+          return apiData({
+            eventName,
+            runs: runsWithQuestions
+          });
+        } catch (error) {
+          console.error('Error fetching runs:', error);
+          return apiServerError();
+        }
+      },
+
       POST: async (req: BunRequest<'/api/events/:eventId/runs'>) => {
         const session = await getSession(req);
 
@@ -77,17 +160,15 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           const run = result[0]!;
 
           return apiData({
-            run: {
-              id: run.id,
-              eventId: run.event_id,
-              status: run.status,
-              gracePeriod: run.grace_period,
-              startedAt: run.started_at,
-              hasTimer: run.has_timer,
-              activeQuestionId: run.active_question_id,
-              questionStartTime: run.question_start_time,
-              createdAt: run.created_at
-            }
+            id: run.id,
+            eventId: run.event_id,
+            status: run.status,
+            gracePeriod: run.grace_period,
+            startedAt: run.started_at,
+            hasTimer: run.has_timer,
+            activeQuestionId: run.active_question_id,
+            questionStartTime: run.question_start_time,
+            createdAt: run.created_at
           });
         } catch (error) {
           console.error('Error creating run:', error);
@@ -232,12 +313,14 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
                 return apiBadRequest('Run has already been started');
               }
 
-              await sql`
+              const startResult: { started_at: string }[] = await sql`
                 UPDATE runs
                 SET status = 'in_progress', started_at = CURRENT_TIMESTAMP
                 WHERE id = ${runId}
+                RETURNING started_at
               `;
-              break;
+
+              return apiData({ startedAt: startResult[0]!.started_at });
 
             case 'complete':
               if (run.status === 'completed') {
@@ -245,7 +328,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               }
 
               await sql`UPDATE runs SET status = 'completed' WHERE id = ${runId}`;
-              break;
+
+              return apiData({ ok: true });
 
             case 'updateGracePeriod':
               if (typeof gracePeriod !== 'number' || gracePeriod < 0) {
@@ -270,12 +354,53 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
                 connection?.host?.send(message);
               }
-              break;
+
+              return apiData({ ok: true });
+
+            default:
+              return apiBadRequest('Invalid action');
           }
+        } catch (error) {
+          console.error('Error updating run:', error);
+          return apiServerError();
+        }
+      },
+
+      DELETE: async (req: BunRequest<'/api/runs/:runId'>) => {
+        const session = await getSession(req);
+
+        if (!session) {
+          return apiUnauthorized();
+        }
+
+        const { runId } = req.params;
+
+        try {
+          // Get run and check permissions
+          const runs: { event_id: string }[] = await sql`SELECT event_id FROM runs WHERE id = ${runId}`;
+
+          if (runs.length === 0) {
+            return apiNotFound();
+          }
+
+          const run = runs[0]!;
+
+          // Check permissions (only owner or admin can delete)
+          const permissions: { role_id: string }[] = await sql`
+            SELECT role_id FROM permissions
+            WHERE user_id = ${session.user_id} AND event_id = ${run.event_id} AND role_id IN ('owner', 'admin')
+          `;
+
+          if (permissions.length === 0) {
+            return apiForbidden();
+          }
+
+          // Delete the run
+          await sql`DELETE FROM runs WHERE id = ${runId}`;
 
           return apiData({ ok: true });
         } catch (error) {
-          console.error('Error updating run:', error);
+          console.error('Error deleting run:', error);
           return apiServerError();
         }
       }
