@@ -704,6 +704,11 @@ export class WebSocketServer {
   }
 
   private async handlePAUSE(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
+
     try {
       // Update run
       await sql`
@@ -712,8 +717,8 @@ export class WebSocketServer {
         WHERE id = ${connection.run!.id}
       `;
 
-      connection.run!.activeQuestionId = null;
-      connection.run!.questionStartTime = null;
+      connection.run.activeQuestionId = null;
+      connection.run.questionStartTime = null;
       connection.activeQuestion = null;
 
       // Broadcast to all language channels
@@ -741,6 +746,7 @@ export class WebSocketServer {
 
       if (slides.length > 0) {
         const slide = slides[0]!;
+
         await this.broadcastToAllLanguageChannels(connection.eventId, {
           type: 'SLIDE_SHOWN',
           slide: {
@@ -759,10 +765,15 @@ export class WebSocketServer {
   }
 
   private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
+
     try {
       // Update run status
       await sql`
-        UPDATE runs SET status = 'completed' WHERE id = ${connection.run!.id}
+        UPDATE runs SET status = 'completed' WHERE id = ${connection.run.id}
       `;
 
       // Get final scores
@@ -774,7 +785,7 @@ export class WebSocketServer {
       }[] = await sql`
         SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
         FROM teams t
-        LEFT JOIN answers a ON a.team_id = t.id AND a.run_id = ${connection.run!.id}
+        LEFT JOIN answers a ON a.team_id = t.id AND a.run_id = ${connection.run.id}
         WHERE t.event_id = ${connection.eventId}
         GROUP BY t.id, t.name, t.number
         ORDER BY total DESC
@@ -792,9 +803,9 @@ export class WebSocketServer {
       });
 
       // Close all connections
-      connection.teams.forEach((teamWs) => {
+      for (const teamWs of connection.teams.values()) {
         teamWs.close();
-      });
+      }
 
       connection.host?.close();
     } catch (error) {
