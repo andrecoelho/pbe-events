@@ -137,7 +137,7 @@ export function Host() {
         </div>
 
         {/* Active Question Section */}
-        {snap.run.activeQuestionId && snap.run.activeQuestion && (
+        {snap.run.activeType === 'question' && snap.run.activeQuestion && (
           <div className='card bg-base-200 shadow-xl mb-6'>
             <div className='card-body'>
               <h3 className='card-title'>Active Question</h3>
@@ -151,6 +151,22 @@ export function Host() {
                   <span>{snap.run.activeQuestion.maxPoints} points</span>
                 </div>
                 <div className='badge badge-outline'>{snap.run.activeQuestion.type}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Slide Section */}
+        {snap.run.activeType === 'slide' && snap.run.activeSlide && (
+          <div className='card bg-base-200 shadow-xl mb-6'>
+            <div className='card-body'>
+              <h3 className='card-title'>Active Slide</h3>
+              <div className='flex items-center gap-4'>
+                <div className='badge badge-secondary badge-lg'>Slide {snap.run.activeSlide.number}</div>
+                <div className='text-sm opacity-75'>Timer disabled for slides</div>
+              </div>
+              <div className='mt-4 p-4 bg-base-300 rounded-lg'>
+                <div className='prose max-w-none'>{snap.run.activeSlide.content}</div>
               </div>
             </div>
           </div>

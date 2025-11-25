@@ -41,10 +41,11 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             status: string;
             grace_period: number;
             has_timer: boolean;
-            active_question_id: string | null;
-            question_start_time: string | null;
+            active_id: string | null;
+            active_type: string | null;
+            active_start_time: string | null;
           }[] = await sql`
-            SELECT event_id, status, grace_period, has_timer, active_question_id, question_start_time
+            SELECT event_id, status, grace_period, has_timer, active_id, active_type, active_start_time
             FROM runs
             WHERE event_id = ${eventId}
           `;
@@ -55,10 +56,11 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           const run = runs[0]!;
 
-          // Get active question details if exists
+          // Get active item details if exists
           let activeQuestion = null;
+          let activeSlide = null;
 
-          if (run.active_question_id) {
+          if (run.active_id && run.active_type === 'question') {
             const questions: {
               id: string;
               number: number;
@@ -68,7 +70,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             }[] = await sql`
               SELECT id, number, type, max_points, seconds
               FROM questions
-              WHERE id = ${run.active_question_id}
+              WHERE id = ${run.active_id}
             `;
 
             if (questions.length > 0) {
@@ -82,6 +84,26 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
                 seconds: q.seconds
               };
             }
+          } else if (run.active_id && run.active_type === 'slide') {
+            const slides: {
+              id: string;
+              number: number;
+              content: string;
+            }[] = await sql`
+              SELECT id, number, content
+              FROM slides
+              WHERE id = ${run.active_id}
+            `;
+
+            if (slides.length > 0) {
+              const s = slides[0]!;
+
+              activeSlide = {
+                id: s.id,
+                number: s.number,
+                content: s.content
+              };
+            }
           }
 
           return apiData({
@@ -90,9 +112,11 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               status: run.status,
               gracePeriod: run.grace_period,
               hasTimer: run.has_timer,
-              activeQuestionId: run.active_question_id,
-              questionStartTime: run.question_start_time,
-              activeQuestion
+              activeId: run.active_id,
+              activeType: run.active_type,
+              activeStartTime: run.active_start_time,
+              activeQuestion,
+              activeSlide
             }
           });
         } catch (error) {
@@ -220,8 +244,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               await sql`
                 UPDATE runs
                 SET status = 'not_started',
-                    active_question_id = NULL,
-                    question_start_time = NULL
+                    active_id = NULL,
+                    active_type = NULL,
+                    active_start_time = NULL
                 WHERE event_id = ${eventId}
               `;
 

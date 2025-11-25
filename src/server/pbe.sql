@@ -94,8 +94,10 @@ CREATE TABLE runs (
   status TEXT NOT NULL CHECK (status IN ('not_started', 'in_progress', 'completed')) DEFAULT 'not_started',
   grace_period INTEGER NOT NULL DEFAULT 2, -- in seconds
   has_timer BOOLEAN NOT NULL DEFAULT true,
-  active_question_id TEXT REFERENCES questions(id) ON DELETE SET NULL,
-  question_start_time TIMESTAMPTZ
+  active_id TEXT, -- References either questions(id) or slides(id)
+  active_type TEXT CHECK (active_type IN ('question', 'slide')),
+  active_start_time TIMESTAMPTZ,
+  CHECK ((active_id IS NULL AND active_type IS NULL AND active_start_time IS NULL) OR (active_id IS NOT NULL AND active_type IS NOT NULL AND active_start_time IS NOT NULL))
 );
 
 CREATE TABLE slides (

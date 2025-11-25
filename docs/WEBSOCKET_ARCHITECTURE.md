@@ -89,7 +89,7 @@ Team submits or updates their answer for the active question. Both message types
 **Response**:
 - Answer stored in database with timestamps
 - Host notified via `ANSWER_RECEIVED`
-- If past deadline (questionStartTime + seconds + gracePeriod), returns `DEADLINE_EXCEEDED` error
+- If past deadline (activeStartTime + seconds + gracePeriod), returns `DEADLINE_EXCEEDED` error
 
 **Errors**:
 - `NO_LANGUAGE_SELECTED` if team hasn't selected a language
@@ -113,7 +113,7 @@ Host starts a specific question.
 
 **Process**:
 1. Validates question belongs to event
-2. Updates run record with `active_question_id` and `question_start_time`
+2. Updates run record with `active_id`, `active_type` ('question'), and `active_start_time`
 3. Loads question translations for all languages
 4. Broadcasts `QUESTION_STARTED` to each language channel with appropriate translation
 5. Calculates deadline: `startTime + seconds + gracePeriod`
@@ -133,7 +133,7 @@ Host pauses/ends the current question.
 ```
 
 **Process**:
-1. Clears `active_question_id` and `question_start_time` in run record
+1. Clears `active_id`, `active_type`, and `active_start_time` in run record
 2. Broadcasts `QUESTION_ENDED` to all language channels
 3. Grades all submitted answers for the question
 
@@ -387,8 +387,9 @@ The WebSocket server maintains in-memory state for each event:
     id: string,
     status: 'not_started' | 'in_progress' | 'completed',
     gracePeriod: number,
-    activeQuestionId: string | null,
-    questionStartTime: number | null,  // Unix timestamp
+    activeId: string | null,
+    activeType: 'question' | 'slide' | null,
+    activeStartTime: number | null,  // Unix timestamp
     hasTimer: boolean
   } | null
 }
@@ -417,7 +418,7 @@ This allows teams to reconnect and resume their work without losing progress.
 
 ### Question Timer Flow
 1. Host sends `START_QUESTION` with `hasTimer: true`
-2. Server records `question_start_time` in database
+2. Server records `active_start_time` in database
 3. Teams receive `QUESTION_STARTED` with:
    - `startTime`: When question started (ms timestamp)
    - `seconds`: Time limit (e.g., 30 seconds)
@@ -427,7 +428,7 @@ This allows teams to reconnect and resume their work without losing progress.
 ### Answer Submission Validation
 When a team submits an answer:
 ```typescript
-const deadline = questionStartTime + (seconds * 1000) + (gracePeriod * 1000);
+const deadline = activeStartTime + (seconds * 1000) + (gracePeriod * 1000);
 const now = Date.now();
 
 if (now > deadline) {

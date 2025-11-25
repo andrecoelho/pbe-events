@@ -64,13 +64,15 @@ export interface Run {
   status: 'not_started' | 'in_progress' | 'completed';
   gracePeriod: number;
   hasTimer: boolean;
-  activeQuestionId: string | null;
-  questionStartTime: string | null;
+  activeId: string | null;
+  activeType: 'question' | 'slide' | null;
+  activeStartTime: string | null;
 }
 
-export interface ActiveQuestionCache {
-  questionId: string;
-  seconds: number;
+export interface ActiveItemCache {
+  id: string;
+  type: 'question' | 'slide';
+  seconds: number; // Only relevant for questions with timer
   startTime: string; // ISO string from database
 }
 

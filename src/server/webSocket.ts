@@ -1,5 +1,5 @@
 import { sql, type ServerWebSocket } from 'bun';
-import type { Session, Run, ActiveQuestionCache } from '@/server/types';
+import type { Session, Run, ActiveItemCache } from '@/server/types';
 import { textBadRequest, textForbidden, textServerError, textUnauthorized } from '@/server/utils/responses';
 
 export type TeamWebsocketData = {
@@ -23,7 +23,7 @@ export interface EventConnection {
   host: ServerWebSocket<WebsocketData> | null;
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
-  activeQuestion: ActiveQuestionCache | null;
+  activeItem: ActiveItemCache | null;
 }
 
 export class WebSocketServer {
@@ -261,7 +261,7 @@ export class WebSocketServer {
           }
 
           // Send existing answer if active question and team has language
-          if (connection.activeQuestion && ws.data.languageId) {
+          if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
             await this.sendExistingAnswerToTeam(ws, connection);
           }
         }
@@ -398,7 +398,7 @@ export class WebSocketServer {
       host: null,
       teams: new Map(),
       run: null,
-      activeQuestion: null
+      activeItem: null
     });
 
     // Query and cache run
@@ -407,10 +407,11 @@ export class WebSocketServer {
       status: string;
       grace_period: number;
       has_timer: boolean;
-      active_question_id: string | null;
-      question_start_time: string | null;
+      active_id: string | null;
+      active_type: string | null;
+      active_start_time: string | null;
     }[] = await sql`
-      SELECT event_id, status, grace_period, has_timer, active_question_id, question_start_time
+      SELECT event_id, status, grace_period, has_timer, active_id, active_type, active_start_time
       FROM runs
       WHERE event_id = ${eventId}
     `;
@@ -423,23 +424,32 @@ export class WebSocketServer {
         status: run.status as 'not_started' | 'in_progress' | 'completed',
         gracePeriod: run.grace_period,
         hasTimer: run.has_timer,
-        activeQuestionId: run.active_question_id,
-        questionStartTime: run.question_start_time
+        activeId: run.active_id,
+        activeType: run.active_type as 'question' | 'slide' | null,
+        activeStartTime: run.active_start_time
       };
 
-      // Cache active question if exists
-      if (run.active_question_id) {
+      // Cache active item if exists
+      if (run.active_id && run.active_type === 'question') {
         const [question]: { seconds: number }[] = await sql`
-          SELECT seconds FROM questions WHERE id = ${run.active_question_id}
+          SELECT seconds FROM questions WHERE id = ${run.active_id}
         `;
 
         if (question) {
-          connection.activeQuestion = {
-            questionId: run.active_question_id,
+          connection.activeItem = {
+            id: run.active_id,
+            type: 'question',
             seconds: question.seconds,
-            startTime: run.question_start_time!
+            startTime: run.active_start_time!
           };
         }
+      } else if (run.active_id && run.active_type === 'slide') {
+        connection.activeItem = {
+          id: run.active_id,
+          type: 'slide',
+          seconds: 0, // Not relevant for slides
+          startTime: run.active_start_time || new Date().toISOString()
+        };
       }
     }
   }
@@ -448,7 +458,12 @@ export class WebSocketServer {
     ws: ServerWebSocket<WebsocketData>,
     connection: EventConnection
   ): Promise<void> {
-    if (!connection.activeQuestion || ws.data.role !== 'team' || !ws.data.languageId) {
+    if (
+      !connection.activeItem ||
+      connection.activeItem.type !== 'question' ||
+      ws.data.role !== 'team' ||
+      !ws.data.languageId
+    ) {
       return;
     }
 
@@ -459,7 +474,7 @@ export class WebSocketServer {
         SELECT a.id, a.answer
         FROM answers a
         JOIN translations t ON t.id = a.translation_id
-        WHERE a.question_id = ${connection.activeQuestion.questionId}
+        WHERE a.question_id = ${connection.activeItem.id}
           AND a.team_id = ${teamId}
           AND t.language_id = ${languageId}
       `;
@@ -553,7 +568,7 @@ export class WebSocketServer {
         connection.host?.send(message);
 
         // Send existing answer if active question
-        if (connection.activeQuestion) {
+        if (connection.activeItem && connection.activeItem.type === 'question') {
           await this.sendExistingAnswerToTeam(ws, connection);
         }
       }
@@ -595,7 +610,7 @@ export class WebSocketServer {
     }
 
     // Validate active question
-    if (!connection.activeQuestion) {
+    if (!connection.activeItem || connection.activeItem.type !== 'question') {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -610,8 +625,8 @@ export class WebSocketServer {
     // Validate deadline if timer enabled
     if (connection.run!.hasTimer) {
       const now = Date.now();
-      const startTime = new Date(connection.activeQuestion.startTime).getTime();
-      const deadline = startTime + connection.activeQuestion.seconds * 1000 + connection.run!.gracePeriod * 1000;
+      const startTime = new Date(connection.activeItem.startTime).getTime();
+      const deadline = startTime + connection.activeItem.seconds * 1000 + connection.run!.gracePeriod * 1000;
 
       if (now > deadline) {
         ws.send(
@@ -630,7 +645,7 @@ export class WebSocketServer {
       // Get translation ID
       const translations: { id: string }[] = await sql`
         SELECT id FROM translations
-        WHERE question_id = ${connection.activeQuestion.questionId}
+        WHERE question_id = ${connection.activeItem.id}
           AND language_id = ${languageId}
       `;
 
@@ -652,7 +667,7 @@ export class WebSocketServer {
       // Upsert answer
       await sql`
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
-        VALUES (${answerId}, ${answer}, ${connection.activeQuestion.questionId}, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (${answerId}, ${answer}, ${connection.activeItem.id}, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
       `;
@@ -690,20 +705,22 @@ export class WebSocketServer {
 
     try {
       // Generate timestamp
-      const questionStartTime = new Date().toISOString();
+      const activeStartTime = new Date().toISOString();
 
       // Update run
       await sql`
         UPDATE runs
-        SET active_question_id = ${questionId},
-            question_start_time = ${questionStartTime},
+        SET active_id = ${questionId},
+            active_type = 'question',
+            active_start_time = ${activeStartTime},
             has_timer = ${hasTimer}
         WHERE event_id = ${connection.eventId}
       `;
 
       // Update connection cache
-      connection.run.activeQuestionId = questionId;
-      connection.run.questionStartTime = questionStartTime;
+      connection.run.activeId = questionId;
+      connection.run.activeType = 'question';
+      connection.run.activeStartTime = activeStartTime;
       connection.run.hasTimer = hasTimer;
 
       // Get question seconds
@@ -712,10 +729,11 @@ export class WebSocketServer {
       `;
 
       if (question) {
-        connection.activeQuestion = {
-          questionId,
+        connection.activeItem = {
+          id: questionId,
+          type: 'question',
           seconds: question.seconds,
-          startTime: connection.run.questionStartTime
+          startTime: connection.run.activeStartTime
         };
       }
 
@@ -747,7 +765,7 @@ export class WebSocketServer {
             questionId
           },
           startTime: Date.now(),
-          seconds: connection.activeQuestion!.seconds,
+          seconds: connection.activeItem!.seconds,
           hasTimer,
           gracePeriod: connection.run.gracePeriod
         });
@@ -777,13 +795,14 @@ export class WebSocketServer {
       // Update run
       await sql`
         UPDATE runs
-        SET active_question_id = NULL, question_start_time = NULL
+        SET active_id = NULL, active_type = NULL, active_start_time = NULL
         WHERE event_id = ${connection.eventId}
       `;
 
-      connection.run.activeQuestionId = null;
-      connection.run.questionStartTime = null;
-      connection.activeQuestion = null;
+      connection.run.activeId = null;
+      connection.run.activeType = null;
+      connection.run.activeStartTime = null;
+      connection.activeItem = null;
 
       // Broadcast to all language channels
       await this.broadcastToAllLanguageChannels(connection.eventId, {

@@ -9,14 +9,20 @@ interface HostStore {
     status: 'not_started' | 'in_progress' | 'completed';
     gracePeriod: number;
     hasTimer: boolean;
-    activeQuestionId: string | null;
-    questionStartTime: string | null;
+    activeId: string | null;
+    activeType: 'question' | 'slide' | null;
+    activeStartTime: string | null;
     activeQuestion?: {
       id: string;
       number: number;
       type: string;
       maxPoints: number;
       seconds: number;
+    };
+    activeSlide?: {
+      id: string;
+      number: number;
+      content: string;
     };
   } | null;
 }
@@ -59,14 +65,20 @@ export class HostValt {
         status: 'not_started' | 'in_progress' | 'completed';
         gracePeriod: number;
         hasTimer: boolean;
-        activeQuestionId: string | null;
-        questionStartTime: string | null;
+        activeId: string | null;
+        activeType: 'question' | 'slide' | null;
+        activeStartTime: string | null;
         activeQuestion?: {
           id: string;
           number: number;
           type: string;
           maxPoints: number;
           seconds: number;
+        };
+        activeSlide?: {
+          id: string;
+          number: number;
+          content: string;
         };
       };
     };
@@ -146,9 +158,11 @@ export class HostValt {
     if (result.status === 200) {
       if (this.store.run) {
         this.store.run.status = 'not_started';
-        this.store.run.activeQuestionId = null;
-        this.store.run.questionStartTime = null;
+        this.store.run.activeId = null;
+        this.store.run.activeType = null;
+        this.store.run.activeStartTime = null;
         this.store.run.activeQuestion = undefined;
+        this.store.run.activeSlide = undefined;
       }
 
       return { ok: true };
