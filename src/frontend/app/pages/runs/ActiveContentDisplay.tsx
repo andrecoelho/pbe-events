@@ -16,10 +16,10 @@ export function ActiveContentDisplay() {
     );
   }
 
-  const { activePhase, activeStartTime, activeQuestion, activeSlide } = snap.run;
+  const { activeQuestion, activeSlide } = snap.run;
 
-  // Ended phase or null - show blank screen
-  if (activePhase === 'ended' || activePhase === null) {
+  // No active content
+  if (!activeQuestion && !activeSlide) {
     return (
       <div className='flex items-center justify-center h-full'>
         <div className='text-center text-base-content/50'>
@@ -30,7 +30,7 @@ export function ActiveContentDisplay() {
   }
 
   // Slide phase
-  if (activePhase === 'slide' && activeSlide) {
+  if (activeSlide) {
     return (
       <div className='p-6 h-full overflow-y-auto'>
         <div className='card bg-base-100 shadow-xl'>
@@ -45,8 +45,8 @@ export function ActiveContentDisplay() {
     );
   }
 
-  // Question phases (prompt or answer)
-  if ((activePhase === 'prompt' || activePhase === 'answer') && activeQuestion) {
+  // Question phases
+  if (activeQuestion) {
     // Fetch the full question details
     const question = snap.questions.find((q) => q.questionId === activeQuestion.id);
 
@@ -62,22 +62,10 @@ export function ActiveContentDisplay() {
 
     return (
       <div className='p-6 h-full overflow-y-auto space-y-4'>
-        {/* Timer for prompt phase */}
-        {activePhase === 'prompt' && activeStartTime && (
-          <TimerDisplay
-            startTime={activeStartTime}
-            seconds={question.seconds}
-            gracePeriod={snap.run.gracePeriod}
-          />
-        )}
-
         {/* Question header */}
         <div className='card bg-base-100 shadow-xl'>
           <div className='card-body'>
-            <h2 className='card-title text-3xl mb-2'>
-              Question {question.number}{' '}
-              <span className='badge badge-primary badge-lg'>{activePhase.toUpperCase()}</span>
-            </h2>
+            <h2 className='card-title text-3xl mb-2'>Question {question.number}</h2>
             <div className='flex gap-4 text-sm opacity-70'>
               <div>Type: {question.type}</div>
               <div>Points: {question.maxPoints}</div>
@@ -99,31 +87,16 @@ export function ActiveContentDisplay() {
                 <input type='checkbox' defaultChecked />
                 <div className='collapse-title text-xl font-medium'>
                   {name} ({code.toUpperCase()})
-                  {activePhase === 'prompt' && (
-                    <span className='ml-2 badge badge-info'>
-                      {answeredCount}/{teamsForLanguage.length} answered
-                    </span>
-                  )}
+                  <span className='ml-2 badge badge-info'>
+                    {answeredCount}/{teamsForLanguage.length} answered
+                  </span>
                 </div>
                 <div className='collapse-content'>
                   <div className='space-y-4 pt-2'>
-                    {activePhase === 'prompt' ? (
-                      <>
-                        <div>
-                          <h4 className='font-semibold mb-1'>Prompt:</h4>
-                          <p className='whitespace-pre-wrap'>Loading...</p>
-                        </div>
-                        <div>
-                          <h4 className='font-semibold mb-1'>Clarification:</h4>
-                          <p className='whitespace-pre-wrap text-sm opacity-70'>Loading...</p>
-                        </div>
-                      </>
-                    ) : (
-                      <div>
-                        <h4 className='font-semibold mb-1'>Answer:</h4>
-                        <p className='whitespace-pre-wrap'>Loading...</p>
-                      </div>
-                    )}
+                    <div>
+                      <h4 className='font-semibold mb-1'>Content:</h4>
+                      <p className='whitespace-pre-wrap'>Question content here...</p>
+                    </div>
                   </div>
                 </div>
               </div>

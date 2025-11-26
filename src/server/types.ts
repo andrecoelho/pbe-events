@@ -63,10 +63,6 @@ export interface Run {
   eventId: string;
   status: 'not_started' | 'in_progress' | 'paused' | 'completed';
   gracePeriod: number;
-  hasTimer: boolean;
-  activeId: string | null;
-  activePhase: 'slide' | 'prompt' | 'answer' | 'ended' | null;
-  activeStartTime: string | null;
 }
 
 export interface ActiveItemCache {
@@ -75,6 +71,7 @@ export interface ActiveItemCache {
   phase: 'slide' | 'prompt' | 'answer' | 'ended';
   seconds: number; // Only relevant for questions with timer
   startTime: string; // ISO string from database
+  hasTimer: boolean; // Whether timer is enabled for this item
 }
 
 export interface Answer {

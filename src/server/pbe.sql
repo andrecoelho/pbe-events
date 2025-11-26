@@ -93,11 +93,11 @@ CREATE TABLE runs (
   event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('not_started', 'in_progress', 'paused', 'completed')) DEFAULT 'not_started',
   grace_period INTEGER NOT NULL DEFAULT 2, -- in seconds
-  has_timer BOOLEAN NOT NULL DEFAULT true,
   active_id TEXT, -- References either questions(id) or slides(id)
   active_phase TEXT CHECK (active_phase IN ('slide', 'prompt', 'answer', 'ended')),
   active_start_time TIMESTAMPTZ,
-  CHECK ((active_id IS NULL AND active_phase IS NULL AND active_start_time IS NULL) OR (active_id IS NOT NULL AND active_phase IS NOT NULL AND active_start_time IS NOT NULL))
+  active_has_timer BOOLEAN,
+  CHECK ((active_id IS NULL AND active_phase IS NULL AND active_start_time IS NULL AND active_has_timer IS NULL) OR (active_id IS NOT NULL AND active_phase IS NOT NULL AND active_start_time IS NOT NULL AND active_has_timer IS NOT NULL))
 );
 
 CREATE TABLE slides (

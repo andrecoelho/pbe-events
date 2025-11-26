@@ -33,10 +33,6 @@ interface HostStore {
     eventId: string;
     status: 'not_started' | 'in_progress' | 'paused' | 'completed';
     gracePeriod: number;
-    hasTimer: boolean;
-    activeId: string | null;
-    activePhase: 'slide' | 'prompt' | 'answer' | 'ended' | null;
-    activeStartTime: string | null;
     activeQuestion?: {
       id: string;
       number: number;
@@ -110,10 +106,6 @@ export class HostValt {
         eventId: string;
         status: 'not_started' | 'in_progress' | 'paused' | 'completed';
         gracePeriod: number;
-        hasTimer: boolean;
-        activeId: string | null;
-        activePhase: 'slide' | 'prompt' | 'answer' | 'ended' | null;
-        activeStartTime: string | null;
         activeQuestion?: {
           id: string;
           number: number;
@@ -597,9 +589,6 @@ export class HostValt {
     if (result.status === 200) {
       if (this.store.run) {
         this.store.run.status = 'not_started';
-        this.store.run.activeId = null;
-        this.store.run.activePhase = null;
-        this.store.run.activeStartTime = null;
         this.store.run.activeQuestion = undefined;
         this.store.run.activeSlide = undefined;
       }

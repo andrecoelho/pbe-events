@@ -23,7 +23,7 @@ export function QuestionSlideNavigator() {
           <h3 className='text-lg font-bold mb-2'>Slides</h3>
           <div className='space-y-1'>
             {snap.slides.map((slide: Slide) => {
-              const isActive = snap.run?.activeId === slide.slideId && snap.run?.activePhase === 'slide';
+              const isActive = snap.run?.activeSlide?.id === slide.slideId;
               const preview = stripMarkdown(slide.content).slice(0, 50);
               const displayText = preview.length < slide.content.length ? `${preview}...` : preview;
 
@@ -45,8 +45,7 @@ export function QuestionSlideNavigator() {
           <h3 className='text-lg font-bold mb-2'>Questions</h3>
           <div className='space-y-3'>
             {snap.questions.map((question: Question) => {
-              const isActiveQuestion = snap.run?.activeId === question.questionId;
-              const activePhase = snap.run?.activePhase;
+              const isActiveQuestion = snap.run?.activeQuestion?.id === question.questionId;
 
               return (
                 <div key={question.questionId} className='space-y-1'>
@@ -55,30 +54,20 @@ export function QuestionSlideNavigator() {
                     <button
                       onClick={() => handleQuestionClick(question.questionId, 'prompt')}
                       className={`btn btn-xs w-full justify-start ${
-                        isActiveQuestion && activePhase === 'prompt'
-                          ? 'border-l-4 border-primary bg-primary/10'
-                          : 'btn-ghost'
+                        isActiveQuestion ? 'border-l-4 border-primary bg-primary/10' : 'btn-ghost'
                       }`}
                     >
                       Prompt
                     </button>
                     <button
                       onClick={() => handleQuestionClick(question.questionId, 'answer')}
-                      className={`btn btn-xs w-full justify-start ${
-                        isActiveQuestion && activePhase === 'answer'
-                          ? 'border-l-4 border-primary bg-primary/10'
-                          : 'btn-ghost'
-                      }`}
+                      className='btn btn-xs w-full justify-start btn-ghost'
                     >
                       Answer
                     </button>
                     <button
                       onClick={() => handleQuestionClick(question.questionId, 'ended')}
-                      className={`btn btn-xs w-full justify-start ${
-                        isActiveQuestion && activePhase === 'ended'
-                          ? 'border-l-4 border-primary bg-primary/10'
-                          : 'btn-ghost'
-                      }`}
+                      className='btn btn-xs w-full justify-start btn-ghost'
                     >
                       Ended
                     </button>

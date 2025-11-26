@@ -40,12 +40,12 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             event_id: string;
             status: string;
             grace_period: number;
-            has_timer: boolean;
             active_id: string | null;
             active_phase: string | null;
             active_start_time: string | null;
+            active_has_timer: boolean | null;
           }[] = await sql`
-            SELECT event_id, status, grace_period, has_timer, active_id, active_phase, active_start_time
+            SELECT event_id, status, grace_period, active_id, active_phase, active_start_time, active_has_timer
             FROM runs
             WHERE event_id = ${eventId}
           `;
@@ -111,10 +111,6 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               eventId: run.event_id,
               status: run.status,
               gracePeriod: run.grace_period,
-              hasTimer: run.has_timer,
-              activeId: run.active_id,
-              activePhase: run.active_phase,
-              activeStartTime: run.active_start_time,
               activeQuestion,
               activeSlide
             }
@@ -246,7 +242,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
                 SET status = 'not_started',
                     active_id = NULL,
                     active_phase = NULL,
-                    active_start_time = NULL
+                    active_start_time = NULL,
+                    active_has_timer = NULL
                 WHERE event_id = ${eventId}
               `;
 
@@ -469,12 +466,12 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             event_id: string;
             status: string;
             grace_period: number;
-            has_timer: boolean;
             active_id: string | null;
             active_phase: string | null;
             active_start_time: string | null;
+            active_has_timer: boolean | null;
           }[] = await sql`
-            SELECT event_id, status, grace_period, has_timer, active_id, active_phase, active_start_time
+            SELECT event_id, status, grace_period, active_id, active_phase, active_start_time, active_has_timer
             FROM runs
             WHERE event_id = ${eventId}
           `;
@@ -534,10 +531,6 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               eventId: updatedRun.event_id,
               status: updatedRun.status,
               gracePeriod: updatedRun.grace_period,
-              hasTimer: updatedRun.has_timer,
-              activeId: updatedRun.active_id,
-              activePhase: updatedRun.active_phase,
-              activeStartTime: updatedRun.active_start_time,
               activeQuestion,
               activeSlide
             }

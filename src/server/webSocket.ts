@@ -418,12 +418,12 @@ export class WebSocketServer {
       event_id: string;
       status: string;
       grace_period: number;
-      has_timer: boolean;
       active_id: string | null;
       active_phase: string | null;
       active_start_time: string | null;
+      active_has_timer: boolean | null;
     }[] = await sql`
-      SELECT event_id, status, grace_period, has_timer, active_id, active_phase, active_start_time
+      SELECT event_id, status, grace_period, active_id, active_phase, active_start_time, active_has_timer
       FROM runs
       WHERE event_id = ${eventId}
     `;
@@ -434,15 +434,11 @@ export class WebSocketServer {
       connection.run = {
         eventId: run.event_id,
         status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
-        gracePeriod: run.grace_period,
-        hasTimer: run.has_timer,
-        activeId: run.active_id,
-        activePhase: run.active_phase as 'slide' | 'prompt' | 'answer' | 'ended' | null,
-        activeStartTime: run.active_start_time
+        gracePeriod: run.grace_period
       };
 
       // Cache active item if exists
-      if (run.active_id && run.active_phase) {
+      if (run.active_id && run.active_phase && run.active_start_time && run.active_has_timer !== null) {
         const [question]: { seconds: number }[] = await sql`SELECT seconds FROM questions WHERE id = ${run.active_id}`;
 
         if (question) {
@@ -451,7 +447,8 @@ export class WebSocketServer {
             type: 'question',
             phase: run.active_phase as 'prompt' | 'answer' | 'ended',
             seconds: question.seconds,
-            startTime: run.active_start_time!
+            startTime: run.active_start_time,
+            hasTimer: run.active_has_timer
           };
         } else {
           // It's a slide
@@ -460,7 +457,8 @@ export class WebSocketServer {
             type: 'slide',
             phase: 'slide',
             seconds: 0,
-            startTime: run.active_start_time || new Date().toISOString()
+            startTime: run.active_start_time,
+            hasTimer: run.active_has_timer
           };
         }
       }
@@ -636,7 +634,7 @@ export class WebSocketServer {
     }
 
     // Validate question is in prompt phase
-    if (connection.run?.activePhase !== 'prompt') {
+    if (connection.activeItem?.phase !== 'prompt') {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -649,7 +647,7 @@ export class WebSocketServer {
     }
 
     // Validate deadline if timer enabled
-    if (connection.run!.hasTimer) {
+    if (connection.activeItem!.hasTimer) {
       const now = Date.now();
       const startTime = new Date(connection.activeItem.startTime).getTime();
       const deadline = startTime + connection.activeItem.seconds * 1000 + connection.run!.gracePeriod * 1000;
@@ -739,17 +737,11 @@ export class WebSocketServer {
         SET active_id = ${questionId},
             active_phase = 'prompt',
             active_start_time = ${activeStartTime},
-            has_timer = ${hasTimer}
+            active_has_timer = ${hasTimer}
         WHERE event_id = ${connection.eventId}
       `;
 
-      // Update connection cache
-      connection.run.activeId = questionId;
-      connection.run.activePhase = 'prompt';
-      connection.run.activeStartTime = activeStartTime;
-      connection.run.hasTimer = hasTimer;
-
-      // Get question seconds
+      // Get question seconds and update connection cache
       const [question]: { seconds: number }[] = await sql`
         SELECT seconds FROM questions WHERE id = ${questionId}
       `;
@@ -760,7 +752,8 @@ export class WebSocketServer {
           type: 'question',
           phase: 'prompt',
           seconds: question.seconds,
-          startTime: connection.run.activeStartTime
+          startTime: activeStartTime,
+          hasTimer
         };
       }
 
@@ -868,7 +861,7 @@ export class WebSocketServer {
       return;
     }
 
-    if (!connection.run.activeId || connection.activeItem?.type !== 'question') {
+    if (!connection.activeItem || connection.activeItem.type !== 'question') {
       console.error('No active question for showing answer');
       return;
     }
@@ -881,10 +874,7 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-      connection.run.activePhase = 'answer';
-      if (connection.activeItem) {
-        connection.activeItem.phase = 'answer';
-      }
+      connection.activeItem.phase = 'answer';
 
       // Get all translations with answers
       const translations: {
@@ -895,7 +885,7 @@ export class WebSocketServer {
         SELECT l.code, t.answer, t.clarification
         FROM translations t
         JOIN languages l ON l.id = t.language_id
-        WHERE t.question_id = ${connection.run.activeId}
+        WHERE t.question_id = ${connection.activeItem.id}
       `;
 
       // Broadcast to all language channels
@@ -926,7 +916,6 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-      connection.run.activePhase = 'ended';
       if (connection.activeItem) {
         connection.activeItem.phase = 'ended';
       }
@@ -963,23 +952,19 @@ export class WebSocketServer {
           UPDATE runs
           SET active_id = ${slideId},
               active_phase = 'slide',
-              active_start_time = ${activeStartTime}
+              active_start_time = ${activeStartTime},
+              active_has_timer = false
           WHERE event_id = ${connection.eventId}
         `;
 
         // Update cache
-        if (connection.run) {
-          connection.run.activeId = slideId;
-          connection.run.activePhase = 'slide';
-          connection.run.activeStartTime = activeStartTime;
-        }
-
         connection.activeItem = {
           id: slideId,
           type: 'slide',
           phase: 'slide',
           seconds: 0,
-          startTime: activeStartTime
+          startTime: activeStartTime,
+          hasTimer: false
         };
 
         await this.broadcastToAllLanguageChannels(connection.eventId, {

@@ -60,7 +60,7 @@ export const eventsRoutes: Routes = {
       try {
         await sql`INSERT INTO events (id, name) VALUES (${id}, ${name.trim()})`;
         await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${session.user_id}, ${id}, ${'owner'})`;
-        await sql`INSERT INTO runs (event_id, status, grace_period, has_timer) VALUES (${id}, 'not_started', 2, true)`;
+        await sql`INSERT INTO runs (event_id, status, grace_period) VALUES (${id}, 'not_started', 2)`;
       } catch (error) {
         console.error('Error creating event:', error);
 

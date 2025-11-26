@@ -222,18 +222,10 @@ export function Host() {
             </button>
 
             {/* Show Answer (only during prompt phase) */}
-            {snap.run.activePhase === 'prompt' && (
+            {snap.run.activeQuestion && (
               <button className='btn btn-primary btn-sm' onClick={() => valt.showAnswer()}>
                 <Icon name='check' className='size-4' />
                 Show Answer
-              </button>
-            )}
-
-            {/* End Question (only during answer phase) */}
-            {snap.run.activePhase === 'answer' && (
-              <button className='btn btn-info btn-sm' onClick={() => valt.endQuestion()}>
-                <Icon name='check' className='size-4' />
-                End Question
               </button>
             )}
 
