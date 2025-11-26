@@ -291,7 +291,7 @@ export class WebSocketServer {
     try {
       if (role === 'host') {
         connection.host = null;
-        await this.handlePAUSE(connection);
+        await this.handlePAUSE_RUN(connection);
         console.log(`Host disconnected from event ${eventId}`);
       } else {
         const { teamId, languageCode } = ws.data;
@@ -360,19 +360,31 @@ export class WebSocketServer {
       if (role === 'host') {
         const msg = JSON.parse(message as string) as
           | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
-          | { type: 'PAUSE' }
-          | { type: 'SHOW_SLIDE'; slideNumber: number }
+          | { type: 'PAUSE_RUN' }
+          | { type: 'RESUME_RUN' }
+          | { type: 'SHOW_ANSWER' }
+          | { type: 'END_QUESTION' }
+          | { type: 'SHOW_SLIDE'; slideId: string }
           | { type: 'COMPLETE_RUN' };
 
         switch (msg.type) {
           case 'START_QUESTION':
             await this.handleSTART_QUESTION(connection, msg.questionId, msg.hasTimer);
             break;
-          case 'PAUSE':
-            await this.handlePAUSE(connection);
+          case 'PAUSE_RUN':
+            await this.handlePAUSE_RUN(connection);
+            break;
+          case 'RESUME_RUN':
+            await this.handleRESUME_RUN(connection);
+            break;
+          case 'SHOW_ANSWER':
+            await this.handleSHOW_ANSWER(connection);
+            break;
+          case 'END_QUESTION':
+            await this.handleEND_QUESTION(connection);
             break;
           case 'SHOW_SLIDE':
-            await this.handleSHOW_SLIDE(connection, msg.slideNumber);
+            await this.handleSHOW_SLIDE(connection, msg.slideId);
             break;
           case 'COMPLETE_RUN':
             await this.handleCOMPLETE_RUN(connection);
@@ -408,10 +420,10 @@ export class WebSocketServer {
       grace_period: number;
       has_timer: boolean;
       active_id: string | null;
-      active_type: string | null;
+      active_phase: string | null;
       active_start_time: string | null;
     }[] = await sql`
-      SELECT event_id, status, grace_period, has_timer, active_id, active_type, active_start_time
+      SELECT event_id, status, grace_period, has_timer, active_id, active_phase, active_start_time
       FROM runs
       WHERE event_id = ${eventId}
     `;
@@ -421,35 +433,36 @@ export class WebSocketServer {
 
       connection.run = {
         eventId: run.event_id,
-        status: run.status as 'not_started' | 'in_progress' | 'completed',
+        status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
         gracePeriod: run.grace_period,
         hasTimer: run.has_timer,
         activeId: run.active_id,
-        activeType: run.active_type as 'question' | 'slide' | null,
+        activePhase: run.active_phase as 'slide' | 'prompt' | 'answer' | 'ended' | null,
         activeStartTime: run.active_start_time
       };
 
       // Cache active item if exists
-      if (run.active_id && run.active_type === 'question') {
-        const [question]: { seconds: number }[] = await sql`
-          SELECT seconds FROM questions WHERE id = ${run.active_id}
-        `;
+      if (run.active_id && run.active_phase) {
+        const [question]: { seconds: number }[] = await sql`SELECT seconds FROM questions WHERE id = ${run.active_id}`;
 
         if (question) {
           connection.activeItem = {
             id: run.active_id,
             type: 'question',
+            phase: run.active_phase as 'prompt' | 'answer' | 'ended',
             seconds: question.seconds,
             startTime: run.active_start_time!
           };
+        } else {
+          // It's a slide
+          connection.activeItem = {
+            id: run.active_id,
+            type: 'slide',
+            phase: 'slide',
+            seconds: 0,
+            startTime: run.active_start_time || new Date().toISOString()
+          };
         }
-      } else if (run.active_id && run.active_type === 'slide') {
-        connection.activeItem = {
-          id: run.active_id,
-          type: 'slide',
-          seconds: 0, // Not relevant for slides
-          startTime: run.active_start_time || new Date().toISOString()
-        };
       }
     }
   }
@@ -622,6 +635,19 @@ export class WebSocketServer {
       return;
     }
 
+    // Validate question is in prompt phase
+    if (connection.run?.activePhase !== 'prompt') {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'INVALID_PHASE',
+          message: 'Question is not open for answers'
+        })
+      );
+
+      return;
+    }
+
     // Validate deadline if timer enabled
     if (connection.run!.hasTimer) {
       const now = Date.now();
@@ -711,7 +737,7 @@ export class WebSocketServer {
       await sql`
         UPDATE runs
         SET active_id = ${questionId},
-            active_type = 'question',
+            active_phase = 'prompt',
             active_start_time = ${activeStartTime},
             has_timer = ${hasTimer}
         WHERE event_id = ${connection.eventId}
@@ -719,7 +745,7 @@ export class WebSocketServer {
 
       // Update connection cache
       connection.run.activeId = questionId;
-      connection.run.activeType = 'question';
+      connection.run.activePhase = 'prompt';
       connection.run.activeStartTime = activeStartTime;
       connection.run.hasTimer = hasTimer;
 
@@ -732,6 +758,7 @@ export class WebSocketServer {
         connection.activeItem = {
           id: questionId,
           type: 'question',
+          phase: 'prompt',
           seconds: question.seconds,
           startTime: connection.run.activeStartTime
         };
@@ -785,35 +812,135 @@ export class WebSocketServer {
     }
   }
 
-  private async handlePAUSE(connection: EventConnection): Promise<void> {
+  private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
     if (!connection.run) {
       console.error('No run found for connection');
       return;
     }
 
     try {
-      // Update run
+      // Update run status to paused
       await sql`
         UPDATE runs
-        SET active_id = NULL, active_type = NULL, active_start_time = NULL
+        SET status = 'paused'
         WHERE event_id = ${connection.eventId}
       `;
 
-      connection.run.activeId = null;
-      connection.run.activeType = null;
-      connection.run.activeStartTime = null;
-      connection.activeItem = null;
+      connection.run.status = 'paused';
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
+        type: 'RUN_PAUSED'
+      });
+    } catch (error) {
+      console.error('Error handling PAUSE_RUN:', error);
+    }
+  }
+
+  private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
+
+    try {
+      // Update run status to in_progress
+      await sql`
+        UPDATE runs
+        SET status = 'in_progress'
+        WHERE event_id = ${connection.eventId}
+      `;
+
+      connection.run.status = 'in_progress';
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
+        type: 'RUN_RESUMED'
+      });
+    } catch (error) {
+      console.error('Error handling RESUME_RUN:', error);
+    }
+  }
+
+  private async handleSHOW_ANSWER(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
+
+    if (!connection.run.activeId || connection.activeItem?.type !== 'question') {
+      console.error('No active question for showing answer');
+      return;
+    }
+
+    try {
+      // Update run to answer phase
+      await sql`
+        UPDATE runs
+        SET active_phase = 'answer'
+        WHERE event_id = ${connection.eventId}
+      `;
+
+      connection.run.activePhase = 'answer';
+      if (connection.activeItem) {
+        connection.activeItem.phase = 'answer';
+      }
+
+      // Get all translations with answers
+      const translations: {
+        code: string;
+        answer: string;
+        clarification: string | null;
+      }[] = await sql`
+        SELECT l.code, t.answer, t.clarification
+        FROM translations t
+        JOIN languages l ON l.id = t.language_id
+        WHERE t.question_id = ${connection.run.activeId}
+      `;
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
+        type: 'ANSWER_SHOWN',
+        translations: translations.map((t) => ({
+          languageCode: t.code,
+          answer: t.answer,
+          clarification: t.clarification
+        }))
+      });
+    } catch (error) {
+      console.error('Error handling SHOW_ANSWER:', error);
+    }
+  }
+
+  private async handleEND_QUESTION(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      console.error('No run found for connection');
+      return;
+    }
+
+    try {
+      // Update run to ended phase
+      await sql`
+        UPDATE runs
+        SET active_phase = 'ended'
+        WHERE event_id = ${connection.eventId}
+      `;
+
+      connection.run.activePhase = 'ended';
+      if (connection.activeItem) {
+        connection.activeItem.phase = 'ended';
+      }
 
       // Broadcast to all language channels
       await this.broadcastToAllLanguageChannels(connection.eventId, {
         type: 'QUESTION_ENDED'
       });
     } catch (error) {
-      console.error('Error handling PAUSE:', error);
+      console.error('Error handling END_QUESTION:', error);
     }
   }
 
-  private async handleSHOW_SLIDE(connection: EventConnection, slideNumber: number): Promise<void> {
+  private async handleSHOW_SLIDE(connection: EventConnection, slideId: string): Promise<void> {
     try {
       const slides: {
         id: string;
@@ -824,11 +951,36 @@ export class WebSocketServer {
       }[] = await sql`
         SELECT id, event_id, number, content, created_at
         FROM slides
-        WHERE event_id = ${connection.eventId} AND number = ${slideNumber}
+        WHERE id = ${slideId} AND event_id = ${connection.eventId}
       `;
 
       if (slides.length > 0) {
         const slide = slides[0]!;
+        const activeStartTime = new Date().toISOString();
+
+        // Update run with slide
+        await sql`
+          UPDATE runs
+          SET active_id = ${slideId},
+              active_phase = 'slide',
+              active_start_time = ${activeStartTime}
+          WHERE event_id = ${connection.eventId}
+        `;
+
+        // Update cache
+        if (connection.run) {
+          connection.run.activeId = slideId;
+          connection.run.activePhase = 'slide';
+          connection.run.activeStartTime = activeStartTime;
+        }
+
+        connection.activeItem = {
+          id: slideId,
+          type: 'slide',
+          phase: 'slide',
+          seconds: 0,
+          startTime: activeStartTime
+        };
 
         await this.broadcastToAllLanguageChannels(connection.eventId, {
           type: 'SLIDE_SHOWN',

@@ -61,17 +61,18 @@ export interface QuestionInfo {
 
 export interface Run {
   eventId: string;
-  status: 'not_started' | 'in_progress' | 'completed';
+  status: 'not_started' | 'in_progress' | 'paused' | 'completed';
   gracePeriod: number;
   hasTimer: boolean;
   activeId: string | null;
-  activeType: 'question' | 'slide' | null;
+  activePhase: 'slide' | 'prompt' | 'answer' | 'ended' | null;
   activeStartTime: string | null;
 }
 
 export interface ActiveItemCache {
   id: string;
-  type: 'question' | 'slide';
+  type: 'question' | 'slide'; // Type of the active item
+  phase: 'slide' | 'prompt' | 'answer' | 'ended';
   seconds: number; // Only relevant for questions with timer
   startTime: string; // ISO string from database
 }
@@ -126,15 +127,18 @@ export type ErrorCode =
   | 'DEADLINE_EXCEEDED'
   | 'TRANSLATION_NOT_FOUND'
   | 'SLIDE_NOT_FOUND'
-  | 'INVALID_ROLE';
+  | 'INVALID_ROLE'
+  | 'INVALID_PHASE';
 
 export type HostMessage =
   | { type: 'START_RUN' }
   | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
-  | { type: 'PAUSE' }
+  | { type: 'PAUSE_RUN' }
+  | { type: 'RESUME_RUN' }
+  | { type: 'SHOW_ANSWER' }
   | { type: 'END_QUESTION' }
   | { type: 'COMPLETE_RUN' }
-  | { type: 'SHOW_SLIDE'; slideNumber: number };
+  | { type: 'SHOW_SLIDE'; slideId: string };
 
 export type TeamMessage =
   | { type: 'SELECT_LANGUAGE'; languageId: string }
@@ -158,6 +162,12 @@ export type ServerMessage =
       gracePeriod: number;
     }
   | { type: 'QUESTION_ENDED' }
+  | { type: 'RUN_PAUSED' }
+  | { type: 'RUN_RESUMED' }
+  | {
+      type: 'ANSWER_SHOWN';
+      translations: Array<{ languageCode: string; answer: string; clarification: string | null }>;
+    }
   | { type: 'SLIDE_SHOWN'; slide: Slide }
   | {
       type: 'TEAM_CONNECTED';

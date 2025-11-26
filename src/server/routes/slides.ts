@@ -12,8 +12,8 @@ import {
 } from '@/server/utils/responses';
 
 export const slidesRoutes: Routes = {
-  '/api/slides/:eventId': {
-    GET: async (req: BunRequest<'/api/slides/:eventId'>) => {
+  '/api/events/:eventId/slides': {
+    GET: async (req: BunRequest<'/api/events/:eventId/slides'>) => {
       const session = await getSession(req);
       if (!session) return apiUnauthorized();
 
@@ -53,7 +53,7 @@ export const slidesRoutes: Routes = {
       }
     },
 
-    POST: async (req: BunRequest<'/api/slides/:eventId'>) => {
+    POST: async (req: BunRequest<'/api/events/:eventId/slides'>) => {
       const session = await getSession(req);
       if (!session) return apiUnauthorized();
 
