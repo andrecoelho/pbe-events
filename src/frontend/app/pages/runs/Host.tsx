@@ -140,8 +140,6 @@ export function Host() {
               {snap.run.status.replace('_', ' ').toUpperCase()}
             </span>
 
-            {snap.run.status === 'paused' && <span className='badge badge-error badge-lg'>⏸ PAUSED</span>}
-
             {/* WebSocket connection status */}
             {snap.connectionState === 'connected' && (
               <span className='badge badge-success badge-sm'>🟢 Connected</span>

@@ -293,6 +293,7 @@ export class WebSocketServer {
         connection.host = null;
         await this.handlePAUSE_RUN(connection);
         console.log(`Host disconnected from event ${eventId}`);
+        ws.send(JSON.stringify({ type: 'HOST_DISCONNECTED' }));
       } else {
         const { teamId, languageCode } = ws.data;
 

@@ -235,18 +235,18 @@ export class HostValt {
         this.ws = ws;
         this.store.connectionState = 'connected';
         this.store.reconnectAttempts = 0;
-        toast.show({ message: 'Connected', type: 'success' });
       };
 
       ws.onclose = () => {
         this.ws = null;
         this.store.connectionState = 'closed';
+      };
 
+      ws.onerror = () => {
         // Attempt reconnection with exponential backoff
         if (this.store.reconnectAttempts < this.store.maxReconnectAttempts) {
           const delay = Math.pow(2, this.store.reconnectAttempts) * 1000;
 
-          toast.show({ message: `Reconnecting in ${delay / 1000}s...`, type: 'info' });
           this.store.reconnectAttempts++;
 
           this.reconnectTimeout = setTimeout(() => {
@@ -254,15 +254,14 @@ export class HostValt {
           }, delay);
         } else {
           this.store.connectionState = 'error';
+
           toast.show({
             message: 'Connection lost. Click Reconnect to try again.',
             type: 'error',
             persist: true
           });
         }
-      };
 
-      ws.onerror = () => {
         this.store.connectionState = 'error';
       };
 
@@ -318,6 +317,7 @@ export class HostValt {
             if (existingTeam) {
               existingTeam.status =
                 team.status === 'TEAM_OFFLINE' ? 'offline' : team.status === 'TEAM_CONNECTED' ? 'connected' : 'ready';
+
               existingTeam.languageCode = team.languageCode;
             }
           });
@@ -376,26 +376,23 @@ export class HostValt {
           if (this.store.run) {
             this.store.run.status = 'paused';
           }
-          toast.show({ message: 'Run paused', type: 'info' });
+
           break;
 
         case 'RUN_RESUMED':
           if (this.store.run) {
             this.store.run.status = 'in_progress';
           }
-          toast.show({ message: 'Run resumed', type: 'success' });
+
           break;
 
         case 'ANSWER_SHOWN':
-          toast.show({ message: 'Answer shown to teams', type: 'success' });
           break;
 
         case 'QUESTION_ENDED':
-          toast.show({ message: 'Question ended', type: 'info' });
           break;
 
         case 'ERROR':
-          toast.show({ message: `Error: ${message.message}`, type: 'error' });
           break;
       }
     } catch (error) {
