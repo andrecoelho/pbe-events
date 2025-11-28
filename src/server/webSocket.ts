@@ -46,6 +46,23 @@ export class WebSocketServer {
     return this.eventConnections.get(eventId);
   }
 
+  completeRun(eventId: string): void {
+    const connection = this.eventConnections.get(eventId);
+
+    if (!connection) {
+      return;
+    }
+
+    // Remove the cached connection first so handleClose ignores the teardown closes
+    this.eventConnections.delete(eventId);
+
+    connection.host?.close();
+
+    for (const ws of connection.teams.values()) {
+      ws.close();
+    }
+  }
+
   createHandlers() {
     return {
       data: {} as WebsocketData,
@@ -137,7 +154,6 @@ export class WebSocketServer {
 
       return textServerError('WebSocket upgrade failed');
     } catch (error) {
-      console.error('Error during WebSocket upgrade:', error);
       return textServerError('WebSocket upgrade failed');
     }
   }
@@ -161,7 +177,6 @@ export class WebSocketServer {
 
       if (this.isHostWebSocket(ws)) {
         connection.host = ws;
-        console.log(`Host connected to event ${eventId}`);
 
         // Get all teams for this event
         const allTeams: { id: string; name: string; number: number }[] =
@@ -265,11 +280,8 @@ export class WebSocketServer {
             await this.sendExistingAnswerToTeam(ws, connection);
           }
         }
-
-        console.log(`Team ${teamId} connected to event ${eventId}`);
       }
     } catch (error) {
-      console.error('Error in WebSocket open handler:', error);
       ws.close();
     }
   };
@@ -291,8 +303,6 @@ export class WebSocketServer {
     try {
       if (role === 'host') {
         connection.host = null;
-        await this.handlePAUSE_RUN(connection);
-        console.log(`Host disconnected from event ${eventId}`);
         ws.send(JSON.stringify({ type: 'HOST_DISCONNECTED' }));
       } else {
         const { teamId, languageCode } = ws.data;
@@ -311,17 +321,13 @@ export class WebSocketServer {
         });
 
         connection.host?.send(message);
-        console.log(`Team ${teamId} disconnected from event ${eventId}`);
       }
 
       // Clean up empty connections
       if (!connection.host && connection.teams.size === 0) {
         this.eventConnections.delete(eventId);
-        console.log(`Event connection ${eventId} cleaned up`);
       }
-    } catch (error) {
-      console.error('Error in WebSocket close handler:', error);
-    }
+    } catch (error) {}
   };
 
   // Called when a WebSocket message is received
@@ -393,8 +399,6 @@ export class WebSocketServer {
         }
       }
     } catch (error) {
-      console.error('Error handling WebSocket message:', error);
-
       const errorMsg = JSON.stringify({
         type: 'ERROR',
         code: 'INVALID_ROLE',
@@ -502,12 +506,10 @@ export class WebSocketServer {
           })
         );
       }
-    } catch (error) {
-      console.error('Error sending existing answer:', error);
-    }
+    } catch {}
   }
 
-  private async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
+  async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
     try {
       const languages: { code: string }[] = await sql`
         SELECT DISTINCT code FROM languages WHERE event_id = ${eventId}
@@ -517,9 +519,7 @@ export class WebSocketServer {
       languages.forEach((lang) => {
         this.server.publish(`${eventId}:${lang.code}`, messageStr);
       });
-    } catch (error) {
-      console.error('Error broadcasting to language channels:', error);
-    }
+    } catch {}
   }
 
   private async handleSELECT_LANGUAGE(
@@ -584,9 +584,7 @@ export class WebSocketServer {
           await this.sendExistingAnswerToTeam(ws, connection);
         }
       }
-    } catch (error) {
-      console.error('Error handling SELECT_LANGUAGE:', error);
-
+    } catch {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -705,9 +703,7 @@ export class WebSocketServer {
       });
 
       connection.host?.send(message);
-    } catch (error) {
-      console.error('Error handling SUBMIT_ANSWER:', error);
-
+    } catch {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -724,7 +720,6 @@ export class WebSocketServer {
     hasTimer: boolean
   ): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
@@ -801,69 +796,41 @@ export class WebSocketServer {
       for (const teamWs of connection.teams.values()) {
         await this.sendExistingAnswerToTeam(teamWs, connection);
       }
-    } catch (error) {
-      console.error('Error handling START_QUESTION:', error);
-    }
+    } catch {}
   }
 
   private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
     try {
-      // Update run status to paused
-      await sql`
-        UPDATE runs
-        SET status = 'paused'
-        WHERE event_id = ${connection.eventId}
-      `;
-
       connection.run.status = 'paused';
 
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'RUN_PAUSED'
-      });
-    } catch (error) {
-      console.error('Error handling PAUSE_RUN:', error);
-    }
+      await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
+    } catch {}
   }
 
   private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
     try {
-      // Update run status to in_progress
-      await sql`
-        UPDATE runs
-        SET status = 'in_progress'
-        WHERE event_id = ${connection.eventId}
-      `;
-
       connection.run.status = 'in_progress';
 
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'RUN_RESUMED'
-      });
-    } catch (error) {
-      console.error('Error handling RESUME_RUN:', error);
-    }
+      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
+    } catch {}
   }
 
   private async handleSHOW_ANSWER(connection: EventConnection): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
     if (!connection.activeItem || connection.activeItem.type !== 'question') {
-      console.error('No active question for showing answer');
       return;
     }
 
@@ -898,14 +865,11 @@ export class WebSocketServer {
           clarification: t.clarification
         }))
       });
-    } catch (error) {
-      console.error('Error handling SHOW_ANSWER:', error);
-    }
+    } catch {}
   }
 
   private async handleEND_QUESTION(connection: EventConnection): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
@@ -925,9 +889,7 @@ export class WebSocketServer {
       await this.broadcastToAllLanguageChannels(connection.eventId, {
         type: 'QUESTION_ENDED'
       });
-    } catch (error) {
-      console.error('Error handling END_QUESTION:', error);
-    }
+    } catch {}
   }
 
   private async handleSHOW_SLIDE(connection: EventConnection, slideId: string): Promise<void> {
@@ -980,14 +942,11 @@ export class WebSocketServer {
         });
       }
       // Silently ignore if slide not found (don't send error to teams)
-    } catch (error) {
-      console.error('Error handling SHOW_SLIDE:', error);
-    }
+    } catch {}
   }
 
   private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
     if (!connection.run) {
-      console.error('No run found for connection');
       return;
     }
 
@@ -1028,8 +987,6 @@ export class WebSocketServer {
       }
 
       connection.host?.close();
-    } catch (error) {
-      console.error('Error handling COMPLETE_RUN:', error);
-    }
+    } catch (error) {}
   }
 }

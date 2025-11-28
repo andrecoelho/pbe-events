@@ -34,6 +34,10 @@ const init = () => {
     }
   };
 
+  const handleResumeRun = async () => {
+    await valt.resumeRun();
+  };
+
   const handleCompleteEvent = async () => {
     const result = await valt.completeRun();
 
@@ -50,11 +54,14 @@ const init = () => {
     }
   };
 
-  return { valt, handleStartEvent, handlePauseEvent, handleCompleteEvent, handleResetEvent };
+  return { valt, handleStartEvent, handlePauseEvent, handleResumeRun, handleCompleteEvent, handleResetEvent };
 };
 
 export const Run = () => {
-  const { valt, handleStartEvent, handlePauseEvent, handleCompleteEvent, handleResetEvent } = useMemo(() => init(), []);
+  const { valt, handleStartEvent, handlePauseEvent, handleResumeRun, handleCompleteEvent, handleResetEvent } = useMemo(
+    () => init(),
+    []
+  );
   const snap = useSnapshot(valt.store);
 
   return (
@@ -72,7 +79,7 @@ export const Run = () => {
             </button>
           )}
           {snap.run.status === 'paused' && (
-            <button className='btn btn-success' onClick={handleStartEvent}>
+            <button className='btn btn-success' onClick={handleResumeRun}>
               <Icon name='play' className='size-4' />
               Resume
             </button>
@@ -83,7 +90,7 @@ export const Run = () => {
               Pause
             </button>
           )}
-          {snap.run.status === 'in_progress' && (
+          {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
             <button className='btn btn-error' onClick={handleCompleteEvent}>
               <Icon name='stop' className='size-4' />
               Complete

@@ -48,7 +48,6 @@ interface RunStore {
   eventName: string;
   run: Run;
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
-  reconnectAttempts: number;
   questions: Question[];
   slides: Slide[];
   languages: Map<string, string>;
@@ -57,6 +56,9 @@ interface RunStore {
 
 export class RunValt {
   store: RunStore;
+  private ws: WebSocket | null = null;
+  private reconnectAttempts: number = 0;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.store = proxy({
@@ -90,8 +92,61 @@ export class RunValt {
     this.store.run = response.run;
     this.store.initialized = true;
 
+    if (this.store.run?.status === 'in_progress' || this.store.run?.status === 'paused') {
+      return await this.connectWebSocket();
+    }
+
     return { ok: true } as const;
   }
+
+  connectWebSocket = () => {
+    const { promise, resolve, reject } = Promise.withResolvers<{ ok: true } | { ok: false; error: string }>();
+
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      resolve({ ok: true } as const);
+      return promise;
+    }
+
+    this.store.connectionState = 'connecting';
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/event-run/ws?role=host&eventId=${this.store.eventId}&teamId=host`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        this.ws = ws;
+        this.store.connectionState = 'connected';
+        this.reconnectAttempts = 0;
+
+        resolve({ ok: true } as const);
+      };
+
+      ws.onclose = () => {
+        this.store.connectionState = 'closed';
+        this.ws = null;
+      };
+
+      ws.onerror = () => {
+        if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.pow(2, this.reconnectAttempts) * 1000;
+
+          this.reconnectAttempts++;
+
+          this.reconnectTimeout = setTimeout(this.connectWebSocket, delay);
+        } else {
+          this.store.connectionState = 'error';
+          reject({ ok: false, error: 'WebSocket connection failed' } as const);
+        }
+      };
+    } catch (error) {
+      this.store.connectionState = 'error';
+      reject({ ok: false, error: 'WebSocket connection failed' } as const);
+    }
+
+    return promise;
+  };
 
   async startRun() {
     const result = await fetch(`/api/events/${this.store.eventId}/run`, {
@@ -102,13 +157,13 @@ export class RunValt {
       }
     });
 
-    if (result.status === 200) {
-      this.store.run.status = 'in_progress';
-
-      return { ok: true } as const;
+    if (result.status !== 200) {
+      return { ok: false, error: 'Failed to start run' } as const;
     }
 
-    return { ok: false, error: 'Failed to start run' } as const;
+    this.store.run.status = 'in_progress';
+
+    return await this.connectWebSocket();
   }
 
   async pauseRun() {
@@ -127,6 +182,12 @@ export class RunValt {
     }
 
     return { ok: false, error: 'Failed to pause run' } as const;
+  }
+
+  async resumeRun() {
+    this.ws?.send(JSON.stringify({ type: 'RESUME_RUN' }));
+    this.store.run.status = 'in_progress';
+    return { ok: true } as const;
   }
 
   async completeRun() {

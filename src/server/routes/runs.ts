@@ -145,8 +145,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           // Handle different actions
           switch (action) {
             case 'start':
-              if (run.status !== 'not_started' && run.status !== 'paused') {
-                return apiBadRequest('Run has already been started or it is not paused');
+              if (run.status !== 'not_started') {
+                return apiBadRequest('Run has already been started');
               }
 
               await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${eventId}`;
@@ -160,6 +160,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
               await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${eventId}`;
 
+              wsServer.broadcastToAllLanguageChannels(eventId, { type: 'RUN_PAUSED' });
+
               return apiData();
 
             case 'complete':
@@ -169,21 +171,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
               await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${eventId}`;
 
-              // Send RUN_COMPLETED message to all teams before closing connections
-              if (wsServer.hasConnection(eventId)) {
-                const connection = wsServer.getConnection(eventId);
-
-                if (connection) {
-                  const message = JSON.stringify({
-                    type: 'RUN_COMPLETED'
-                  });
-
-                  for (const teamWs of connection.teams.values()) {
-                    teamWs.send(message);
-                    teamWs.close();
-                  }
-                }
-              }
+              wsServer.broadcastToAllLanguageChannels(eventId, { type: 'RUN_COMPLETED' });
+              wsServer.completeRun(eventId);
 
               return apiData();
 
@@ -194,22 +183,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
               await sql`UPDATE runs SET grace_period = ${gracePeriod} WHERE event_id = ${eventId}`;
 
-              // Update cache and broadcast to host if connection exists
-              if (wsServer.hasConnection(eventId)) {
-                const connection = wsServer.getConnection(eventId);
-
-                if (connection && connection.run) {
-                  connection.run.gracePeriod = gracePeriod;
-                }
-
-                // Send to host only
-                const message = JSON.stringify({
-                  type: 'GRACE_PERIOD_UPDATED',
-                  gracePeriod
-                });
-
-                connection?.host?.send(message);
-              }
+              wsServer.broadcastToAllLanguageChannels(eventId, { type: 'GRACE_PERIOD_UPDATED', gracePeriod });
 
               return apiData();
 
@@ -219,12 +193,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               }
 
               // Delete all answers for this event
-              await sql`
-                DELETE FROM answers
-                WHERE team_id IN (
-                  SELECT id FROM teams WHERE event_id = ${eventId}
-                )
-              `;
+              await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${eventId})`;
 
               // Reset the run
               await sql`
@@ -243,7 +212,6 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               return apiBadRequest('Invalid action');
           }
         } catch (error) {
-          console.error('Error updating run:', error);
           return apiServerError();
         }
       }
@@ -531,7 +499,6 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             }
           });
         } catch (error) {
-          console.error('Error navigating run:', error);
           return apiServerError();
         }
       }
