@@ -1,8 +1,6 @@
-import { sql } from 'bun';
-import type { Routes } from '@/server/types';
+import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
-import type { BunRequest } from 'bun';
-import type { WebSocketServer } from '@/server/webSocket';
+import type { Routes } from '@/server/types';
 import {
   apiBadRequest,
   apiData,
@@ -11,6 +9,9 @@ import {
   apiServerError,
   apiUnauthorized
 } from '@/server/utils/responses';
+import type { WebSocketServer } from '@/server/webSocket';
+import type { BunRequest } from 'bun';
+import { sql } from 'bun';
 
 export function createRunsRoutes(wsServer: WebSocketServer): Routes {
   return {
@@ -24,20 +25,15 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
         const { eventId } = req.params;
 
+        const event = await querySelectEvent(eventId, session.user_id);
+
+        if (!event) {
+          return apiForbidden();
+        }
+
         try {
-          // Check permissions
-          const permissions: { role_id: string }[] = await sql`
-            SELECT role_id FROM permissions
-            WHERE user_id = ${session.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin', 'judge')
-          `;
-
-          if (permissions.length === 0) {
-            return apiForbidden();
-          }
-
           // Get run
           const runs: {
-            event_id: string;
             status: string;
             grace_period: number;
             active_id: string | null;
@@ -45,7 +41,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             active_start_time: string | null;
             active_has_timer: boolean | null;
           }[] = await sql`
-            SELECT event_id, status, grace_period, active_id, active_phase, active_start_time, active_has_timer
+            SELECT status, grace_period, active_id, active_phase, active_start_time, active_has_timer
             FROM runs
             WHERE event_id = ${eventId}
           `;
@@ -60,18 +56,17 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           let activeQuestion = null;
           let activeSlide = null;
 
-          if (run.active_id && (run.active_phase === 'prompt' || run.active_phase === 'answer' || run.active_phase === 'ended')) {
+          if (
+            run.active_id &&
+            (run.active_phase === 'prompt' || run.active_phase === 'answer' || run.active_phase === 'ended')
+          ) {
             const questions: {
               id: string;
               number: number;
               type: string;
               max_points: number;
               seconds: number;
-            }[] = await sql`
-              SELECT id, number, type, max_points, seconds
-              FROM questions
-              WHERE id = ${run.active_id}
-            `;
+            }[] = await sql`SELECT id, number, type, max_points, seconds FROM questions WHERE id = ${run.active_id}`;
 
             if (questions.length > 0) {
               const q = questions[0]!;
@@ -89,11 +84,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               id: string;
               number: number;
               content: string;
-            }[] = await sql`
-              SELECT id, number, content
-              FROM slides
-              WHERE id = ${run.active_id}
-            `;
+            }[] = await sql`SELECT id, number, content FROM slides WHERE id = ${run.active_id}`;
 
             if (slides.length > 0) {
               const s = slides[0]!;
@@ -107,16 +98,10 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           }
 
           return apiData({
-            run: {
-              eventId: run.event_id,
-              status: run.status,
-              gracePeriod: run.grace_period,
-              activeQuestion,
-              activeSlide
-            }
+            eventName: event.name,
+            run: { status: run.status, gracePeriod: run.grace_period, activeQuestion, activeSlide }
           });
         } catch (error) {
-          console.error('Error fetching run:', error);
           return apiServerError();
         }
       },
@@ -134,8 +119,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           const body = await req.json();
           const { action, gracePeriod } = body;
 
-          if (!action || !['start', 'complete', 'updateGracePeriod', 'reset'].includes(action)) {
-            return apiBadRequest('Invalid action. Must be one of: start, complete, updateGracePeriod, reset');
+          if (!action || !['start', 'pause', 'complete', 'updateGracePeriod', 'reset'].includes(action)) {
+            return apiBadRequest('Invalid action. Must be one of: start, pause, complete, updateGracePeriod, reset');
           }
 
           // Get run and check permissions
@@ -160,15 +145,20 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           // Handle different actions
           switch (action) {
             case 'start':
-              if (run.status !== 'not_started') {
-                return apiBadRequest('Run has already been started');
+              if (run.status !== 'not_started' && run.status !== 'paused') {
+                return apiBadRequest('Run has already been started or it is not paused');
               }
 
-              await sql`
-                UPDATE runs
-                SET status = 'in_progress'
-                WHERE event_id = ${eventId}
-              `;
+              await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${eventId}`;
+
+              return apiData();
+
+            case 'pause':
+              if (run.status !== 'in_progress') {
+                return apiBadRequest('Run is not in progress');
+              }
+
+              await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${eventId}`;
 
               return apiData();
 
@@ -480,7 +470,12 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           let activeQuestion = null;
           let activeSlide = null;
 
-          if (updatedRun.active_id && (updatedRun.active_phase === 'prompt' || updatedRun.active_phase === 'answer' || updatedRun.active_phase === 'ended')) {
+          if (
+            updatedRun.active_id &&
+            (updatedRun.active_phase === 'prompt' ||
+              updatedRun.active_phase === 'answer' ||
+              updatedRun.active_phase === 'ended')
+          ) {
             const questions: {
               id: string;
               number: number;
