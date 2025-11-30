@@ -19,19 +19,11 @@ const init = () => {
   }
 
   const handleStartEvent = async () => {
-    const result = await valt.startRun();
-
-    if (!result.ok) {
-      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
-    }
+    await valt.startRun();
   };
 
   const handlePauseEvent = async () => {
-    const result = await valt.pauseRun();
-
-    if (!result.ok) {
-      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
-    }
+    await valt.pauseRun();
   };
 
   const handleResumeRun = async () => {
@@ -39,19 +31,11 @@ const init = () => {
   };
 
   const handleCompleteEvent = async () => {
-    const result = await valt.completeRun();
-
-    if (!result.ok) {
-      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
-    }
+    await valt.completeRun();
   };
 
   const handleResetEvent = async () => {
-    const result = await valt.resetRun();
-
-    if (!result.ok) {
-      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
-    }
+    await valt.resetRun();
   };
 
   return { valt, handleStartEvent, handlePauseEvent, handleResumeRun, handleCompleteEvent, handleResetEvent };
@@ -66,9 +50,11 @@ export const Run = () => {
 
   return (
     <div className='bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
-      <div className='flex-1 overflow-auto p-8'>
+      <div className='flex-1 overflow-auto p-8 place-items-center'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Run</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
+        <div className='card shadow-md w-180 h-135 bg-blue-400'></div>
+        <div className='card shadow-md bg-green-200 mt-4 w-180 h-12'></div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between shadow-md-top'>
         <div className='flex gap-2'>

@@ -160,7 +160,7 @@ export class WebSocketServer {
 
   // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
-    const { eventId, role } = ws.data;
+    const { eventId } = ws.data;
 
     if (!eventId) {
       ws.close();
@@ -366,23 +366,34 @@ export class WebSocketServer {
       // Handle host messages
       if (role === 'host') {
         const msg = JSON.parse(message as string) as
-          | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
+          | { type: 'START_RUN' }
           | { type: 'PAUSE_RUN' }
           | { type: 'RESUME_RUN' }
+          | { type: 'COMPLETE_RUN' }
+          | { type: 'RESET_RUN' }
+          | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
           | { type: 'SHOW_ANSWER' }
           | { type: 'END_QUESTION' }
-          | { type: 'SHOW_SLIDE'; slideId: string }
-          | { type: 'COMPLETE_RUN' };
+          | { type: 'SHOW_SLIDE'; slideId: string };
 
         switch (msg.type) {
-          case 'START_QUESTION':
-            await this.handleSTART_QUESTION(connection, msg.questionId, msg.hasTimer);
+          case 'START_RUN':
+            await this.handleSTART_RUN(connection);
             break;
           case 'PAUSE_RUN':
             await this.handlePAUSE_RUN(connection);
             break;
           case 'RESUME_RUN':
             await this.handleRESUME_RUN(connection);
+            break;
+          case 'COMPLETE_RUN':
+            await this.handleCOMPLETE_RUN(connection);
+            break;
+          case 'RESET_RUN':
+            await this.handleRESET_RUN(connection);
+            break;
+          case 'START_QUESTION':
+            await this.handleSTART_QUESTION(connection, msg.questionId, msg.hasTimer);
             break;
           case 'SHOW_ANSWER':
             await this.handleSHOW_ANSWER(connection);
@@ -392,9 +403,6 @@ export class WebSocketServer {
             break;
           case 'SHOW_SLIDE':
             await this.handleSHOW_SLIDE(connection, msg.slideId);
-            break;
-          case 'COMPLETE_RUN':
-            await this.handleCOMPLETE_RUN(connection);
             break;
         }
       }
@@ -714,6 +722,116 @@ export class WebSocketServer {
     }
   }
 
+  private async handleSTART_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      return;
+    }
+
+    try {
+      connection.run.status = 'in_progress';
+
+      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STARTED' });
+    } catch {}
+  }
+
+  private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      return;
+    }
+
+    try {
+      connection.run.status = 'paused';
+
+      await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
+    } catch {}
+  }
+
+  private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      return;
+    }
+
+    try {
+      connection.run.status = 'in_progress';
+
+      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
+    } catch {}
+  }
+
+  private async handleRESET_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      return;
+    }
+
+    try {
+      connection.run.status = 'not_started';
+
+      // Delete all answers for this event
+      await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
+
+      // Delete all answers for this event
+      await sql`
+        UPDATE runs
+        SET status = 'not_started',
+            active_id = NULL,
+            active_phase = NULL,
+            active_start_time = NULL,
+            active_has_timer = NULL
+        WHERE event_id = ${connection.eventId}
+      `;
+
+      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESET' });
+    } catch {}
+  }
+
+  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
+    if (!connection.run) {
+      return;
+    }
+
+    try {
+      // Update run status
+      await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
+
+      // Get final scores
+      const scores: {
+        id: string;
+        name: string;
+        number: number;
+        total: number | null;
+      }[] = await sql`
+        SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
+        FROM teams t
+        LEFT JOIN answers a ON a.team_id = t.id
+        LEFT JOIN questions q ON q.id = a.question_id
+        WHERE t.event_id = ${connection.eventId}
+        GROUP BY t.id, t.name, t.number
+        ORDER BY total DESC
+      `;
+
+      // Broadcast to all language channels
+      await this.broadcastToAllLanguageChannels(connection.eventId, {
+        type: 'RUN_COMPLETED',
+        scores: scores.map((s) => ({
+          teamId: s.id,
+          teamName: s.name,
+          teamNumber: s.number,
+          total: s.total || 0
+        }))
+      });
+
+      // Close all connections
+      for (const teamWs of connection.teams.values()) {
+        teamWs.close();
+      }
+
+      connection.host?.close();
+    } catch (error) {}
+  }
+
   private async handleSTART_QUESTION(
     connection: EventConnection,
     questionId: string,
@@ -796,32 +914,6 @@ export class WebSocketServer {
       for (const teamWs of connection.teams.values()) {
         await this.sendExistingAnswerToTeam(teamWs, connection);
       }
-    } catch {}
-  }
-
-  private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      connection.run.status = 'paused';
-
-      await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
-    } catch {}
-  }
-
-  private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      connection.run.status = 'in_progress';
-
-      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
     } catch {}
   }
 
@@ -943,50 +1035,5 @@ export class WebSocketServer {
       }
       // Silently ignore if slide not found (don't send error to teams)
     } catch {}
-  }
-
-  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      // Update run status
-      await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
-
-      // Get final scores
-      const scores: {
-        id: string;
-        name: string;
-        number: number;
-        total: number | null;
-      }[] = await sql`
-        SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
-        FROM teams t
-        LEFT JOIN answers a ON a.team_id = t.id
-        LEFT JOIN questions q ON q.id = a.question_id
-        WHERE t.event_id = ${connection.eventId}
-        GROUP BY t.id, t.name, t.number
-        ORDER BY total DESC
-      `;
-
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'RUN_COMPLETED',
-        scores: scores.map((s) => ({
-          teamId: s.id,
-          teamName: s.name,
-          teamNumber: s.number,
-          total: s.total || 0
-        }))
-      });
-
-      // Close all connections
-      for (const teamWs of connection.teams.values()) {
-        teamWs.close();
-      }
-
-      connection.host?.close();
-    } catch (error) {}
   }
 }

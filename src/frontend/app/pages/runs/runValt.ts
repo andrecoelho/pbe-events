@@ -92,11 +92,7 @@ export class RunValt {
     this.store.run = response.run;
     this.store.initialized = true;
 
-    if (this.store.run?.status === 'in_progress' || this.store.run?.status === 'paused') {
-      return await this.connectWebSocket();
-    }
-
-    return { ok: true } as const;
+    return await this.connectWebSocket();
   }
 
   connectWebSocket = () => {
@@ -149,39 +145,15 @@ export class RunValt {
   };
 
   async startRun() {
-    const result = await fetch(`/api/events/${this.store.eventId}/run`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'start' }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to start run' } as const;
-    }
-
+    this.ws?.send(JSON.stringify({ type: 'START_RUN' }));
     this.store.run.status = 'in_progress';
-
-    return await this.connectWebSocket();
+    return { ok: true } as const;
   }
 
   async pauseRun() {
-    const result = await fetch(`/api/events/${this.store.eventId}/run`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'pause' }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (result.status === 200) {
-      this.store.run.status = 'paused';
-
-      return { ok: true } as const;
-    }
-
-    return { ok: false, error: 'Failed to pause run' } as const;
+    this.ws?.send(JSON.stringify({ type: 'PAUSE_RUN' }));
+    this.store.run.status = 'paused';
+    return { ok: true } as const;
   }
 
   async resumeRun() {
@@ -191,58 +163,22 @@ export class RunValt {
   }
 
   async completeRun() {
-    const result = await fetch(`/api/events/${this.store.eventId}/run`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'complete' }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (result.status === 200) {
-      this.store.run.status = 'completed';
-
-      return { ok: true } as const;
-    }
-
-    return { ok: false, error: 'Failed to complete run' } as const;
+    this.ws?.send(JSON.stringify({ type: 'COMPLETE_RUN' }));
+    this.store.run.status = 'completed';
+    return { ok: true } as const;
   }
 
   async updateGracePeriod(gracePeriod: number) {
-    const result = await fetch(`/api/events/${this.store.eventId}/run`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'updateGracePeriod', gracePeriod }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (result.status === 200) {
-      this.store.run.gracePeriod = gracePeriod;
-
-      return { ok: true } as const;
-    }
-
-    return { ok: false, error: 'Failed to update grace period' } as const;
+    this.ws?.send(JSON.stringify({ type: 'UPDATE_GRACE_PERIOD', gracePeriod }));
+    this.store.run.gracePeriod = gracePeriod;
+    return { ok: true } as const;
   }
 
   async resetRun() {
-    const result = await fetch(`/api/events/${this.store.eventId}/run`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'reset' }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (result.status === 200) {
-      this.store.run.status = 'not_started';
-      this.store.run.activeQuestion = undefined;
-      this.store.run.activeSlide = undefined;
-
-      return { ok: true } as const;
-    }
-
-    return { ok: false, error: 'Failed to reset run' } as const;
+    this.ws?.send(JSON.stringify({ type: 'RESET_RUN' }));
+    this.store.run.status = 'not_started';
+    this.store.run.activeQuestion = undefined;
+    this.store.run.activeSlide = undefined;
+    return { ok: true } as const;
   }
 }
