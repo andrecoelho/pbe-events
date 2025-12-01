@@ -45,6 +45,7 @@ export function Permissions() {
       email: permission.email,
       firstName: permission.firstName,
       lastName: permission.lastName,
+      avatarUrl: permission.avatarUrl,
       roleId: permission.roleId as 'admin' | 'judge'
     });
   };

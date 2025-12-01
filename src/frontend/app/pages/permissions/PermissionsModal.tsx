@@ -98,7 +98,8 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
           store.user.roleId,
           store.user.email,
           store.user.firstName,
-          store.user.lastName
+          store.user.lastName,
+          store.user.avatarUrl
         );
       }
 
