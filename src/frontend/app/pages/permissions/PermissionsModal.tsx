@@ -1,6 +1,7 @@
 import { Avatar } from '@/frontend/components/Avatar';
 import { Icon } from '@/frontend/components/Icon';
 import { modal } from '@/frontend/components/Modal';
+import { roleBadgeColors } from '@/frontend/utils/roleColors';
 import { useMemo, type CSSProperties } from 'react';
 import { proxy, useSnapshot } from 'valtio';
 import type { PermissionsValt } from './permissionsValt';
@@ -187,7 +188,7 @@ function PermissionsModal(props: Props) {
                 style={{ anchorName } as CSSProperties}
               >
                 <span
-                  className={snap.user.roleId ? `badge badge-${snap.user.roleId === 'admin' ? 'info' : 'accent'}` : ''}
+                  className={snap.user.roleId ? `badge ${roleBadgeColors[snap.user.roleId]}` : ''}
                 >
                   {snap.user.roleId || 'Choose Role'}
                 </span>
@@ -202,12 +203,12 @@ function PermissionsModal(props: Props) {
               >
                 <li>
                   <button data-role='admin' onClick={handleChooseRole}>
-                    <span className='badge badge-info'>admin</span>
+                    <span className={`badge ${roleBadgeColors.admin}`}>admin</span>
                   </button>
                 </li>
                 <li>
                   <button data-role='judge' onClick={handleChooseRole}>
-                    <span className='badge badge-accent'>judge</span>
+                    <span className={`badge ${roleBadgeColors.judge}`}>judge</span>
                   </button>
                 </li>
               </ul>

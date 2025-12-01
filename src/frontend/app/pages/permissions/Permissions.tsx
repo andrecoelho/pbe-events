@@ -2,17 +2,12 @@ import { Avatar } from '@/frontend/components/Avatar';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
+import { roleBadgeColors } from '@/frontend/utils/roleColors';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Permissions.css';
 import { permissionsModal } from './PermissionsModal';
 import { PermissionsValt } from './permissionsValt';
-
-const badgeColors = {
-  owner: 'badge-success',
-  admin: 'badge-info',
-  judge: 'badge-accent'
-};
 
 const init = () => {
   const permissionsValt = new PermissionsValt();
@@ -85,7 +80,7 @@ export function Permissions() {
                     {permission.firstName} {permission.lastName}
                   </td>
                   <td className='col-role'>
-                    <span className={`badge ${badgeColors[permission.roleId]}`}>{permission.roleId}</span>
+                    <span className={`badge ${roleBadgeColors[permission.roleId]}`}>{permission.roleId}</span>
                   </td>
                   <td className='col-actions'>
                     {permission.roleId !== 'owner' && (
