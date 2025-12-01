@@ -7,6 +7,7 @@ import { Languages } from '@/frontend/app/pages/languages/Languages';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
 import { Questions } from '@/frontend/app/pages/questions/Questions';
 import { Run } from '@/frontend/app/pages/runs/Run';
+import { Settings } from '@/frontend/app/pages/settings/Settings';
 import { Slides } from '@/frontend/app/pages/slides/Slides';
 import { Teams } from '@/frontend/app/pages/teams/Teams';
 import { Loading } from '@/frontend/components/Loading';
@@ -21,6 +22,7 @@ const routes: Routes = new Map([
   [/^\/questions/, Questions],
   [/^\/slides/, Slides],
   [/^\/run/, Run],
+  [/^\/settings/, Settings],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 

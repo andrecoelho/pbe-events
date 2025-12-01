@@ -46,7 +46,7 @@ export const NavBar = memo(() => {
           style={{ positionAnchor: '--profile-menu-anchor' } as CSSProperties}
         >
           <li>
-            <button>Settings</button>
+            <a href='/settings'>Settings</a>
           </li>
           <li>
             <button onClick={handleLogout} onKeyDown={handleLogout}>
