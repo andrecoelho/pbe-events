@@ -1,3 +1,4 @@
+import { Avatar } from '@/frontend/components/Avatar';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
@@ -76,11 +77,7 @@ export function Permissions() {
               {snap.permissions.map((permission) => (
                 <tr key={permission.userId}>
                   <td className='col-avatar'>
-                    <div className='avatar'>
-                      <div className='w-8 rounded-full'>
-                        <img src={`/user-image/${permission.userId}`} />
-                      </div>
-                    </div>
+                    <Avatar user={permission} size='sm' />
                   </td>
                   <td className='col-email'>{permission.email}</td>
                   <td className='col-name'>

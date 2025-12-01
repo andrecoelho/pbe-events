@@ -30,7 +30,7 @@ export const permissionRoutes: Routes = {
       }
 
       const permissions: UserPermission[] = await sql`
-        SELECT permissions.user_id, permissions.role_id, users.email, users.first_name, users.last_name
+        SELECT permissions.user_id, permissions.role_id, users.email, users.first_name, users.last_name, users.avatar_url
         FROM permissions
         JOIN users ON permissions.user_id = users.id
         WHERE permissions.event_id = ${eventId}

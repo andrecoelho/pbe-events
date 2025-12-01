@@ -12,7 +12,9 @@ export const sessionRoutes: Routes = {
         return apiUnauthorized();
       }
 
-      const users: User[] = await sql`SELECT id, email, first_name, last_name FROM users WHERE id = ${session.user_id}`;
+      const users: User[] =
+        await sql`SELECT id, email, first_name, last_name, avatar_url FROM users WHERE id = ${session.user_id}`;
+
       const user = users[0];
 
       if (!user) {

@@ -10,6 +10,7 @@ interface PermissionsStore {
     email: string;
     firstName: string;
     lastName: string;
+    avatarUrl?: string;
   }[];
 }
 

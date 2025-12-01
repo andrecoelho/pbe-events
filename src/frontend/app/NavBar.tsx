@@ -3,6 +3,7 @@ import { memo, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'r
 import logo from '@/assets/favicon.svg';
 import { useAppValt } from '@/frontend/app/appValt';
 import { alertModal } from '@/frontend/components/AlertModal';
+import { Avatar } from '@/frontend/components/Avatar';
 import { useSnapshot } from 'valtio';
 
 export const NavBar = memo(() => {
@@ -32,13 +33,11 @@ export const NavBar = memo(() => {
       <div className='flex-1' />
       <div className='flex-none'>
         <button
-          className='btn btn-ghost btn-circle avatar'
+          className='btn btn-ghost btn-circle'
           popoverTarget='NavBar__profile-menu'
           style={{ anchorName: '--profile-menu-anchor' } as CSSProperties}
         >
-          <div className='w-10 rounded-full'>
-            <img src={`/user-image/${snap.user.id}`} />
-          </div>
+          <Avatar user={snap.user} size='md' />
         </button>
         <ul
           className='dropdown dropdown-end menu menu-sm bg-base-100 rounded-box z-10 mt-1 w-52 p-2 shadow'

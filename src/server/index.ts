@@ -66,7 +66,7 @@ const server = Bun.serve({
       const userId = url.pathname.split('/')[2];
 
       if (typeof userId === 'string' && userId.length > 0) {
-        const file = Bun.file(join(global.PBE.imageDir, `${userId}.png`));
+        const file = Bun.file(join(global.PBE.imageDir, `${userId}`));
 
         if (await file.exists()) {
           return new Response(file);

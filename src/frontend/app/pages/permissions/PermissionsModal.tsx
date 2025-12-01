@@ -1,3 +1,4 @@
+import { Avatar } from '@/frontend/components/Avatar';
 import { Icon } from '@/frontend/components/Icon';
 import { modal } from '@/frontend/components/Modal';
 import { useMemo, type CSSProperties } from 'react';
@@ -14,6 +15,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  avatarUrl?: string;
   roleId?: 'admin' | 'judge';
 }
 
@@ -38,13 +40,14 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
     store.searchStatus = 'done';
 
     if (result.status === 200) {
-      const response = (await result.json()) as { user: { id: string; firstName: string; lastName: string } };
+      const response = (await result.json()) as { user: { id: string; firstName: string; lastName: string; avatarUrl?: string } };
 
       store.user = {
         userId: response.user.id,
         email,
         firstName: response.user.firstName,
-        lastName: response.user.lastName
+        lastName: response.user.lastName,
+        avatarUrl: response.user.avatarUrl
       };
 
       return true;
@@ -172,11 +175,7 @@ function PermissionsModal(props: Props) {
 
         {snap.searchStatus === 'done' && snap.user && (
           <div className='flex gap-4 w-full items-center'>
-            <div className='avatar'>
-              <div className='w-8 rounded-full'>
-                <img src={`/user-image/${snap.user.userId}`} />
-              </div>
-            </div>
+            <Avatar user={snap.user} size='sm' />
             <div className='flex-1'>
               {snap.user.firstName} {snap.user.lastName} ({snap.user.email})
             </div>

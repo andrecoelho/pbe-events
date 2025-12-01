@@ -21,10 +21,11 @@ export const userRoutes: Routes = {
       }
 
       const users: User[] = await sql`
-        SELECT id, first_name, last_name
+        SELECT id, first_name, last_name, avatar_url, email
         FROM users
         WHERE email = ${email}
       `;
+
       const user = users[0];
 
       if (!user) {
