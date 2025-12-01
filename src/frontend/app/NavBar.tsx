@@ -1,4 +1,4 @@
-import { memo, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 
 import logo from '@/assets/favicon.svg';
 import { useAppValt } from '@/frontend/app/appValt';
@@ -9,6 +9,9 @@ import { useSnapshot } from 'valtio';
 export const NavBar = memo(() => {
   const appValt = useAppValt();
   const snap = useSnapshot(appValt.store);
+  const menuRef = useRef<HTMLUListElement>(null);
+
+  const closeMenu = () => menuRef.current?.hidePopover();
 
   const handleLogout = async (event: MouseEvent | KeyboardEvent) => {
     if ('key' in event && event.key === 'Tab') {
@@ -40,16 +43,17 @@ export const NavBar = memo(() => {
           <Avatar user={snap.user} size='md' />
         </button>
         <ul
+          ref={menuRef}
           className='dropdown dropdown-end menu menu-sm bg-base-100 rounded-box z-10 mt-1 w-52 p-2 shadow'
           id='NavBar__profile-menu'
           popover='auto'
           style={{ positionAnchor: '--profile-menu-anchor' } as CSSProperties}
         >
           <li>
-            <a href='/settings'>Settings</a>
+            <a href='/settings' onClick={closeMenu}>Settings</a>
           </li>
           <li>
-            <button onClick={handleLogout} onKeyDown={handleLogout}>
+            <button onClick={(e) => { closeMenu(); handleLogout(e); }} onKeyDown={handleLogout}>
               Logout
             </button>
           </li>
