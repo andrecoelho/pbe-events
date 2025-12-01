@@ -1,0 +1,23 @@
+@reference '../../../base.css';
+
+.Slides {
+  .shadow-md-top {
+    @apply shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1),0_-2px_4px_-2px_rgba(0,0,0,0.1)];
+  }
+
+  .slides-content {
+    @apply max-w-2xl mx-auto flex flex-col gap-6;
+  }
+
+  .slide-section {
+    @apply flex flex-col;
+  }
+
+  .slide-header {
+    @apply flex justify-between items-center;
+  }
+
+  .slide-header .btn {
+    @apply hover:bg-error/20;
+  }
+}

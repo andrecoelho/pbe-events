@@ -30,6 +30,17 @@ export const slidesRoutes: Routes = {
           return apiForbidden();
         }
 
+        // Get event info
+        const events: { name: string; title_remarks: string | null }[] = await sql`
+          SELECT name, title_remarks FROM events WHERE id = ${eventId}
+        `;
+
+        if (events.length === 0) {
+          return apiNotFound();
+        }
+
+        const event = events[0]!;
+
         const slides: { id: string; event_id: string; number: number; content: string; created_at: string }[] =
           await sql`
           SELECT id, event_id, number, content, created_at
@@ -39,6 +50,8 @@ export const slidesRoutes: Routes = {
         `;
 
         return apiData({
+          eventName: event.name,
+          titleRemarks: event.title_remarks || '',
           slides: slides.map((s) => ({
             id: s.id,
             eventId: s.event_id,
@@ -63,8 +76,8 @@ export const slidesRoutes: Routes = {
         const body = await req.json();
         const { content } = body;
 
-        if (!content || typeof content !== 'string') {
-          return apiBadRequest('Content is required');
+        if (typeof content !== 'string') {
+          return apiBadRequest('Content must be a string');
         }
 
         // Check permissions
@@ -78,7 +91,7 @@ export const slidesRoutes: Routes = {
         }
 
         const slideId = Bun.randomUUIDv7();
-        const result: { id: string }[] = await sql`
+        const result: { id: string; number: number }[] = await sql`
           INSERT INTO slides (id, event_id, number, content)
           VALUES (
             ${slideId},
@@ -86,14 +99,14 @@ export const slidesRoutes: Routes = {
             (SELECT COALESCE(MAX(number), 0) + 1 FROM slides WHERE event_id = ${eventId}),
             ${content}
           )
-          RETURNING id
+          RETURNING id, number
         `;
 
         if (result.length === 0) {
           return apiServerError();
         }
 
-        return apiData({ slideId: result[0]!.id, ok: true });
+        return apiData({ slideId: result[0]!.id, number: result[0]!.number });
       } catch (error) {
         console.error('Error creating slide:', error);
         return apiServerError();
@@ -141,7 +154,7 @@ export const slidesRoutes: Routes = {
           UPDATE slides SET content = ${content} WHERE id = ${slideId}
         `;
 
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error updating slide:', error);
         return apiServerError();
@@ -150,14 +163,17 @@ export const slidesRoutes: Routes = {
 
     DELETE: async (req: BunRequest<'/api/slides/:slideId'>) => {
       const session = await getSession(req);
-      if (!session) return apiUnauthorized();
+
+      if (!session) {
+        return apiUnauthorized();
+      }
 
       const { slideId } = req.params;
 
       try {
-        // Get slide to check event ownership
-        const slides: { event_id: string }[] = await sql`
-          SELECT event_id FROM slides WHERE id = ${slideId}
+        // Get slide to check event ownership and get its number for renumbering
+        const slides: { event_id: string; number: number }[] = await sql`
+          SELECT event_id, number FROM slides WHERE id = ${slideId}
         `;
 
         if (slides.length === 0) {
@@ -165,6 +181,7 @@ export const slidesRoutes: Routes = {
         }
 
         const eventId = slides[0]!.event_id;
+        const deletedSlideNumber = slides[0]!.number;
 
         // Check permissions
         const permissions: { role_id: string }[] = await sql`
@@ -176,11 +193,20 @@ export const slidesRoutes: Routes = {
           return apiForbidden();
         }
 
-        await sql`
-          DELETE FROM slides WHERE id = ${slideId}
-        `;
+        // Delete the slide and renumber remaining slides in a transaction
+        await sql.begin(async (tx) => {
+          await tx`
+            DELETE FROM slides WHERE id = ${slideId}
+          `;
 
-        return apiData({ ok: true });
+          await tx`
+            UPDATE slides
+            SET number = number - 1
+            WHERE event_id = ${eventId} AND number > ${deletedSlideNumber}
+          `;
+        });
+
+        return apiData();
       } catch (error) {
         console.error('Error deleting slide:', error);
         return apiServerError();
@@ -221,7 +247,7 @@ export const slidesRoutes: Routes = {
           return apiNotFound();
         }
 
-        return apiData({ ok: true });
+        return apiData();
       } catch (error) {
         console.error('Error updating title remarks:', error);
         return apiServerError();
@@ -229,4 +255,3 @@ export const slidesRoutes: Routes = {
     }
   }
 };
-
