@@ -39,6 +39,47 @@ export const userRoutes: Routes = {
   },
 
   '/api/users/me': {
+    DELETE: async (req: BunRequest) => {
+      const session = await getSession(req);
+
+      if (!session) {
+        return apiUnauthorized();
+      }
+
+      const userId = session.user_id;
+
+      // Get current avatar URL to delete the file
+      const users: { avatar_url: string | null }[] = await sql`
+        SELECT avatar_url FROM users WHERE id = ${userId}
+      `;
+
+      const user = users[0];
+
+      if (user?.avatar_url) {
+        // Extract filename from URL and delete file
+        const fileName = user.avatar_url.split('/').pop();
+        if (fileName) {
+          const filePath = join(global.PBE.imageDir, fileName);
+          try {
+            await unlink(filePath);
+          } catch {
+            // File may not exist, ignore error
+          }
+        }
+      }
+
+      // Delete all user sessions first
+      await sql`DELETE FROM sessions WHERE user_id = ${userId}`;
+
+      // Delete user permissions
+      await sql`DELETE FROM permissions WHERE user_id = ${userId}`;
+
+      // Delete the user
+      await sql`DELETE FROM users WHERE id = ${userId}`;
+
+      return apiData({}, { 'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0` });
+    },
+
     PATCH: async (req: BunRequest) => {
       const session = await getSession(req);
 

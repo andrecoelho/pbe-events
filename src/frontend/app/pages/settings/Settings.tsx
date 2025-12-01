@@ -1,3 +1,4 @@
+import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useAppValt } from '@/frontend/app/appValt';
@@ -127,6 +128,25 @@ export const Settings = memo(() => {
       if (appValt.store.user) {
         appValt.store.user.avatarUrl = undefined;
       }
+    } else {
+      toast.show({ message: result.error, type: 'error' });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = await confirmModal.open(
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.'
+    );
+
+    if (!confirmed) return;
+
+    const result = await valt.deleteAccount();
+
+    if (result.ok) {
+      toast.show({ message: 'Account deleted successfully', type: 'success' });
+      // Redirect to login page
+      window.location.href = '/';
+      window.location.reload();
     } else {
       toast.show({ message: result.error, type: 'error' });
     }
@@ -311,6 +331,23 @@ export const Settings = memo(() => {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Delete Account Section */}
+          <div className='Settings__section Settings__section--danger'>
+            <h2 className='Settings__section-title'>Delete Account</h2>
+            <p className='Settings__danger-text'>
+              Once you delete your account, there is no going back. All your data will be permanently removed.
+            </p>
+            <button
+              type='button'
+              className='btn btn-error'
+              onClick={handleDeleteAccount}
+              disabled={snap.saving}
+            >
+              <Icon name='trash' className='size-4' />
+              Delete Account
+            </button>
           </div>
         </div>
       </div>

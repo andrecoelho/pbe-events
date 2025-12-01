@@ -144,6 +144,26 @@ export class SettingsValt {
       this.store.uploadingAvatar = false;
     }
   }
+
+  async deleteAccount() {
+    this.store.saving = true;
+
+    try {
+      const result = await fetch('/api/users/me', {
+        method: 'DELETE'
+      });
+
+      const response = await result.json();
+
+      if (response.error) {
+        return { ok: false, error: response.error } as const;
+      }
+
+      return { ok: true } as const;
+    } finally {
+      this.store.saving = false;
+    }
+  }
 }
 
 export const SettingsValtContext = createContext<SettingsValt>(new SettingsValt());
