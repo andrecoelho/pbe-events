@@ -113,11 +113,12 @@ export class TeamsValt {
   }
 
   async copyTeamLink(teamId: string) {
-    // TODO: Update this URL once the team event route is determined
-    const teamEventUrl = `${window.location.origin}/event-run/team/${this.store.eventId}/${teamId}`;
+    const teamEventUrl = new URL('/event-run/team', window.location.origin);
+
+    teamEventUrl.search = new URLSearchParams({ eventId: this.store.eventId, teamId }).toString();
 
     try {
-      await navigator.clipboard.writeText(teamEventUrl);
+      await navigator.clipboard.writeText(teamEventUrl.toString());
 
       // Clear any existing timeout for this team
       const existingTimeout = this.copyTimeouts.get(teamId);

@@ -86,12 +86,12 @@ export class WebSocketServer {
     const eventId = url.searchParams.get('eventId');
     const teamId = url.searchParams.get('teamId');
 
-    if (!eventId || !teamId || !role) {
-      return textBadRequest('Missing eventId, teamId, or role');
+    if (!eventId || !role) {
+      return;
     }
 
     if (role !== 'host' && role !== 'team') {
-      return textBadRequest('Invalid role, must be host or team');
+      return;
     }
 
     try {
@@ -99,17 +99,17 @@ export class WebSocketServer {
       const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
 
       if (events.length === 0) {
-        return textBadRequest('Event not found');
+        return;
       }
 
       if (role === 'host') {
         if (!session) {
-          return textUnauthorized();
+          return;
         }
 
         // Check if host is already connected
         if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
-          return textBadRequest('Host already connected');
+          return;
         }
 
         // Validate session and permissions for host
@@ -120,14 +120,18 @@ export class WebSocketServer {
         `;
 
         if (permissions.length === 0) {
-          return textForbidden('Unauthorized - requires owner or admin role to host event');
+          return;
         }
       } else {
+        if (!teamId) {
+          return;
+        }
+
         // Validate team exists for team role
         const teams: { id: string }[] = await sql`SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
 
         if (teams.length === 0) {
-          return textBadRequest('Invalid team ID');
+          return;
         }
       }
 
@@ -189,10 +193,10 @@ export class WebSocketServer {
           if (!teamWs) {
             // Team is not connected
             return {
-              teamId: team.id,
-              teamName: team.name,
-              teamNumber: team.number,
-              status: 'TEAM_OFFLINE',
+              id: team.id,
+              name: team.name,
+              number: team.number,
+              status: 'offline',
               languageCode: null
             };
           }
@@ -200,20 +204,20 @@ export class WebSocketServer {
           // Team is connected - check if they have selected a language
           if (teamWs.data.languageCode) {
             return {
-              teamId: team.id,
-              teamName: team.name,
-              teamNumber: team.number,
-              status: 'TEAM_READY',
+              id: team.id,
+              name: team.name,
+              number: team.number,
+              status: 'ready',
               languageCode: teamWs.data.languageCode
             };
           }
 
           // Team is connected but no language selected
           return {
-            teamId: team.id,
-            teamName: team.name,
-            teamNumber: team.number,
-            status: 'TEAM_CONNECTED',
+            id: team.id,
+            name: team.name,
+            number: team.number,
+            status: 'connected',
             languageCode: null
           };
         });
@@ -256,21 +260,31 @@ export class WebSocketServer {
             // Send TEAM_CONNECTED to host
             connection.host?.send(
               JSON.stringify({
-                type: 'TEAM_READY',
-                teamId,
-                teamName: team.name,
-                teamNumber: team.number,
-                languageCode: team.code
+                type: 'TEAM_STATUS',
+                teams: [
+                  {
+                    id: teamId,
+                    status: 'ready',
+                    name: team.name,
+                    number: team.number,
+                    languageCode: team.code
+                  }
+                ]
               })
             );
           } else {
             connection.host?.send(
               JSON.stringify({
-                type: 'TEAM_CONNECTED',
-                teamId,
-                teamName: team.name,
-                teamNumber: team.number,
-                languageCode: null
+                type: 'TEAM_STATUS',
+                teams: [
+                  {
+                    id: teamId,
+                    status: 'connected',
+                    name: team.name,
+                    number: team.number,
+                    languageCode: null
+                  }
+                ]
               })
             );
           }
@@ -723,57 +737,39 @@ export class WebSocketServer {
   }
 
   private async handleSTART_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
+    connection.run!.status = 'in_progress';
 
-    try {
-      connection.run.status = 'in_progress';
-
-      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STARTED' });
-    } catch {}
+    await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STARTED' });
   }
 
   private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
+    connection.run!.status = 'paused';
 
-    try {
-      connection.run.status = 'paused';
-
-      await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
-    } catch {}
+    await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
   }
 
   private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
+    connection.run!.status = 'in_progress';
 
-    try {
-      connection.run.status = 'in_progress';
+    await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
+  }
 
-      await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
-    } catch {}
+  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
+    connection.run!.status = 'completed';
+
+    await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_COMPLETED' });
   }
 
   private async handleRESET_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
+    connection.run!.status = 'not_started';
 
-    try {
-      connection.run.status = 'not_started';
+    await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
 
-      // Delete all answers for this event
-      await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
-
-      // Delete all answers for this event
-      await sql`
+    await sql`
         UPDATE runs
         SET status = 'not_started',
             active_id = NULL,
@@ -783,53 +779,7 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-      await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESET' });
-    } catch {}
-  }
-
-  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      // Update run status
-      await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
-
-      // Get final scores
-      const scores: {
-        id: string;
-        name: string;
-        number: number;
-        total: number | null;
-      }[] = await sql`
-        SELECT t.id, t.name, t.number, COALESCE(SUM(a.points_awarded), 0) as total
-        FROM teams t
-        LEFT JOIN answers a ON a.team_id = t.id
-        LEFT JOIN questions q ON q.id = a.question_id
-        WHERE t.event_id = ${connection.eventId}
-        GROUP BY t.id, t.name, t.number
-        ORDER BY total DESC
-      `;
-
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'RUN_COMPLETED',
-        scores: scores.map((s) => ({
-          teamId: s.id,
-          teamName: s.name,
-          teamNumber: s.number,
-          total: s.total || 0
-        }))
-      });
-
-      // Close all connections
-      for (const teamWs of connection.teams.values()) {
-        teamWs.close();
-      }
-
-      connection.host?.close();
-    } catch (error) {}
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESET' });
   }
 
   private async handleSTART_QUESTION(

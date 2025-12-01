@@ -1,9 +1,10 @@
+import type { TeamsValt } from '@/frontend/app/pages/teams/teamsValt';
 import { proxy } from 'valtio';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 export interface TeamStatus {
-  teamId: string;
+  id: string;
   name: string;
   number: number;
   status: 'offline' | 'connected' | 'ready';
@@ -50,8 +51,8 @@ interface RunStore {
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
   questions: Question[];
   slides: Slide[];
-  languages: Map<string, string>;
-  teams: Map<string, TeamStatus>;
+  languages: Record<string, string>;
+  teams: Record<string, TeamStatus>;
 }
 
 export class RunValt {
@@ -73,8 +74,8 @@ export class RunValt {
       reconnectAttempts: 0,
       questions: [],
       slides: [],
-      languages: new Map(),
-      teams: new Map()
+      languages: {},
+      teams: {}
     });
   }
 
@@ -106,10 +107,12 @@ export class RunValt {
     this.store.connectionState = 'connecting';
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/event-run/ws?role=host&eventId=${this.store.eventId}&teamId=host`;
+    const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
+
+    wsUrl.search = new URLSearchParams({ role: 'host', eventId: this.store.eventId }).toString();
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsUrl.toString());
 
       ws.onopen = () => {
         this.ws = ws;
@@ -136,6 +139,21 @@ export class RunValt {
           reject({ ok: false, error: 'WebSocket connection failed' } as const);
         }
       };
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data) as
+          | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
+          | { type: 'TEAM_DISCONNECTED'; teamId: string };
+
+        switch (message.type) {
+          case 'TEAM_STATUS':
+            this.handleTEAM_STATUS(message.teams);
+            break;
+          case 'TEAM_DISCONNECTED':
+            this.handleTEAM_DISCONNECTED(message.teamId);
+            break;
+        }
+      };
     } catch (error) {
       this.store.connectionState = 'error';
       reject({ ok: false, error: 'WebSocket connection failed' } as const);
@@ -143,6 +161,10 @@ export class RunValt {
 
     return promise;
   };
+
+  disconnectWebSocket() {
+    this.ws?.close();
+  }
 
   async startRun() {
     this.ws?.send(JSON.stringify({ type: 'START_RUN' }));
@@ -180,5 +202,15 @@ export class RunValt {
     this.store.run.activeQuestion = undefined;
     this.store.run.activeSlide = undefined;
     return { ok: true } as const;
+  }
+
+  handleTEAM_STATUS(teams: TeamStatus[]) {
+    for (const team of teams) {
+      this.store.teams[team.id] = team;
+    }
+  }
+
+  handleTEAM_DISCONNECTED(teamId: string) {
+    this.store.teams[teamId]!.status = 'offline';
   }
 }
