@@ -49,7 +49,11 @@ export const EventCard = memo((props: Props) => {
     }
   };
 
-  const roleColorClass = isOwner ? 'bg-success' : isAdmin ? 'bg-info' : 'bg-accent';
+  const roleColorClass = isOwner
+    ? 'bg-gradient-to-b from-emerald-400 to-emerald-600'
+    : isAdmin
+      ? 'bg-gradient-to-b from-sky-400 to-indigo-500'
+      : 'bg-gradient-to-b from-amber-400 to-orange-500';
 
   return (
     <div className='Events__card'>

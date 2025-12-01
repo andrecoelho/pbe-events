@@ -1,7 +1,7 @@
 @reference '../../../base.css';
 
 .Events {
-  @apply flex-1 relative flex flex-col overflow-auto bg-base-100/50;
+  @apply flex-1 relative flex flex-col overflow-auto;
 
   .Events__content {
     @apply flex-1 p-8 overflow-auto;
