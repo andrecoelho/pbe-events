@@ -2,8 +2,13 @@ import '../base.css';
 
 import logo from 'src/assets/favicon.svg';
 import { alertModal } from '../components/AlertModal';
+import { modal } from '../components/Modal';
+import { CreateAccountModal } from './CreateAccountModal';
 
 export function Login() {
+  const handleCreateAccount = () => {
+    modal.open(<CreateAccountModal />);
+  };
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -55,6 +60,12 @@ export function Login() {
             <div className='col-span-2'>
               <button type='submit' className='btn btn-primary w-full'>
                 Login
+              </button>
+            </div>
+
+            <div className='col-span-2 text-center'>
+              <button type='button' className='link link-hover text-sm' onClick={handleCreateAccount}>
+                Don't have an account? Create one
               </button>
             </div>
           </form>

@@ -89,7 +89,7 @@ export const userRoutes: Routes = {
         WHERE id = ${session.user_id}
       `;
 
-      return apiData({ ok: true });
+      return apiData();
     }
   },
 
@@ -136,7 +136,7 @@ export const userRoutes: Routes = {
         UPDATE users SET password = ${hashedPassword} WHERE id = ${session.user_id}
       `;
 
-      return apiData({ ok: true });
+      return apiData();
     }
   },
 
@@ -224,7 +224,7 @@ export const userRoutes: Routes = {
         UPDATE users SET avatar_url = NULL WHERE id = ${session.user_id}
       `;
 
-      return apiData({ ok: true });
+      return apiData();
     }
   }
 };
