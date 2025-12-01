@@ -30,7 +30,7 @@ export function Languages() {
 
   return (
     <div className='Languages bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
-      <div className='flex-1 overflow-auto p-8 justify-center'>
+      <div className='flex-1 overflow-auto p-8 justify-items-center'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Languages</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
         <div className='grid grid-cols-[120px_1fr_140px] text-sm w-[800px] self-center'>
