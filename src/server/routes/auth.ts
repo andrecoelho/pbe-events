@@ -81,10 +81,10 @@ export const authRoutes: Routes = {
           return apiBadRequest('Invalid file type. Allowed: JPEG, PNG, WebP, GIF');
         }
 
-        // Validate file size (max 5MB)
-        const maxSize = 5 * 1024 * 1024;
+        // Validate file size (max 500KB)
+        const maxSize = 500 * 1024;
         if (avatar.size > maxSize) {
-          return apiBadRequest('File size must be less than 5MB');
+          return apiBadRequest('File size must be less than 500KB');
         }
 
         // Get file extension from mime type

@@ -39,10 +39,10 @@ export function CreateAccountModal() {
       return;
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024;
+    // Validate file size (max 500KB)
+    const maxSize = 500 * 1024;
     if (file.size > maxSize) {
-      setAvatarError('File size must be less than 5MB');
+      setAvatarError('File size must be less than 500KB');
       return;
     }
 
