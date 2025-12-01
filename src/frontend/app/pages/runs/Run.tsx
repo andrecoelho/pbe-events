@@ -88,7 +88,7 @@ export const Run = () => {
                 <span className='text-sm font-semibold'>CONNECTION STATUS</span>
               </div>
               <div className='badge bg-black/10 border-black/20 text-accent-content font-semibold px-3 py-2'>
-                {Object.keys(snap.teams).length} active
+                {Object.values(snap.teams).filter((t) => t.status !== 'offline').length} active
               </div>
             </div>
           </div>
