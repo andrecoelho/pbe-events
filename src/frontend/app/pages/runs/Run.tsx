@@ -183,11 +183,11 @@ export const Run = () => {
 
             {snap.run.status === 'in_progress' && (
               <>
-                <button className='btn' onClick={() => valt.previous()}>
+                <button className='btn btn-neutral' onClick={() => valt.previous()}>
                   <Icon name='chevron-left' className='size-4' />
                   Previous
                 </button>
-                <button className='btn' onClick={() => valt.next()}>
+                <button className='btn btn-neutral' onClick={() => valt.next()}>
                   Next
                   <Icon name='chevron-right' className='size-4' />
                 </button>
