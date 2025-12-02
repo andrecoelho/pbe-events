@@ -1,8 +1,7 @@
-import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import { useEffect, useState } from 'react';
 import logo from 'src/assets/favicon.svg';
-import { useSnapshot, type Snapshot } from 'valtio';
+import { type Snapshot } from 'valtio';
 
 const Title = ({
   item

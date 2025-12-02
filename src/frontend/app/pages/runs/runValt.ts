@@ -234,7 +234,6 @@ export class RunValt {
           | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
           | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
           | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
-          | { type: 'TEAM_DISCONNECTED'; teamId: string }
           | { type: 'ANSWER_RECEIVED'; teamId: string };
 
         switch (message.type) {
@@ -251,12 +250,6 @@ export class RunValt {
             break;
           case 'TEAM_STATUS':
             this.handleTEAM_STATUS(message.teams);
-            break;
-          case 'TEAM_DISCONNECTED':
-            if (this.store.teams[message.teamId]) {
-              this.store.teams[message.teamId]!.status = 'offline';
-            }
-
             break;
           case 'ANSWER_RECEIVED':
             if (this.store.teams[message.teamId]) {

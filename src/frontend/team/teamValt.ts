@@ -3,17 +3,19 @@ import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
 interface TeamStore {
-  eventId: string;
-  team: {
+  event?: {
+    id: string;
+    name: string;
+  };
+  team?: {
     id: string;
     name: string;
     number: number;
     languageId: string | null;
   };
   activeItem: ActiveItem | null;
-  gracePeriod: number;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, { id: string; code: string; name: string }>;
+  languages?: Record<string, { id: string; code: string; name: string }>;
 }
 
 export class TeamValt {
@@ -22,12 +24,8 @@ export class TeamValt {
 
   constructor() {
     this.store = proxy({
-      eventId: '',
-      team: { id: '', name: '', number: 0, languageId: null },
       activeItem: null,
-      gracePeriod: 0,
-      runStatus: 'not_started',
-      languages: {}
+      runStatus: 'not_started'
     });
   }
 
@@ -36,21 +34,10 @@ export class TeamValt {
       throw new Error('eventId and teamId are required for TeamValt initialization');
     }
 
-    this.store.eventId = eventId;
-    this.store.team.id = teamId;
-
-    await this.connectWebSocket();
-  }
-
-  async connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
-    wsUrl.search = new URLSearchParams({
-      role: 'team',
-      eventId: this.store.eventId,
-      teamId: this.store.team.id
-    }).toString();
+    wsUrl.search = new URLSearchParams({ role: 'team', eventId, teamId }).toString();
 
     this.ws = new WebSocket(wsUrl.toString());
 
@@ -59,9 +46,17 @@ export class TeamValt {
     };
 
     this.ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
+      const message = JSON.parse(event.data) as
+        | { type: 'EVENT_INFO'; event: { id: string; name: string } }
+        | { type: 'TEAM_INFO'; team: { id: string; name: string; number: number; languageId: string | null } }
+        | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
+        | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null }
+        | { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> };
 
       switch (message.type) {
+        case 'EVENT_INFO':
+          this.store.event = message.event;
+          break;
         case 'TEAM_INFO':
           this.store.team = message.team;
           break;
