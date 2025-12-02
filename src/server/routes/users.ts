@@ -58,8 +58,10 @@ export const userRoutes: Routes = {
       if (user?.avatar_url) {
         // Extract filename from URL and delete file
         const fileName = user.avatar_url.split('/').pop();
+
         if (fileName) {
           const filePath = join(global.PBE.imageDir, fileName);
+
           try {
             await unlink(filePath);
           } catch {
@@ -68,13 +70,11 @@ export const userRoutes: Routes = {
         }
       }
 
-      // Delete all user sessions first
-      await sql`DELETE FROM sessions WHERE user_id = ${userId}`;
+      await sql`
+        DELETE FROM events
+        WHERE id IN (
+          SELECT event_id FROM permissions WHERE user_id = ${userId} AND role_id = 'owner')`;
 
-      // Delete user permissions
-      await sql`DELETE FROM permissions WHERE user_id = ${userId}`;
-
-      // Delete the user
       await sql`DELETE FROM users WHERE id = ${userId}`;
 
       return apiData({}, { 'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0` });
@@ -113,10 +113,12 @@ export const userRoutes: Routes = {
         updates.push('email = ${email}');
         values.email = email;
       }
+
       if (firstName) {
         updates.push('first_name = ${firstName}');
         values.firstName = firstName;
       }
+
       if (lastName) {
         updates.push('last_name = ${lastName}');
         values.lastName = lastName;
@@ -198,12 +200,14 @@ export const userRoutes: Routes = {
 
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
       if (!allowedTypes.includes(file.type)) {
         return apiBadRequest('Invalid file type. Allowed: JPEG, PNG, WebP, GIF');
       }
 
       // Validate file size (max 500KB)
       const maxSize = 500 * 1024;
+
       if (file.size > maxSize) {
         return apiBadRequest('File size must be less than 500KB');
       }
@@ -215,6 +219,7 @@ export const userRoutes: Routes = {
         'image/webp': '.webp',
         'image/gif': '.gif'
       };
+
       const ext = extensions[file.type] || '.png';
 
       // Save file to disk
@@ -226,9 +231,7 @@ export const userRoutes: Routes = {
       // Update user avatar_url in database
       const avatarUrl = `/user-image/${fileName}`;
 
-      await sql`
-        UPDATE users SET avatar_url = ${avatarUrl} WHERE id = ${session.user_id}
-      `;
+      await sql`UPDATE users SET avatar_url = ${avatarUrl} WHERE id = ${session.user_id}`;
 
       return apiData({ avatarUrl });
     },
@@ -250,8 +253,10 @@ export const userRoutes: Routes = {
       if (user?.avatar_url) {
         // Extract filename from URL and delete file
         const fileName = user.avatar_url.split('/').pop();
+
         if (fileName) {
           const filePath = join(global.PBE.imageDir, fileName);
+
           try {
             await unlink(filePath);
           } catch {
@@ -261,9 +266,7 @@ export const userRoutes: Routes = {
       }
 
       // Clear avatar_url in database
-      await sql`
-        UPDATE users SET avatar_url = NULL WHERE id = ${session.user_id}
-      `;
+      await sql`UPDATE users SET avatar_url = NULL WHERE id = ${session.user_id}`;
 
       return apiData();
     }
