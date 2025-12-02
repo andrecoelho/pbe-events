@@ -205,6 +205,7 @@ export class WebSocketServer {
 
         // Send team status message to the newly connected host
         ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+        ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
       } else if (this.isTeamWebSocket(ws)) {
         const { teamId } = ws.data;
 
@@ -269,6 +270,8 @@ export class WebSocketServer {
               })
             );
           }
+
+          ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
           // Send existing answer if active question and team has language
           if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
@@ -675,6 +678,7 @@ export class WebSocketServer {
       `;
     }
 
+    connection.host?.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS_CHANGED', status });
   }
 }

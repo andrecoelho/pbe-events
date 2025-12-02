@@ -132,10 +132,14 @@ export class RunValt {
 
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data) as
+          | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
           | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
           | { type: 'TEAM_DISCONNECTED'; teamId: string };
 
         switch (message.type) {
+          case 'ACTIVE_ITEM':
+            this.handleACTIVE_ITEM(message.activeItem);
+            break;
           case 'TEAM_STATUS':
             this.handleTEAM_STATUS(message.teams);
             break;
@@ -160,10 +164,6 @@ export class RunValt {
     this.ws?.send(JSON.stringify({ type: 'UPDATE_RUN_STATUS', status }));
     this.store.run.status = status;
 
-    if (status === 'not_started') {
-      this.store.run.activeItem = null;
-    }
-
     return { ok: true } as const;
   }
 
@@ -171,6 +171,10 @@ export class RunValt {
     this.ws?.send(JSON.stringify({ type: 'UPDATE_GRACE_PERIOD', gracePeriod }));
     this.store.run.gracePeriod = gracePeriod;
     return { ok: true } as const;
+  }
+
+  handleACTIVE_ITEM(activeItem: ActiveItem) {
+    this.store.run.activeItem = activeItem;
   }
 
   handleTEAM_STATUS(teams: TeamStatus[]) {
