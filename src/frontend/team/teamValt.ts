@@ -4,11 +4,16 @@ import { proxy } from 'valtio';
 
 interface TeamStore {
   eventId: string;
-  teamId: string;
+  team: {
+    id: string;
+    name: string;
+    number: number;
+    languageId: string | null;
+  };
   activeItem: ActiveItem | null;
   gracePeriod: number;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, string>;
+  languages: Record<string, { id: string; code: string; name: string }>;
 }
 
 export class TeamValt {
@@ -18,7 +23,7 @@ export class TeamValt {
   constructor() {
     this.store = proxy({
       eventId: '',
-      teamId: '',
+      team: { id: '', name: '', number: 0, languageId: null },
       activeItem: null,
       gracePeriod: 0,
       runStatus: 'not_started',
@@ -32,7 +37,7 @@ export class TeamValt {
     }
 
     this.store.eventId = eventId;
-    this.store.teamId = teamId;
+    this.store.team.id = teamId;
 
     await this.connectWebSocket();
   }
@@ -44,13 +49,10 @@ export class TeamValt {
     wsUrl.search = new URLSearchParams({
       role: 'team',
       eventId: this.store.eventId,
-      teamId: this.store.teamId
+      teamId: this.store.team.id
     }).toString();
 
     this.ws = new WebSocket(wsUrl.toString());
-
-    this.ws.onerror = () => {};
-    this.ws.onopen = () => {};
 
     this.ws.onclose = () => {
       this.ws = null;
@@ -60,6 +62,9 @@ export class TeamValt {
       const message = JSON.parse(event.data);
 
       switch (message.type) {
+        case 'TEAM_INFO':
+          this.store.team = message.team;
+          break;
         case 'RUN_STATUS_CHANGED':
           this.store.runStatus = message.status;
 

@@ -1,13 +1,7 @@
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import {
-  apiData,
-  apiForbidden,
-  apiNotFound,
-  apiServerError,
-  apiUnauthorized
-} from '@/server/utils/responses';
+import { apiData, apiForbidden, apiNotFound, apiServerError, apiUnauthorized } from '@/server/utils/responses';
 import type { WebSocketServer } from '@/server/webSocket';
 import type { ActiveItem } from '@/types';
 import type { BunRequest } from 'bun';
@@ -117,10 +111,11 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           // Get languages
           const languages: {
+            id: string;
             code: string;
             name: string;
           }[] = await sql`
-            SELECT code, name
+            SELECT id, code, name
             FROM languages
             WHERE event_id = ${eventId}
           `;
@@ -134,12 +129,12 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               activeItem: run.active_item
             },
             questions: Array.from(questionsMap.values()),
-            slides: slides.map(s => ({
+            slides: slides.map((s) => ({
               id: s.id,
               number: s.number,
               content: s.content
             })),
-            languages: Object.fromEntries(languages.map(l => [l.code, l.name]))
+            languages: Object.fromEntries(languages.map((l) => [l.code, { id: l.id, code: l.code, name: l.name }]))
           });
         } catch (error) {
           console.log('Error fetching run data:', error);

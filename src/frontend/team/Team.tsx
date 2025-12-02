@@ -31,7 +31,9 @@ export const Team = () => {
     <div className='fixed inset-0 flex justify-center items-center bg-primary'>
       <img src={logo} className='opacity-10' />
 
-      <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+      {snap.team.languageId && (
+        <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+      )}
     </div>
   );
 };

@@ -42,7 +42,7 @@ interface RunStore {
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
   items: ActiveItem[];
   currentIndex: number;
-  languages: Record<string, string>;
+  languages: Record<string, { id: string; code: string; name: string }>;
   teams: Record<string, TeamStatus>;
 }
 
@@ -83,7 +83,7 @@ export class RunValt {
       run: Run;
       questions: Question[];
       slides: Slide[];
-      languages: Record<string, string>;
+      languages: Record<string, { id: string; code: string; name: string }>;
     };
 
     this.store.eventId = eventId;

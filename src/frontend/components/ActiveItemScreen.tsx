@@ -197,7 +197,7 @@ const QuestionAnswer = ({
     phase: 'answer';
     translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
   }>;
-  languages: Record<string, string>;
+  languages: Record<string, { id: string; code: string; name: string }>;
 }) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
@@ -208,7 +208,7 @@ const QuestionAnswer = ({
       <h2 className='text-4xl font-serif font-semibold border-b border-accent pb-4'>Answers:</h2>
       {item.translations.map((t) => (
         <div key={t.languageCode} className='text-2xl font-serif'>
-          [{languages[t.languageCode]}] &nbsp;
+          [{languages[t.languageCode]?.name}] &nbsp;
           {t.answer} {t.clarification && <> ({t.clarification})</>}
         </div>
       ))}
@@ -256,7 +256,7 @@ Completed.displayName = 'Completed';
 
 export const ActiveItemScreen = (props: {
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, string>;
+  languages: Record<string, { id: string; code: string; name: string }>;
   activeItem: Snapshot<ActiveItem> | null;
 }) => {
   const activeItem = props.activeItem;

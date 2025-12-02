@@ -38,7 +38,7 @@ export interface EventConnection {
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
   activeItem: ActiveItem | null;
-  languages?: Record<string, string>;
+  languages?: Record<string, { id: string; code: string; name: string }>;
 }
 
 export interface Run {
@@ -275,9 +275,20 @@ export class WebSocketServer {
         ws.data.languageId = team.language_id;
         ws.data.languageCode = team.code;
 
+        ws.send(
+          JSON.stringify({
+            type: 'TEAM_INFO',
+            team: { id: teamId, name: team.name, number: team.number, languageId: ws.data.languageId }
+          })
+        );
+
+        ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+
         // Subscribe to language channel if language selected
         if (team.code) {
           ws.subscribe(`${eventId}:${team.code}`);
+          ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run!.status }));
+          ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
           // Send TEAM_CONNECTED to host
           connection.host?.send(
@@ -310,11 +321,6 @@ export class WebSocketServer {
             })
           );
         }
-
-        // Send initial state to team
-        ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
-        ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run!.status }));
-        ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
         // Send existing answer if active question and team has language
         if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
@@ -450,14 +456,14 @@ export class WebSocketServer {
     }
 
     // Fetch languages for the event
-    const languages: { code: string; name: string }[] = await sql`
-      SELECT code, name
+    const languages: { id: string; code: string; name: string }[] = await sql`
+      SELECT id, code, name
       FROM languages
       WHERE event_id = ${eventId}
     `;
 
     const connection = this.eventConnections.get(eventId)!;
-    connection.languages = Object.fromEntries(languages.map((lang) => [lang.code, lang.name]));
+    connection.languages = Object.fromEntries(languages.map((lang) => [lang.code, lang]));
   }
 
   private async sendExistingAnswerToTeam(
@@ -520,12 +526,12 @@ export class WebSocketServer {
       return;
     }
 
-    if (ws.data.languageId) {
+    if (ws.data.languageId && connection.run?.status !== 'not_started') {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
           code: 'LANGUAGE_ALREADY_SELECTED',
-          message: 'Language has already been selected'
+          message: 'Cannot change language after event has started'
         })
       );
 
