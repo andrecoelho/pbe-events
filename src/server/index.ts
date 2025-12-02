@@ -3,6 +3,7 @@ import './validate-app-data';
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import team from '@/frontend/team/team.html';
+import presenter from '@/frontend/presenter/presenter.html';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { languagesRoutes } from '@/server/routes/languages';
@@ -22,6 +23,7 @@ import { styleText } from 'node:util';
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();
+const presenterNounce = Bun.randomUUIDv7();
 const teamNounce = Bun.randomUUIDv7();
 
 const wsServer = new WebSocketServer();
@@ -31,6 +33,7 @@ const server = Bun.serve({
     [`/${loginNounce}`]: login,
     [`/${appNounce}`]: app,
     [`/${teamNounce}`]: team,
+    [`/${presenterNounce}`]: presenter,
     ...authRoutes,
     ...sessionRoutes,
     ...eventsRoutes,
@@ -56,6 +59,10 @@ const server = Bun.serve({
 
     if (!session) {
       return await fetch(`${server.url}${loginNounce}`);
+    }
+
+    if (url.pathname === '/event-run/presenter') {
+      return await fetch(`${server.url}${presenterNounce}`);
     }
 
     if (url.pathname.startsWith('/api')) {

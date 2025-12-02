@@ -69,6 +69,10 @@ const init = () => {
     valt.disableTimer();
   };
 
+  const handleOpenPresenter = () => {
+    window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,menubar=no,toolbar=no,location=no,status=no');
+  };
+
   return {
     valt,
     handleStartEvent,
@@ -78,7 +82,8 @@ const init = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
-    handleDisableTimer
+    handleDisableTimer,
+    handleOpenPresenter
   };
 };
 
@@ -92,7 +97,8 @@ export const Run = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
-    handleDisableTimer
+    handleDisableTimer,
+    handleOpenPresenter
   } = useMemo(() => init(), []);
 
   const snap = useSnapshot(valt.store);
@@ -226,11 +232,20 @@ export const Run = () => {
             )}
           </div>
 
-          {snap.run.activeItem && snap.run.activeItem.type === 'question' && snap.run.activeItem.phase === 'prompt' && (
-            <button className='btn btn-outline' onClick={handleDisableTimer}>
-              ∞ Disable Timer
+          <div className='flex gap-2'>
+            {snap.run.activeItem &&
+              snap.run.activeItem.type === 'question' &&
+              snap.run.activeItem.phase === 'prompt' && (
+                <button className='btn btn-outline' onClick={handleDisableTimer}>
+                  ∞ Disable Timer
+                </button>
+              )}
+
+            <button className='btn btn-accent' onClick={handleOpenPresenter}>
+              <Icon name='presentation-chart-bar' className='size-4' />
+              Presenter
             </button>
-          )}
+          </div>
         </footer>
       </div>
     </RunValtContext.Provider>

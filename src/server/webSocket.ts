@@ -17,11 +17,18 @@ export type HostWebsocketData = {
   eventId: string;
 };
 
-export type WebsocketData = HostWebsocketData | TeamWebsocketData;
+export type PresenterWebsocketData = {
+  role: 'presenter';
+  session: Session;
+  eventId: string;
+};
+
+export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWebsocketData;
 
 export interface EventConnection {
   eventId: string;
-  host: ServerWebSocket<WebsocketData> | null;
+  host: ServerWebSocket<HostWebsocketData> | null;
+  presenter: ServerWebSocket<PresenterWebsocketData>[];
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
   activeItem: ActiveItem | null;
@@ -62,6 +69,10 @@ export class WebSocketServer {
     return ws.data.role === 'host';
   }
 
+  private isPresenterWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<PresenterWebsocketData> {
+    return ws.data.role === 'presenter';
+  }
+
   async upgradeWebSocket(req: Request, session: Session | null): Promise<Response | undefined> {
     const url = new URL(req.url);
     const role = url.searchParams.get('role');
@@ -72,7 +83,7 @@ export class WebSocketServer {
       return;
     }
 
-    if (role !== 'host' && role !== 'team') {
+    if (role !== 'host' && role !== 'team' && role !== 'presenter') {
       return;
     }
 
@@ -104,6 +115,21 @@ export class WebSocketServer {
         if (permissions.length === 0) {
           return;
         }
+      } else if (role === 'presenter') {
+        if (!session) {
+          return;
+        }
+
+        // Validate session and permissions for host
+        const permissions: { role_id: string }[] = await sql`
+          SELECT role_id
+          FROM permissions
+          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        `;
+
+        if (permissions.length === 0) {
+          return;
+        }
       } else {
         if (!teamId) {
           return;
@@ -122,7 +148,13 @@ export class WebSocketServer {
           role === 'host'
             ? {
                 role: 'host',
-                session: session!,
+                session,
+                eventId
+              }
+            : role === 'presenter'
+            ? {
+                role: 'presenter',
+                session,
                 eventId
               }
             : {
@@ -205,6 +237,12 @@ export class WebSocketServer {
 
       // Send team status message to the newly connected host
       ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+    } else if (this.isPresenterWebSocket(ws)) {
+      connection.presenter.push(ws);
+
+      ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+      ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run!.status }));
       ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
     } else if (this.isTeamWebSocket(ws)) {
       const { teamId } = ws.data;
@@ -300,6 +338,8 @@ export class WebSocketServer {
 
     if (role === 'host') {
       connection.host = null;
+    } else if (role === 'presenter') {
+      connection.presenter = connection.presenter.filter((presenterWs) => presenterWs !== ws);
     } else {
       const { teamId, languageCode } = ws.data;
 
@@ -311,16 +351,16 @@ export class WebSocketServer {
       }
 
       // Notify host
-      const message = JSON.stringify({
-        type: 'TEAM_DISCONNECTED',
-        teamId
-      });
-
-      connection.host?.send(message);
+      connection.host?.send(
+        JSON.stringify({
+          type: 'TEAM_DISCONNECTED',
+          teamId
+        })
+      );
     }
 
     // Clean up empty connections
-    if (!connection.host && connection.teams.size === 0) {
+    if (!connection.host && connection.teams.size === 0 && connection.presenter.length === 0) {
       this.eventConnections.delete(eventId);
     }
   };
@@ -379,6 +419,7 @@ export class WebSocketServer {
     this.eventConnections.set(eventId, {
       eventId,
       host: null,
+      presenter: [],
       teams: new Map(),
       run: null,
       activeItem: null
@@ -658,6 +699,10 @@ export class WebSocketServer {
 
     connection.host?.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status }));
 
+    connection.presenter.forEach((presenterWs) =>
+      presenterWs.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status }))
+    );
+
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS_CHANGED', status });
   }
 
@@ -675,6 +720,15 @@ export class WebSocketServer {
         type: 'ACTIVE_ITEM',
         activeItem: connection.activeItem
       })
+    );
+
+    connection.presenter.forEach((presenterWs) =>
+      presenterWs.send(
+        JSON.stringify({
+          type: 'ACTIVE_ITEM',
+          activeItem: connection.activeItem
+        })
+      )
     );
 
     await this.broadcastToAllLanguageChannels(connection.eventId, {
