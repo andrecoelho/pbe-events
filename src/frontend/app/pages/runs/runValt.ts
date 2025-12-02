@@ -353,6 +353,15 @@ export class RunValt {
     }
   }
 
+  disableTimer() {
+    this.ws?.send(
+      JSON.stringify({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: this.store.items[this.store.currentIndex]
+      })
+    );
+  }
+
   private handleTEAM_STATUS(teams: TeamStatus[]) {
     for (const team of teams) {
       this.store.teams[team.id] = team;

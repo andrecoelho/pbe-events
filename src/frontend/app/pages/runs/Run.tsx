@@ -57,12 +57,43 @@ const init = () => {
     }
   };
 
-  return { valt, handleStartEvent, handlePauseEvent, handleResumeEvent, handleCompleteEvent, handleResetEvent };
+  const handlePreviousEvent = async () => {
+    valt.previous();
+  };
+
+  const handleNextEvent = async () => {
+    valt.next();
+  };
+
+  const handleDisableTimer = async () => {
+    valt.disableTimer();
+  };
+
+  return {
+    valt,
+    handleStartEvent,
+    handlePauseEvent,
+    handleResumeEvent,
+    handleCompleteEvent,
+    handleResetEvent,
+    handlePreviousEvent,
+    handleNextEvent,
+    handleDisableTimer
+  };
 };
 
 export const Run = () => {
-  const { valt, handleStartEvent, handlePauseEvent, handleResumeEvent, handleCompleteEvent, handleResetEvent } =
-    useMemo(() => init(), []);
+  const {
+    valt,
+    handleStartEvent,
+    handlePauseEvent,
+    handleResumeEvent,
+    handleCompleteEvent,
+    handleResetEvent,
+    handlePreviousEvent,
+    handleNextEvent,
+    handleDisableTimer
+  } = useMemo(() => init(), []);
 
   const snap = useSnapshot(valt.store);
 
@@ -183,17 +214,23 @@ export const Run = () => {
 
             {snap.run.status === 'in_progress' && (
               <>
-                <button className='btn btn-neutral' onClick={() => valt.previous()}>
+                <button className='btn btn-neutral' onClick={handlePreviousEvent}>
                   <Icon name='chevron-left' className='size-4' />
                   Previous
                 </button>
-                <button className='btn btn-neutral' onClick={() => valt.next()}>
+                <button className='btn btn-neutral' onClick={handleNextEvent}>
                   Next
                   <Icon name='chevron-right' className='size-4' />
                 </button>
               </>
             )}
           </div>
+
+          {snap.run.activeItem && snap.run.activeItem.type === 'question' && snap.run.activeItem.phase === 'prompt' && (
+            <button className='btn btn-outline' onClick={handleDisableTimer}>
+              ∞ Disable Timer
+            </button>
+          )}
         </footer>
       </div>
     </RunValtContext.Provider>
