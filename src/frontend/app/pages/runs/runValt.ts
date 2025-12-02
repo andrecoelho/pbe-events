@@ -185,7 +185,7 @@ export class RunValt {
           }
         })
       );
-    } else if (status === 'not_started') {
+    } else if (status === 'completed') {
       this.ws?.send(
         JSON.stringify({
           type: 'SET_ACTIVE_ITEM',
