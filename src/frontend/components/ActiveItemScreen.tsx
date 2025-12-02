@@ -1,5 +1,6 @@
-import { RunValtContext } from '@/frontend/app/pages/runs/runValt';
-import { useContext, useEffect, useState } from 'react';
+import { useTeamValt } from '@/frontend/team/teamValt';
+import type { ActiveItem } from '@/types';
+import { useEffect, useState } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot, type Snapshot } from 'valtio';
 
@@ -22,6 +23,8 @@ const Title = ({
     </div>
   );
 };
+
+Title.displayName = 'Title';
 
 const Slide = ({
   item
@@ -49,6 +52,8 @@ const Slide = ({
     </div>
   );
 };
+
+Slide.displayName = 'Slide';
 
 const QuestionReading = ({
   item
@@ -82,6 +87,8 @@ const QuestionReading = ({
     </div>
   );
 };
+
+QuestionReading.displayName = 'QuestionReading';
 
 const QuestionPrompt = ({
   item
@@ -177,6 +184,8 @@ const QuestionPrompt = ({
   );
 };
 
+QuestionPrompt.displayName = 'QuestionPrompt';
+
 const QuestionAnswer = ({
   item,
   languages
@@ -207,6 +216,8 @@ const QuestionAnswer = ({
   );
 };
 
+QuestionAnswer.displayName = 'QuestionAnswer';
+
 const NotStarted = () => {
   return (
     <div className='absolute inset-0 flex flex-col items-center justify-center text-base-100 gap-8 px-10'>
@@ -214,6 +225,8 @@ const NotStarted = () => {
     </div>
   );
 };
+
+NotStarted.displayName = 'NotStarted';
 
 const Paused = () => {
   return (
@@ -223,6 +236,8 @@ const Paused = () => {
     </div>
   );
 };
+
+Paused.displayName = 'Paused';
 
 const Completed = () => {
   return (
@@ -237,20 +252,24 @@ const Completed = () => {
   );
 };
 
-export const ActiveItem = () => {
-  const runValt = useContext(RunValtContext);
-  const snap = useSnapshot(runValt!.store);
-  const activeItem = snap.run.activeItem;
+Completed.displayName = 'Completed';
 
-  if (snap.run.status === 'not_started') {
+export const ActiveItemScreen = (props: {
+  runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
+  languages: Record<string, string>;
+  activeItem: Snapshot<ActiveItem> | null;
+}) => {
+  const activeItem = props.activeItem;
+
+  if (props.runStatus === 'not_started') {
     return <NotStarted />;
   }
 
-  if (snap.run.status === 'paused') {
+  if (props.runStatus === 'paused') {
     return <Paused />;
   }
 
-  if (snap.run.status === 'completed') {
+  if (props.runStatus === 'completed') {
     return <Completed />;
   }
 
@@ -271,8 +290,10 @@ export const ActiveItem = () => {
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
-    return <QuestionAnswer item={activeItem} languages={snap.languages} />;
+    return <QuestionAnswer item={activeItem} languages={props.languages} />;
   }
 
   return null;
 };
+
+ActiveItemScreen.displayName = 'ActiveItemScreen';

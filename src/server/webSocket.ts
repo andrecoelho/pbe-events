@@ -25,6 +25,7 @@ export interface EventConnection {
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
   activeItem: ActiveItem | null;
+  languages?: Record<string, string>;
 }
 
 export interface Run {
@@ -152,136 +153,134 @@ export class WebSocketServer {
       return;
     }
 
-    try {
-      // Initialize connection tracking if needed
-      if (!this.eventConnections.has(eventId)) {
-        await this.initializeEventConnection(eventId);
-      }
+    // Initialize connection tracking if needed
+    if (!this.eventConnections.has(eventId)) {
+      await this.initializeEventConnection(eventId);
+    }
 
-      const connection = this.eventConnections.get(eventId)!;
+    const connection = this.eventConnections.get(eventId)!;
 
-      if (this.isHostWebSocket(ws)) {
-        connection.host = ws;
+    if (this.isHostWebSocket(ws)) {
+      connection.host = ws;
 
-        // Get all teams for this event
-        const allTeams: { id: string; name: string; number: number }[] =
-          await sql`SELECT id, name, number FROM teams WHERE event_id = ${eventId}`;
+      // Get all teams for this event
+      const allTeams: { id: string; name: string; number: number }[] =
+        await sql`SELECT id, name, number FROM teams WHERE event_id = ${eventId}`;
 
-        // Build status array for all teams
-        const teamStatuses = allTeams.map((team) => {
-          const teamWs = connection.teams.get(team.id);
+      // Build status array for all teams
+      const teamStatuses = allTeams.map((team) => {
+        const teamWs = connection.teams.get(team.id);
 
-          if (!teamWs) {
-            // Team is not connected
-            return {
-              id: team.id,
-              name: team.name,
-              number: team.number,
-              status: 'offline',
-              languageCode: null
-            };
-          }
-
-          // Team is connected - check if they have selected a language
-          if (teamWs.data.languageCode) {
-            return {
-              id: team.id,
-              name: team.name,
-              number: team.number,
-              status: 'ready',
-              languageCode: teamWs.data.languageCode
-            };
-          }
-
-          // Team is connected but no language selected
+        if (!teamWs) {
+          // Team is not connected
           return {
             id: team.id,
             name: team.name,
             number: team.number,
-            status: 'connected',
+            status: 'offline',
             languageCode: null
           };
-        });
-
-        // Send team status message to the newly connected host
-        ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
-        ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
-      } else if (this.isTeamWebSocket(ws)) {
-        const { teamId } = ws.data;
-
-        // Close existing connection if team reconnecting
-        if (connection.teams.has(teamId)) {
-          connection.teams.get(teamId)?.close();
         }
 
-        connection.teams.set(teamId, ws);
+        // Team is connected - check if they have selected a language
+        if (teamWs.data.languageCode) {
+          return {
+            id: team.id,
+            name: team.name,
+            number: team.number,
+            status: 'ready',
+            languageCode: teamWs.data.languageCode
+          };
+        }
 
-        // Get team details including language
-        const teams: {
-          language_id: string | null;
-          code: string | null;
-          name: string;
-          number: number;
-        }[] = await sql`
+        // Team is connected but no language selected
+        return {
+          id: team.id,
+          name: team.name,
+          number: team.number,
+          status: 'connected',
+          languageCode: null
+        };
+      });
+
+      // Send team status message to the newly connected host
+      ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+    } else if (this.isTeamWebSocket(ws)) {
+      const { teamId } = ws.data;
+
+      // Close existing connection if team reconnecting
+      if (connection.teams.has(teamId)) {
+        connection.teams.get(teamId)?.close();
+      }
+
+      connection.teams.set(teamId, ws);
+
+      // Get team details including language
+      const teams: {
+        language_id: string | null;
+        code: string | null;
+        name: string;
+        number: number;
+      }[] = await sql`
           SELECT t.language_id, l.code, t.name, t.number
           FROM teams t
           LEFT JOIN languages l ON l.id = t.language_id
           WHERE t.id = ${teamId}
         `;
 
-        if (teams.length > 0) {
-          const team = teams[0]!;
+      if (teams.length > 0) {
+        const team = teams[0]!;
 
-          ws.data.languageId = team.language_id;
-          ws.data.languageCode = team.code;
+        ws.data.languageId = team.language_id;
+        ws.data.languageCode = team.code;
 
-          // Subscribe to language channel if language selected
-          if (team.code) {
-            ws.subscribe(`${eventId}:${team.code}`);
+        // Subscribe to language channel if language selected
+        if (team.code) {
+          ws.subscribe(`${eventId}:${team.code}`);
 
-            // Send TEAM_CONNECTED to host
-            connection.host?.send(
-              JSON.stringify({
-                type: 'TEAM_STATUS',
-                teams: [
-                  {
-                    id: teamId,
-                    status: 'ready',
-                    name: team.name,
-                    number: team.number,
-                    languageCode: team.code
-                  }
-                ]
-              })
-            );
-          } else {
-            connection.host?.send(
-              JSON.stringify({
-                type: 'TEAM_STATUS',
-                teams: [
-                  {
-                    id: teamId,
-                    status: 'connected',
-                    name: team.name,
-                    number: team.number,
-                    languageCode: null
-                  }
-                ]
-              })
-            );
-          }
+          // Send TEAM_CONNECTED to host
+          connection.host?.send(
+            JSON.stringify({
+              type: 'TEAM_STATUS',
+              teams: [
+                {
+                  id: teamId,
+                  status: 'ready',
+                  name: team.name,
+                  number: team.number,
+                  languageCode: team.code
+                }
+              ]
+            })
+          );
+        } else {
+          connection.host?.send(
+            JSON.stringify({
+              type: 'TEAM_STATUS',
+              teams: [
+                {
+                  id: teamId,
+                  status: 'connected',
+                  name: team.name,
+                  number: team.number,
+                  languageCode: null
+                }
+              ]
+            })
+          );
+        }
 
-          ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+        // Send initial state to team
+        ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+        ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run!.status }));
+        ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
-          // Send existing answer if active question and team has language
-          if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
-            await this.sendExistingAnswerToTeam(ws, connection);
-          }
+        // Send existing answer if active question and team has language
+        if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
+          await this.sendExistingAnswerToTeam(ws, connection);
         }
       }
-    } catch (error) {
-      console.log('WebSocket open error', error);
-      ws.close();
     }
   };
 
@@ -406,6 +405,16 @@ export class WebSocketServer {
 
       connection.activeItem = run.active_item;
     }
+
+    // Fetch languages for the event
+    const languages: { code: string; name: string }[] = await sql`
+      SELECT code, name
+      FROM languages
+      WHERE event_id = ${eventId}
+    `;
+
+    const connection = this.eventConnections.get(eventId)!;
+    connection.languages = Object.fromEntries(languages.map((lang) => [lang.code, lang.name]));
   }
 
   private async sendExistingAnswerToTeam(

@@ -7,7 +7,7 @@ import { useEffect, useMemo } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot } from 'valtio';
 import './Run.css';
-import { ActiveItem } from '@/frontend/app/pages/runs/ActiveItem';
+import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreen';
 
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',
@@ -82,7 +82,7 @@ export const Run = () => {
           {/* Current Slide */}
           <div className='card shadow-md w-180 h-135 bg-primary relative flex items-center justify-center'>
             <img src={logo} className='opacity-10' />
-            <ActiveItem />
+            <ActiveItemScreen activeItem={snap.run.activeItem} languages={snap.languages} runStatus={snap.run.status} />
           </div>
 
           {/* Team connection status */}

@@ -1,32 +1,39 @@
-import { TeamValt } from '@/frontend/team/teamValt';
+import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreen';
+import { TeamValt, TeamValtContext } from '@/frontend/team/teamValt';
 import { useMemo } from 'react';
+import logo from 'src/assets/favicon.svg';
+import '../base.css';
+import { useSnapshot } from 'valtio';
 
 const init = () => {
   const url = new URL(window.location.href);
   const eventId = url.searchParams.get('eventId');
   const teamId = url.searchParams.get('teamId');
 
-  if (!eventId) {
-    console.error('No eventId found in URL');
-    return;
-  }
+  const valt = new TeamValt();
 
-  if (!teamId) {
-    console.error('No teamId found in URL');
-    return;
-  }
-
-  const valt = new TeamValt(eventId, teamId);
-
-  valt.init().catch((error) => {
+  valt.init(eventId, teamId).catch((error) => {
     console.error('Failed to initialize TeamValt:', error);
   });
+
+  return { valt };
 };
 
 export const Team = () => {
-  useMemo(init, []);
+  const { valt } = useMemo(init, []);
+  const snap = useSnapshot(valt.store);
 
-  return <div className='flex justify-center items-center h-screen'>Welcome, Team Member!</div>;
+  if (!valt) {
+    return <div>Initialization error. Check console for details.</div>;
+  }
+
+  return (
+    <div className='fixed inset-0 flex justify-center items-center bg-primary'>
+      <img src={logo} className='opacity-10' />
+
+      <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+    </div>
+  );
 };
 
 Team.displayName = 'Team';
