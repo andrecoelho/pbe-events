@@ -178,7 +178,8 @@ const QuestionPrompt = ({
 };
 
 const QuestionAnswer = ({
-  item
+  item,
+  languages
 }: {
   item: Snapshot<{
     type: 'question';
@@ -187,6 +188,7 @@ const QuestionAnswer = ({
     phase: 'answer';
     translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
   }>;
+  languages: Record<string, string>;
 }) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
@@ -194,9 +196,10 @@ const QuestionAnswer = ({
         <img src={logo} className='h-28' />
         <h1 className='text-5xl uppercase text-center font-serif'>Question #{item.number}</h1>
       </div>
+      <h2 className='text-4xl font-serif font-semibold border-b border-accent pb-4'>Answers:</h2>
       {item.translations.map((t) => (
         <div key={t.languageCode} className='text-2xl font-serif'>
-          ({t.languageCode.toUpperCase()}) &nbsp;
+          [{languages[t.languageCode]}] &nbsp;
           {t.answer} {t.clarification && <> ({t.clarification})</>}
         </div>
       ))}
@@ -268,7 +271,7 @@ export const ActiveItem = () => {
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
-    return <QuestionAnswer item={activeItem} />;
+    return <QuestionAnswer item={activeItem} languages={snap.languages} />;
   }
 
   return null;
