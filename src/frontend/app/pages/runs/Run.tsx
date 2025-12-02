@@ -80,8 +80,8 @@ export const Run = () => {
           <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
 
           {/* Current Slide */}
-          <div className='card shadow-md w-180 h-135 bg-primary relative flex items-center justify-center p-10 overflow-hidden'>
-            <img src={logo} className='opacity-20' />
+          <div className='card shadow-md w-180 h-135 bg-primary relative flex items-center justify-center'>
+            <img src={logo} className='opacity-10' />
             <ActiveItem />
           </div>
 

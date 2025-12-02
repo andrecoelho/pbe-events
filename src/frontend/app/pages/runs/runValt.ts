@@ -117,7 +117,9 @@ export class RunValt {
         id: question.id,
         number: question.number,
         questionType: question.type,
+        maxPoints: question.maxPoints,
         phase: 'reading',
+        seconds: question.seconds,
         translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt }))
       });
 
@@ -126,6 +128,7 @@ export class RunValt {
         id: question.id,
         number: question.number,
         questionType: question.type,
+        maxPoints: question.maxPoints,
         phase: 'prompt',
         seconds: question.seconds,
         startTime: new Date().toISOString(),

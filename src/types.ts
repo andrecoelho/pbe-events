@@ -9,7 +9,9 @@ export type ActiveItem =
       id: string;
       number: number;
       questionType: 'PG' | 'PS' | 'TF' | 'FB';
+      maxPoints: number;
       phase: 'reading';
+      seconds: number;
       translations: Array<{ languageCode: string; prompt: string }>;
     }
   | {
@@ -17,6 +19,7 @@ export type ActiveItem =
       id: string;
       number: number;
       questionType: 'PG' | 'PS' | 'TF' | 'FB';
+      maxPoints: number;
       phase: 'prompt';
       seconds: number;
       startTime: string;
