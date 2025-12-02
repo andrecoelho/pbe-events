@@ -219,16 +219,17 @@ export const Run = () => {
             )}
 
             {snap.run.status === 'in_progress' && (
-              <>
-                <button className='btn btn-neutral' onClick={handlePreviousEvent}>
-                  <Icon name='chevron-left' className='size-4' />
-                  Previous
-                </button>
-                <button className='btn btn-neutral' onClick={handleNextEvent}>
-                  Next
-                  <Icon name='chevron-right' className='size-4' />
-                </button>
-              </>
+              <button className='btn btn-neutral' onClick={handlePreviousEvent}>
+                <Icon name='chevron-left' className='size-4' />
+                Previous
+              </button>
+            )}
+
+            {snap.run.status === 'in_progress' && (
+              <button className='btn btn-neutral' onClick={handleNextEvent}>
+                Next
+                <Icon name='chevron-right' className='size-4' />
+              </button>
             )}
           </div>
 
