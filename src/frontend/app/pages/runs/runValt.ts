@@ -16,7 +16,7 @@ export interface TeamStatus {
 export interface Question {
   id: string;
   number: number;
-  type: string;
+  type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
   translations: Array<{ languageCode: string; prompt: string }>;
@@ -38,11 +38,10 @@ interface RunStore {
   initialized: boolean;
   eventId: string;
   eventName: string;
-  titleRemarks: string | null;
   run: Run;
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
-  questions: Question[];
-  slides: Slide[];
+  items: ActiveItem[];
+  currentIndex: number;
   languages: Record<string, string>;
   teams: Record<string, TeamStatus>;
 }
@@ -58,16 +57,14 @@ export class RunValt {
       initialized: false,
       eventId: '',
       eventName: '',
-      titleRemarks: null,
       run: {
         status: 'not_started',
         gracePeriod: 0,
         activeItem: null
       },
       connectionState: 'disconnected',
-      reconnectAttempts: 0,
-      questions: [],
-      slides: [],
+      items: [],
+      currentIndex: -1,
       languages: {},
       teams: {}
     });
@@ -91,11 +88,61 @@ export class RunValt {
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
-    this.store.titleRemarks = response.titleRemarks;
     this.store.run = response.run;
-    this.store.questions = response.questions;
-    this.store.slides = response.slides;
     this.store.languages = response.languages;
+
+    // Build items array: title, slides, questions
+    const items: ActiveItem[] = [];
+
+    // First item: title
+    items.push({
+      type: 'title',
+      title: 'PATHFINDER BIBLE EXPERIENCE',
+      remarks: response.titleRemarks
+    });
+
+    // Add slides
+    for (const slide of response.slides) {
+      items.push({
+        type: 'slide',
+        number: slide.number,
+        content: slide.content
+      });
+    }
+
+    // Add questions
+    for (const question of response.questions) {
+      items.push({
+        type: 'question',
+        id: question.id,
+        number: question.number,
+        questionType: question.type,
+        phase: 'prompt',
+        seconds: question.seconds,
+        startTime: new Date().toISOString(),
+        hasTimer: true,
+        translations: question.translations
+      });
+    }
+
+    this.store.items = items;
+
+    // Set current index based on activeItem
+    if (response.run.activeItem) {
+      const activeItem = response.run.activeItem;
+
+      const index = items.findIndex((item) => {
+        if (item.type === 'title' && activeItem.type === 'title') return true;
+        if (item.type === 'slide' && activeItem.type === 'slide' && item.number === activeItem.number) return true;
+        if (item.type === 'question' && activeItem.type === 'question' && item.id === activeItem.id) return true;
+        return false;
+      });
+
+      this.store.currentIndex = index !== -1 ? index : 0;
+    } else {
+      this.store.currentIndex = 0;
+    }
+
     this.store.initialized = true;
 
     return await this.connectWebSocket();
@@ -186,16 +233,19 @@ export class RunValt {
     this.ws?.send(JSON.stringify({ type: 'UPDATE_RUN_STATUS', status }));
 
     if (this.store.run.status === 'not_started' && status === 'in_progress') {
-      this.ws?.send(
-        JSON.stringify({
-          type: 'SET_ACTIVE_ITEM',
-          activeItem: {
-            type: 'title',
-            title: 'PATHFINDER BIBLE EXPERIENCE',
-            remarks: this.store.titleRemarks
-          }
-        })
-      );
+      // Start at the first item (title)
+      this.store.currentIndex = 0;
+
+      const activeItem = this.store.items[0];
+
+      if (activeItem) {
+        this.ws?.send(
+          JSON.stringify({
+            type: 'SET_ACTIVE_ITEM',
+            activeItem
+          })
+        );
+      }
     } else if (status === 'completed') {
       this.ws?.send(
         JSON.stringify({
@@ -206,6 +256,70 @@ export class RunValt {
     }
 
     return { ok: true } as const;
+  }
+
+  next() {
+    if (this.store.currentIndex < this.store.items.length - 1) {
+      this.store.currentIndex++;
+
+      const nextItem = this.store.items[this.store.currentIndex];
+
+      if (nextItem) {
+        // For questions, update the startTime to current time
+        if (nextItem.type === 'question') {
+          const updatedItem = {
+            ...nextItem,
+            startTime: new Date().toISOString()
+          };
+
+          this.ws?.send(
+            JSON.stringify({
+              type: 'SET_ACTIVE_ITEM',
+              activeItem: updatedItem
+            })
+          );
+        } else {
+          this.ws?.send(
+            JSON.stringify({
+              type: 'SET_ACTIVE_ITEM',
+              activeItem: nextItem
+            })
+          );
+        }
+      }
+    }
+  }
+
+  previous() {
+    if (this.store.currentIndex > 0) {
+      this.store.currentIndex--;
+
+      const prevItem = this.store.items[this.store.currentIndex];
+
+      if (prevItem) {
+        // For questions, update the startTime to current time
+        if (prevItem.type === 'question') {
+          const updatedItem = {
+            ...prevItem,
+            startTime: new Date().toISOString()
+          };
+
+          this.ws?.send(
+            JSON.stringify({
+              type: 'SET_ACTIVE_ITEM',
+              activeItem: updatedItem
+            })
+          );
+        } else {
+          this.ws?.send(
+            JSON.stringify({
+              type: 'SET_ACTIVE_ITEM',
+              activeItem: prevItem
+            })
+          );
+        }
+      }
+    }
   }
 
   private handleTEAM_STATUS(teams: TeamStatus[]) {
@@ -225,4 +339,4 @@ export const useRunValt = () => {
   }
 
   return valt;
-}
+};

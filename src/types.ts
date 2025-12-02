@@ -3,7 +3,7 @@
 // Discriminated union for active item types stored in runs.active_item JSONB column
 export type ActiveItem =
   | { type: 'title'; title: string; remarks: string | null }
-  | { type: 'slide'; content: string }
+  | { type: 'slide'; number: number; content: string }
   | {
       type: 'question';
       id: string;
