@@ -1,4 +1,4 @@
-import type { TeamsValt } from '@/frontend/app/pages/teams/teamsValt';
+import type { ActiveItem } from '@/types';
 import { proxy } from 'valtio';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -29,18 +29,7 @@ export interface Slide {
 interface Run {
   status: 'not_started' | 'in_progress' | 'paused' | 'completed';
   gracePeriod: number;
-  activeQuestion?: {
-    id: string;
-    number: number;
-    type: string;
-    maxPoints: number;
-    seconds: number;
-  };
-  activeSlide?: {
-    id: string;
-    number: number;
-    content: string;
-  };
+  activeItem: ActiveItem | null;
 }
 
 interface RunStore {
@@ -68,7 +57,8 @@ export class RunValt {
       eventName: '',
       run: {
         status: 'not_started',
-        gracePeriod: 0
+        gracePeriod: 0,
+        activeItem: null
       },
       connectionState: 'disconnected',
       reconnectAttempts: 0,
@@ -166,41 +156,20 @@ export class RunValt {
     this.ws?.close();
   }
 
-  async startRun() {
-    this.ws?.send(JSON.stringify({ type: 'START_RUN' }));
-    this.store.run.status = 'in_progress';
-    return { ok: true } as const;
-  }
+  async updateRunStatus(status: 'not_started' | 'in_progress' | 'paused' | 'completed') {
+    this.ws?.send(JSON.stringify({ type: 'UPDATE_RUN_STATUS', status }));
+    this.store.run.status = status;
 
-  async pauseRun() {
-    this.ws?.send(JSON.stringify({ type: 'PAUSE_RUN' }));
-    this.store.run.status = 'paused';
-    return { ok: true } as const;
-  }
+    if (status === 'not_started') {
+      this.store.run.activeItem = null;
+    }
 
-  async resumeRun() {
-    this.ws?.send(JSON.stringify({ type: 'RESUME_RUN' }));
-    this.store.run.status = 'in_progress';
-    return { ok: true } as const;
-  }
-
-  async completeRun() {
-    this.ws?.send(JSON.stringify({ type: 'COMPLETE_RUN' }));
-    this.store.run.status = 'completed';
     return { ok: true } as const;
   }
 
   async updateGracePeriod(gracePeriod: number) {
     this.ws?.send(JSON.stringify({ type: 'UPDATE_GRACE_PERIOD', gracePeriod }));
     this.store.run.gracePeriod = gracePeriod;
-    return { ok: true } as const;
-  }
-
-  async resetRun() {
-    this.ws?.send(JSON.stringify({ type: 'RESET_RUN' }));
-    this.store.run.status = 'not_started';
-    this.store.run.activeQuestion = undefined;
-    this.store.run.activeSlide = undefined;
     return { ok: true } as const;
   }
 

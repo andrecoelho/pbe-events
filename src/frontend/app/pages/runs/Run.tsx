@@ -1,5 +1,6 @@
 import type { TeamStatus } from '@/frontend/app/pages/runs/runValt';
 import { RunValt } from '@/frontend/app/pages/runs/runValt';
+import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useEffect, useMemo } from 'react';
@@ -30,30 +31,34 @@ const init = () => {
   }
 
   const handleStartEvent = async () => {
-    await valt.startRun();
+    await valt.updateRunStatus('in_progress');
   };
 
   const handlePauseEvent = async () => {
-    await valt.pauseRun();
+    await valt.updateRunStatus('paused');
   };
 
-  const handleResumeRun = async () => {
-    await valt.resumeRun();
+  const handleResumeEvent = async () => {
+    await valt.updateRunStatus('in_progress');
   };
 
   const handleCompleteEvent = async () => {
-    await valt.completeRun();
+    await valt.updateRunStatus('completed');
   };
 
   const handleResetEvent = async () => {
-    await valt.resetRun();
+    const confirmed = await confirmModal.open('Are you sure you want to reset this run? All team answers will be deleted.');
+
+    if (confirmed) {
+      await valt.updateRunStatus('not_started');
+    }
   };
 
-  return { valt, handleStartEvent, handlePauseEvent, handleResumeRun, handleCompleteEvent, handleResetEvent };
+  return { valt, handleStartEvent, handlePauseEvent, handleResumeEvent, handleCompleteEvent, handleResetEvent };
 };
 
 export const Run = () => {
-  const { valt, handleStartEvent, handlePauseEvent, handleResumeRun, handleCompleteEvent, handleResetEvent } = useMemo(
+  const { valt, handleStartEvent, handlePauseEvent, handleResumeEvent, handleCompleteEvent, handleResetEvent } = useMemo(
     () => init(),
     []
   );
@@ -149,7 +154,7 @@ export const Run = () => {
             </button>
           )}
           {snap.run.status === 'paused' && (
-            <button className='btn btn-success' onClick={handleResumeRun}>
+            <button className='btn btn-success' onClick={handleResumeEvent}>
               <Icon name='play' className='size-4' />
               Resume
             </button>

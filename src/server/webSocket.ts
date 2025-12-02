@@ -1,6 +1,7 @@
 import { sql, type ServerWebSocket } from 'bun';
-import type { Session, Run, ActiveItemCache } from '@/server/types';
-import { textBadRequest, textForbidden, textServerError, textUnauthorized } from '@/server/utils/responses';
+import type { Session } from '@/server/types';
+import type { ActiveItem } from '@/types';
+import { textServerError } from '@/server/utils/responses';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -23,7 +24,12 @@ export interface EventConnection {
   host: ServerWebSocket<WebsocketData> | null;
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run | null;
-  activeItem: ActiveItemCache | null;
+  activeItem: ActiveItem | null;
+}
+
+export interface Run {
+  status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+  gracePeriod: number;
 }
 
 export class WebSocketServer {
@@ -36,31 +42,6 @@ export class WebSocketServer {
 
   setServer(server: Bun.Server<WebsocketData>) {
     this.server = server;
-  }
-
-  hasConnection(eventId: string): boolean {
-    return this.eventConnections.has(eventId);
-  }
-
-  getConnection(eventId: string): EventConnection | undefined {
-    return this.eventConnections.get(eventId);
-  }
-
-  completeRun(eventId: string): void {
-    const connection = this.eventConnections.get(eventId);
-
-    if (!connection) {
-      return;
-    }
-
-    // Remove the cached connection first so handleClose ignores the teardown closes
-    this.eventConnections.delete(eventId);
-
-    connection.host?.close();
-
-    for (const ws of connection.teams.values()) {
-      ws.close();
-    }
   }
 
   createHandlers() {
@@ -301,7 +282,7 @@ export class WebSocketServer {
   };
 
   // Called when a WebSocket connection is closed
-  private handleClose = async (ws: ServerWebSocket<WebsocketData>, code: number, reason: string) => {
+  private handleClose = async (ws: ServerWebSocket<WebsocketData>) => {
     const { eventId, role } = ws.data;
 
     if (!eventId) {
@@ -314,34 +295,31 @@ export class WebSocketServer {
       return;
     }
 
-    try {
-      if (role === 'host') {
-        connection.host = null;
-        ws.send(JSON.stringify({ type: 'HOST_DISCONNECTED' }));
-      } else {
-        const { teamId, languageCode } = ws.data;
+    if (role === 'host') {
+      connection.host = null;
+    } else {
+      const { teamId, languageCode } = ws.data;
 
-        connection.teams.delete(teamId);
+      connection.teams.delete(teamId);
 
-        // Unsubscribe from language channel
-        if (languageCode) {
-          ws.unsubscribe(`${eventId}:${languageCode}`);
-        }
-
-        // Notify host
-        const message = JSON.stringify({
-          type: 'TEAM_DISCONNECTED',
-          teamId
-        });
-
-        connection.host?.send(message);
+      // Unsubscribe from language channel
+      if (languageCode) {
+        ws.unsubscribe(`${eventId}:${languageCode}`);
       }
 
-      // Clean up empty connections
-      if (!connection.host && connection.teams.size === 0) {
-        this.eventConnections.delete(eventId);
-      }
-    } catch (error) {}
+      // Notify host
+      const message = JSON.stringify({
+        type: 'TEAM_DISCONNECTED',
+        teamId
+      });
+
+      connection.host?.send(message);
+    }
+
+    // Clean up empty connections
+    if (!connection.host && connection.teams.size === 0) {
+      this.eventConnections.delete(eventId);
+    }
   };
 
   // Called when a WebSocket message is received
@@ -358,76 +336,34 @@ export class WebSocketServer {
       return;
     }
 
-    try {
-      // Handle team messages
-      if (role === 'team') {
-        const msg = JSON.parse(message as string) as
-          | { type: 'SELECT_LANGUAGE'; languageId: string }
-          | { type: 'SUBMIT_ANSWER'; answer: string }
-          | { type: 'UPDATE_ANSWER'; answer: string };
+    // Handle team messages
+    if (role === 'team') {
+      const msg = JSON.parse(message as string) as
+        | { type: 'SELECT_LANGUAGE'; languageId: string }
+        | { type: 'SUBMIT_ANSWER'; answer: string };
 
-        switch (msg.type) {
-          case 'SELECT_LANGUAGE':
-            await this.handleSELECT_LANGUAGE(ws, connection, msg.languageId);
-            break;
-          case 'SUBMIT_ANSWER':
-          case 'UPDATE_ANSWER':
-            await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
-            break;
-        }
+      switch (msg.type) {
+        case 'SELECT_LANGUAGE':
+          await this.handleSELECT_LANGUAGE(ws, connection, msg.languageId);
+          break;
+        case 'SUBMIT_ANSWER':
+          await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+          break;
       }
+    }
 
-      // Handle host messages
-      if (role === 'host') {
-        const msg = JSON.parse(message as string) as
-          | { type: 'START_RUN' }
-          | { type: 'PAUSE_RUN' }
-          | { type: 'RESUME_RUN' }
-          | { type: 'COMPLETE_RUN' }
-          | { type: 'RESET_RUN' }
-          | { type: 'START_QUESTION'; questionId: string; hasTimer: boolean }
-          | { type: 'SHOW_ANSWER' }
-          | { type: 'END_QUESTION' }
-          | { type: 'SHOW_SLIDE'; slideId: string };
+    // Handle host messages
+    if (role === 'host') {
+      const msg = JSON.parse(message as string) as {
+        type: 'UPDATE_RUN_STATUS';
+        status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+      };
 
-        switch (msg.type) {
-          case 'START_RUN':
-            await this.handleSTART_RUN(connection);
-            break;
-          case 'PAUSE_RUN':
-            await this.handlePAUSE_RUN(connection);
-            break;
-          case 'RESUME_RUN':
-            await this.handleRESUME_RUN(connection);
-            break;
-          case 'COMPLETE_RUN':
-            await this.handleCOMPLETE_RUN(connection);
-            break;
-          case 'RESET_RUN':
-            await this.handleRESET_RUN(connection);
-            break;
-          case 'START_QUESTION':
-            await this.handleSTART_QUESTION(connection, msg.questionId, msg.hasTimer);
-            break;
-          case 'SHOW_ANSWER':
-            await this.handleSHOW_ANSWER(connection);
-            break;
-          case 'END_QUESTION':
-            await this.handleEND_QUESTION(connection);
-            break;
-          case 'SHOW_SLIDE':
-            await this.handleSHOW_SLIDE(connection, msg.slideId);
-            break;
-        }
+      switch (msg.type) {
+        case 'UPDATE_RUN_STATUS':
+          await this.handleUPDATE_RUN_STATUS(connection, msg.status);
+          break;
       }
-    } catch (error) {
-      const errorMsg = JSON.stringify({
-        type: 'ERROR',
-        code: 'INVALID_ROLE',
-        message: 'Error processing message'
-      });
-
-      ws.send(errorMsg);
     }
   };
 
@@ -445,12 +381,9 @@ export class WebSocketServer {
       event_id: string;
       status: string;
       grace_period: number;
-      active_id: string | null;
-      active_phase: string | null;
-      active_start_time: string | null;
-      active_has_timer: boolean | null;
+      active_item: ActiveItem | null;
     }[] = await sql`
-      SELECT event_id, status, grace_period, active_id, active_phase, active_start_time, active_has_timer
+      SELECT event_id, status, grace_period, active_item
       FROM runs
       WHERE event_id = ${eventId}
     `;
@@ -459,36 +392,12 @@ export class WebSocketServer {
       const connection = this.eventConnections.get(eventId)!;
 
       connection.run = {
-        eventId: run.event_id,
         status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
         gracePeriod: run.grace_period
       };
 
-      // Cache active item if exists
-      if (run.active_id && run.active_phase && run.active_start_time && run.active_has_timer !== null) {
-        const [question]: { seconds: number }[] = await sql`SELECT seconds FROM questions WHERE id = ${run.active_id}`;
-
-        if (question) {
-          connection.activeItem = {
-            id: run.active_id,
-            type: 'question',
-            phase: run.active_phase as 'prompt' | 'answer' | 'ended',
-            seconds: question.seconds,
-            startTime: run.active_start_time,
-            hasTimer: run.active_has_timer
-          };
-        } else {
-          // It's a slide
-          connection.activeItem = {
-            id: run.active_id,
-            type: 'slide',
-            phase: 'slide',
-            seconds: 0,
-            startTime: run.active_start_time,
-            hasTimer: run.active_has_timer
-          };
-        }
-      }
+      // Cache active item directly from JSONB
+      connection.activeItem = run.active_item;
     }
   }
 
@@ -538,6 +447,7 @@ export class WebSocketServer {
       `;
 
       const messageStr = JSON.stringify(message);
+
       languages.forEach((lang) => {
         this.server.publish(`${eventId}:${lang.code}`, messageStr);
       });
@@ -736,254 +646,35 @@ export class WebSocketServer {
     }
   }
 
-  private async handleSTART_RUN(connection: EventConnection): Promise<void> {
-    connection.run!.status = 'in_progress';
+  private async handleUPDATE_RUN_STATUS(
+    connection: EventConnection,
+    status: 'not_started' | 'in_progress' | 'paused' | 'completed'
+  ): Promise<void> {
+    connection.run!.status = status;
 
-    await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STARTED' });
-  }
+    // Reset run clears answers and active item
+    if (status === 'not_started') {
+      connection.activeItem = null;
 
-  private async handlePAUSE_RUN(connection: EventConnection): Promise<void> {
-    connection.run!.status = 'paused';
+      await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
 
-    await sql`UPDATE runs SET status = 'paused' WHERE event_id = ${connection.eventId}`;
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_PAUSED' });
-  }
-
-  private async handleRESUME_RUN(connection: EventConnection): Promise<void> {
-    connection.run!.status = 'in_progress';
-
-    await sql`UPDATE runs SET status = 'in_progress' WHERE event_id = ${connection.eventId}`;
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESUMED' });
-  }
-
-  private async handleCOMPLETE_RUN(connection: EventConnection): Promise<void> {
-    connection.run!.status = 'completed';
-
-    await sql`UPDATE runs SET status = 'completed' WHERE event_id = ${connection.eventId}`;
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_COMPLETED' });
-  }
-
-  private async handleRESET_RUN(connection: EventConnection): Promise<void> {
-    connection.run!.status = 'not_started';
-
-    await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
-
-    await sql`
+      await sql`
         UPDATE runs
         SET status = 'not_started',
-            active_id = NULL,
-            active_phase = NULL,
-            active_start_time = NULL,
-            active_has_timer = NULL
+            active_item = NULL
         WHERE event_id = ${connection.eventId}
       `;
+    } else {
+      connection.activeItem = { type: 'blank' };
 
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_RESET' });
-  }
-
-  private async handleSTART_QUESTION(
-    connection: EventConnection,
-    questionId: string,
-    hasTimer: boolean
-  ): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      // Generate timestamp
-      const activeStartTime = new Date().toISOString();
-
-      // Update run
       await sql`
         UPDATE runs
-        SET active_id = ${questionId},
-            active_phase = 'prompt',
-            active_start_time = ${activeStartTime},
-            active_has_timer = ${hasTimer}
+        SET status = ${status},
+            active_item = ${JSON.stringify({ type: 'blank' })}::jsonb
         WHERE event_id = ${connection.eventId}
       `;
-
-      // Get question seconds and update connection cache
-      const [question]: { seconds: number }[] = await sql`
-        SELECT seconds FROM questions WHERE id = ${questionId}
-      `;
-
-      if (question) {
-        connection.activeItem = {
-          id: questionId,
-          type: 'question',
-          phase: 'prompt',
-          seconds: question.seconds,
-          startTime: activeStartTime,
-          hasTimer
-        };
-      }
-
-      // Get all translations
-      const translations: {
-        id: string;
-        prompt: string;
-        clarification: string | null;
-        language_id: string;
-        code: string;
-      }[] = await sql`
-        SELECT t.id, t.prompt, t.clarification, t.language_id, l.code
-        FROM translations t
-        JOIN languages l ON l.id = t.language_id
-        WHERE t.question_id = ${questionId}
-      `;
-
-      // Group by language and broadcast
-      const languageMap = new Map<string, any>();
-
-      for (const t of translations) {
-        languageMap.set(t.code, {
-          type: 'QUESTION_STARTED',
-          translation: {
-            id: t.id,
-            prompt: t.prompt,
-            clarification: t.clarification,
-            languageId: t.language_id,
-            questionId
-          },
-          startTime: Date.now(),
-          seconds: connection.activeItem!.seconds,
-          hasTimer,
-          gracePeriod: connection.run.gracePeriod
-        });
-      }
-
-      // Broadcast to each language channel
-      for (const [code, message] of languageMap) {
-        this.server.publish(`${connection.eventId}:${code}`, JSON.stringify(message));
-      }
-
-      // Send existing answers to teams
-      for (const teamWs of connection.teams.values()) {
-        await this.sendExistingAnswerToTeam(teamWs, connection);
-      }
-    } catch {}
-  }
-
-  private async handleSHOW_ANSWER(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
     }
 
-    if (!connection.activeItem || connection.activeItem.type !== 'question') {
-      return;
-    }
-
-    try {
-      // Update run to answer phase
-      await sql`
-        UPDATE runs
-        SET active_phase = 'answer'
-        WHERE event_id = ${connection.eventId}
-      `;
-
-      connection.activeItem.phase = 'answer';
-
-      // Get all translations with answers
-      const translations: {
-        code: string;
-        answer: string;
-        clarification: string | null;
-      }[] = await sql`
-        SELECT l.code, t.answer, t.clarification
-        FROM translations t
-        JOIN languages l ON l.id = t.language_id
-        WHERE t.question_id = ${connection.activeItem.id}
-      `;
-
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'ANSWER_SHOWN',
-        translations: translations.map((t) => ({
-          languageCode: t.code,
-          answer: t.answer,
-          clarification: t.clarification
-        }))
-      });
-    } catch {}
-  }
-
-  private async handleEND_QUESTION(connection: EventConnection): Promise<void> {
-    if (!connection.run) {
-      return;
-    }
-
-    try {
-      // Update run to ended phase
-      await sql`
-        UPDATE runs
-        SET active_phase = 'ended'
-        WHERE event_id = ${connection.eventId}
-      `;
-
-      if (connection.activeItem) {
-        connection.activeItem.phase = 'ended';
-      }
-
-      // Broadcast to all language channels
-      await this.broadcastToAllLanguageChannels(connection.eventId, {
-        type: 'QUESTION_ENDED'
-      });
-    } catch {}
-  }
-
-  private async handleSHOW_SLIDE(connection: EventConnection, slideId: string): Promise<void> {
-    try {
-      const slides: {
-        id: string;
-        event_id: string;
-        number: number;
-        content: string;
-        created_at: string;
-      }[] = await sql`
-        SELECT id, event_id, number, content, created_at
-        FROM slides
-        WHERE id = ${slideId} AND event_id = ${connection.eventId}
-      `;
-
-      if (slides.length > 0) {
-        const slide = slides[0]!;
-        const activeStartTime = new Date().toISOString();
-
-        // Update run with slide
-        await sql`
-          UPDATE runs
-          SET active_id = ${slideId},
-              active_phase = 'slide',
-              active_start_time = ${activeStartTime},
-              active_has_timer = false
-          WHERE event_id = ${connection.eventId}
-        `;
-
-        // Update cache
-        connection.activeItem = {
-          id: slideId,
-          type: 'slide',
-          phase: 'slide',
-          seconds: 0,
-          startTime: activeStartTime,
-          hasTimer: false
-        };
-
-        await this.broadcastToAllLanguageChannels(connection.eventId, {
-          type: 'SLIDE_SHOWN',
-          slide: {
-            id: slide.id,
-            eventId: slide.event_id,
-            number: slide.number,
-            content: slide.content,
-            createdAt: slide.created_at
-          }
-        });
-      }
-      // Silently ignore if slide not found (don't send error to teams)
-    } catch {}
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS_CHANGED', status });
   }
 }

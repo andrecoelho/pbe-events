@@ -1,5 +1,5 @@
 import { sql } from 'bun';
-import type { Routes, Slide } from '@/server/types';
+import type { Routes } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
 import {
