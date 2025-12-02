@@ -470,65 +470,41 @@ export class WebSocketServer {
 
     const { teamId } = ws.data;
 
-    // Check if run has started
-    if (connection.run?.status !== 'not_started') {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'RUN_ALREADY_STARTED',
-          message: 'Cannot change language after run has started'
-        })
-      );
+    // Update team language
+    await sql`UPDATE teams SET language_id = ${languageId} WHERE id = ${teamId}`;
 
-      return;
-    }
-
-    try {
-      // Update team language
-      await sql`UPDATE teams SET language_id = ${languageId} WHERE id = ${teamId}`;
-
-      // Get language code and team details
-      const results: { code: string; name: string; number: number }[] = await sql`
+    // Get language code and team details
+    const results: { code: string; name: string; number: number }[] = await sql`
         SELECT l.code, t.name, t.number
         FROM languages l
         JOIN teams t ON t.id = ${teamId}
         WHERE l.id = ${languageId}
       `;
 
-      if (results.length > 0) {
-        const { code, name, number } = results[0]!;
+    if (results.length > 0) {
+      const { code, name, number } = results[0]!;
 
-        // TypeScript knows ws.data is team type here
-        ws.data.languageId = languageId;
-        ws.data.languageCode = code;
+      ws.data.languageId = languageId;
+      ws.data.languageCode = code;
 
-        // Subscribe to language channel
-        ws.subscribe(`${connection.eventId}:${code}`);
+      // Subscribe to language channel
+      ws.subscribe(`${connection.eventId}:${code}`);
 
-        // Notify host
-        const message = JSON.stringify({
-          type: 'TEAM_READY',
-          teamId,
-          teamName: name,
-          teamNumber: number,
-          languageCode: code
-        });
+      // Notify host
+      const message = JSON.stringify({
+        type: 'TEAM_READY',
+        teamId,
+        teamName: name,
+        teamNumber: number,
+        languageCode: code
+      });
 
-        connection.host?.send(message);
+      connection.host?.send(message);
 
-        // Send existing answer if active question
-        if (connection.activeItem && connection.activeItem.type === 'question') {
-          await this.sendExistingAnswerToTeam(ws, connection);
-        }
+      // Send existing answer if active question
+      if (connection.activeItem && connection.activeItem.type === 'question') {
+        await this.sendExistingAnswerToTeam(ws, connection);
       }
-    } catch {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'INVALID_ROLE',
-          message: 'Error selecting language'
-        })
-      );
     }
   }
 
@@ -583,72 +559,69 @@ export class WebSocketServer {
     }
 
     // Validate deadline if timer enabled
-    if (connection.activeItem!.hasTimer) {
+    let isValid = false;
+
+    if (connection.activeItem.startTime === null) {
+      isValid = true; // No timer set, so always valid
+    } else {
       const now = Date.now();
       const startTime = new Date(connection.activeItem.startTime).getTime();
       const deadline = startTime + connection.activeItem.seconds * 1000 + connection.run!.gracePeriod * 1000;
 
-      if (now > deadline) {
-        ws.send(
-          JSON.stringify({
-            type: 'ERROR',
-            code: 'DEADLINE_EXCEEDED',
-            message: 'Answer submitted after deadline'
-          })
-        );
-
-        return;
+      if (now <= deadline) {
+        isValid = true;
       }
     }
 
-    try {
-      // Get translation ID
-      const translations: { id: string }[] = await sql`
+    if (!isValid) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'TIME_EXCEEDED',
+          message: 'Answer submitted after time limit'
+        })
+      );
+
+      return;
+    }
+
+    // Get translation ID
+    const translations: { id: string }[] = await sql`
         SELECT id FROM translations
         WHERE question_id = ${connection.activeItem.id}
           AND language_id = ${languageId}
       `;
 
-      if (translations.length === 0) {
-        ws.send(
-          JSON.stringify({
-            type: 'ERROR',
-            code: 'TRANSLATION_NOT_FOUND',
-            message: 'Translation not found'
-          })
-        );
+    if (translations.length === 0) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'TRANSLATION_NOT_FOUND',
+          message: 'Translation not found'
+        })
+      );
 
-        return;
-      }
+      return;
+    }
 
-      const translationId = translations[0]!.id;
-      const answerId = Bun.randomUUIDv7();
+    const translationId = translations[0]!.id;
+    const answerId = Bun.randomUUIDv7();
 
-      // Upsert answer
-      await sql`
+    // Upsert answer
+    await sql`
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
         VALUES (${answerId}, ${answer}, ${connection.activeItem.id}, ${teamId}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
       `;
 
-      // Notify host
-      const message = JSON.stringify({
-        type: 'ANSWER_RECEIVED',
-        teamId,
-        hasAnswer: true
-      });
+    // Notify host
+    const message = JSON.stringify({
+      type: 'ANSWER_RECEIVED',
+      teamId
+    });
 
-      connection.host?.send(message);
-    } catch {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'INVALID_ROLE',
-          message: 'Error submitting answer'
-        })
-      );
-    }
+    connection.host?.send(message);
   }
 
   private async handleUPDATE_RUN_STATUS(
