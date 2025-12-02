@@ -468,6 +468,18 @@ export class WebSocketServer {
       return;
     }
 
+    if (ws.data.languageId) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'LANGUAGE_ALREADY_SELECTED',
+          message: 'Language has already been selected'
+        })
+      );
+
+      return;
+    }
+
     const { teamId } = ws.data;
 
     // Update team language
