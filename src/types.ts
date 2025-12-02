@@ -22,7 +22,7 @@ export type ActiveItem =
       maxPoints: number;
       phase: 'prompt';
       seconds: number;
-      startTime: string;
+      startTime: string | null;
       translations: Array<{ languageCode: string; prompt: string }>;
     }
   | {

@@ -131,7 +131,7 @@ export class RunValt {
         maxPoints: question.maxPoints,
         phase: 'prompt',
         seconds: question.seconds,
-        startTime: new Date().toISOString(),
+        startTime: null,
         translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt }))
       });
 
@@ -332,28 +332,12 @@ export class RunValt {
 
       const prevItem = this.store.items[this.store.currentIndex]!;
 
-      // For questions, update the startTime to current time
-      if (prevItem.type === 'question') {
-        const updatedItem = { ...prevItem };
-
-        if (updatedItem.phase === 'prompt') {
-          updatedItem.startTime = new Date().toISOString();
-        }
-
-        this.ws?.send(
-          JSON.stringify({
-            type: 'SET_ACTIVE_ITEM',
-            activeItem: updatedItem
-          })
-        );
-      } else {
-        this.ws?.send(
-          JSON.stringify({
-            type: 'SET_ACTIVE_ITEM',
-            activeItem: prevItem
-          })
-        );
-      }
+      this.ws?.send(
+        JSON.stringify({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem: prevItem
+        })
+      );
     }
   }
 
