@@ -151,6 +151,10 @@ export class WebSocketServer {
         return textBadRequest('Missing teamId');
       }
 
+      if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.teams.has(teamId)) {
+        return textBadRequest('Team already connected');
+      }
+
       // Validate team exists for team role
       const teams: { id: string; name: string; number: number; languageId: string | null }[] =
         await sql`SELECT id, name, number, language_id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
