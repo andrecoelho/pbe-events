@@ -1,7 +1,13 @@
 import { sql, type ServerWebSocket } from 'bun';
 import type { Session } from '@/server/types';
 import type { ActiveItem } from '@/types';
-import { textServerError } from '@/server/utils/responses';
+import {
+  textBadRequest,
+  textForbidden,
+  textNotFound,
+  textServerError,
+  textUnauthorized
+} from '@/server/utils/responses';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -80,100 +86,96 @@ export class WebSocketServer {
     const teamId = url.searchParams.get('teamId');
 
     if (!eventId || !role) {
-      return;
+      return textBadRequest('Missing eventId or role');
     }
 
     if (role !== 'host' && role !== 'team' && role !== 'presenter') {
+      return textBadRequest('Invalid role');
+    }
+
+    // Check if event exists
+    const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
+
+    if (events.length === 0) {
+      return textNotFound('Event not found');
+    }
+
+    if (role === 'host') {
+      if (!session) {
+        return textUnauthorized();
+      }
+
+      // Check if host is already connected
+      if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
+        return textBadRequest('Host already connected');
+      }
+
+      // Validate session and permissions for host
+      const permissions: { role_id: string }[] = await sql`
+          SELECT role_id
+          FROM permissions
+          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        `;
+
+      if (permissions.length === 0) {
+        return textForbidden();
+      }
+    } else if (role === 'presenter') {
+      if (!session) {
+        return textUnauthorized();
+      }
+
+      // Validate session and permissions for host
+      const permissions: { role_id: string }[] = await sql`
+          SELECT role_id
+          FROM permissions
+          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
+        `;
+
+      if (permissions.length === 0) {
+        return textForbidden();
+      }
+    } else {
+      if (!teamId) {
+        return textBadRequest('Missing teamId');
+      }
+
+      // Validate team exists for team role
+      const teams: { id: string }[] = await sql`SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
+
+      if (teams.length === 0) {
+        return textNotFound('Team not found');
+      }
+    }
+
+    const upgraded = this.server.upgrade(req, {
+      data:
+        role === 'host'
+          ? {
+              role: 'host',
+              session,
+              eventId
+            }
+          : role === 'presenter'
+          ? {
+              role: 'presenter',
+              session,
+              eventId
+            }
+          : {
+              role: 'team',
+              eventId,
+              teamId,
+              languageId: null,
+              languageCode: null
+            }
+    });
+
+    if (upgraded) {
       return;
     }
 
-    try {
-      // Check if event exists
-      const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
-
-      if (events.length === 0) {
-        return;
-      }
-
-      if (role === 'host') {
-        if (!session) {
-          return;
-        }
-
-        // Check if host is already connected
-        if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
-          return;
-        }
-
-        // Validate session and permissions for host
-        const permissions: { role_id: string }[] = await sql`
-          SELECT role_id
-          FROM permissions
-          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
-
-        if (permissions.length === 0) {
-          return;
-        }
-      } else if (role === 'presenter') {
-        if (!session) {
-          return;
-        }
-
-        // Validate session and permissions for host
-        const permissions: { role_id: string }[] = await sql`
-          SELECT role_id
-          FROM permissions
-          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
-
-        if (permissions.length === 0) {
-          return;
-        }
-      } else {
-        if (!teamId) {
-          return;
-        }
-
-        // Validate team exists for team role
-        const teams: { id: string }[] = await sql`SELECT id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
-
-        if (teams.length === 0) {
-          return;
-        }
-      }
-
-      const upgraded = this.server.upgrade(req, {
-        data:
-          role === 'host'
-            ? {
-                role: 'host',
-                session,
-                eventId
-              }
-            : role === 'presenter'
-            ? {
-                role: 'presenter',
-                session,
-                eventId
-              }
-            : {
-                role: 'team',
-                eventId,
-                teamId,
-                languageId: null,
-                languageCode: null
-              }
-      });
-
-      if (upgraded) {
-        return;
-      }
-
-      return textServerError('WebSocket upgrade failed');
-    } catch (error) {
-      return textServerError('WebSocket upgrade failed');
-    }
+    return textServerError('WebSocket upgrade failed');
   }
 
   // Called when a new WebSocket connection is opened
