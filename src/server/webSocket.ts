@@ -628,12 +628,7 @@ export class WebSocketServer {
       `;
 
     // Notify host
-    const message = JSON.stringify({
-      type: 'ANSWER_RECEIVED',
-      teamId
-    });
-
-    connection.host?.send(message);
+    connection.host?.send(JSON.stringify({ type: 'ANSWER_RECEIVED', teamId }));
   }
 
   private async handleUPDATE_RUN_STATUS(
