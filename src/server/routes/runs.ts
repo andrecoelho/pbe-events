@@ -58,6 +58,8 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             seconds: number;
             language_code: string;
             prompt: string;
+            answer: string;
+            clarification: string;
           }[] = await sql`
             SELECT
               q.id,
@@ -66,7 +68,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               q.max_points,
               q.seconds,
               l.code as language_code,
-              t.prompt
+              t.prompt,
+              t.answer,
+              t.clarification
             FROM questions q
             LEFT JOIN translations t ON q.id = t.question_id
             LEFT JOIN languages l ON t.language_id = l.id
@@ -92,7 +96,9 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
             if (q.language_code && q.prompt) {
               questionsMap.get(q.id).translations.push({
                 languageCode: q.language_code,
-                prompt: q.prompt
+                prompt: q.prompt,
+                answer: q.answer,
+                clarification: q.clarification
               });
             }
           }

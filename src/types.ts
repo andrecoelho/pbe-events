@@ -9,9 +9,23 @@ export type ActiveItem =
       id: string;
       number: number;
       questionType: 'PG' | 'PS' | 'TF' | 'FB';
-      phase: 'prompt' | 'answer' | 'ended';
+      phase: 'reading';
+      translations: Array<{ languageCode: string; prompt: string }>;
+    }
+  | {
+      type: 'question';
+      id: string;
+      number: number;
+      questionType: 'PG' | 'PS' | 'TF' | 'FB';
+      phase: 'prompt';
       seconds: number;
       startTime: string;
-      hasTimer: boolean;
       translations: Array<{ languageCode: string; prompt: string }>;
+    }
+  | {
+      type: 'question';
+      id: string;
+      number: number;
+      phase: 'answer';
+      translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
     };
