@@ -17,9 +17,3 @@ export interface User {
   avatar: Blob;
   createdAt: string;
 }
-
-export interface PBEEvent {
-  id: string;
-  name: string;
-  createdAt: string;
-}

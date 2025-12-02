@@ -2,7 +2,6 @@ import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
 import {
-  apiBadRequest,
   apiData,
   apiForbidden,
   apiNotFound,
@@ -52,6 +51,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
 
           return apiData({
             eventName: event.name,
+            titleRemarks: event.title_remarks,
             run: {
               status: run.status,
               gracePeriod: run.grace_period,

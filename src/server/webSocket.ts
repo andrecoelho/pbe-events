@@ -280,6 +280,7 @@ export class WebSocketServer {
         }
       }
     } catch (error) {
+      console.log('WebSocket open error', error);
       ws.close();
     }
   };
@@ -357,14 +358,19 @@ export class WebSocketServer {
 
     // Handle host messages
     if (role === 'host') {
-      const msg = JSON.parse(message as string) as {
-        type: 'UPDATE_RUN_STATUS';
-        status: 'not_started' | 'in_progress' | 'paused' | 'completed';
-      };
+      const msg = JSON.parse(message as string) as
+        | {
+            type: 'UPDATE_RUN_STATUS';
+            status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+          }
+        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem };
 
       switch (msg.type) {
         case 'UPDATE_RUN_STATUS':
           await this.handleUPDATE_RUN_STATUS(connection, msg.status);
+          break;
+        case 'SET_ACTIVE_ITEM':
+          await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
           break;
       }
     }
@@ -379,7 +385,6 @@ export class WebSocketServer {
       activeItem: null
     });
 
-    // Query and cache run
     const [run]: {
       event_id: string;
       status: string;
@@ -399,7 +404,6 @@ export class WebSocketServer {
         gracePeriod: run.grace_period
       };
 
-      // Cache active item directly from JSONB
       connection.activeItem = run.active_item;
     }
   }
@@ -444,17 +448,15 @@ export class WebSocketServer {
   }
 
   async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
-    try {
-      const languages: { code: string }[] = await sql`
+    const languages: { code: string }[] = await sql`
         SELECT DISTINCT code FROM languages WHERE event_id = ${eventId}
       `;
 
-      const messageStr = JSON.stringify(message);
+    const messageStr = JSON.stringify(message);
 
-      languages.forEach((lang) => {
-        this.server.publish(`${eventId}:${lang.code}`, messageStr);
-      });
-    } catch {}
+    languages.forEach((lang) => {
+      this.server.publish(`${eventId}:${lang.code}`, messageStr);
+    });
   }
 
   private async handleSELECT_LANGUAGE(
@@ -655,30 +657,40 @@ export class WebSocketServer {
   ): Promise<void> {
     connection.run!.status = status;
 
-    // Reset run clears answers and active item
     if (status === 'not_started') {
-      connection.activeItem = null;
-
       await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
-
-      await sql`
-        UPDATE runs
-        SET status = 'not_started',
-            active_item = NULL
-        WHERE event_id = ${connection.eventId}
-      `;
-    } else {
-      connection.activeItem = { type: 'blank' };
-
-      await sql`
-        UPDATE runs
-        SET status = ${status},
-            active_item = ${JSON.stringify({ type: 'blank' })}::jsonb
-        WHERE event_id = ${connection.eventId}
-      `;
     }
 
-    connection.host?.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+    await sql`
+        UPDATE runs
+        SET status = ${status}
+        WHERE event_id = ${connection.eventId}
+      `;
+
+    connection.host?.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status }));
+
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS_CHANGED', status });
+  }
+
+  private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {
+    connection.activeItem = activeItem;
+
+    await sql`
+      UPDATE runs
+      SET active_item = ${activeItem}::jsonb
+      WHERE event_id = ${connection.eventId}
+    `;
+
+    connection.host?.send(
+      JSON.stringify({
+        type: 'ACTIVE_ITEM',
+        activeItem: connection.activeItem
+      })
+    );
+
+    await this.broadcastToAllLanguageChannels(connection.eventId, {
+      type: 'ACTIVE_ITEM',
+      activeItem: connection.activeItem
+    });
   }
 }

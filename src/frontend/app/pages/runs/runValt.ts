@@ -1,4 +1,5 @@
 import type { ActiveItem } from '@/types';
+import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -36,6 +37,7 @@ interface RunStore {
   initialized: boolean;
   eventId: string;
   eventName: string;
+  titleRemarks: string | null;
   run: Run;
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
   questions: Question[];
@@ -55,6 +57,7 @@ export class RunValt {
       initialized: false,
       eventId: '',
       eventName: '',
+      titleRemarks: null,
       run: {
         status: 'not_started',
         gracePeriod: 0,
@@ -76,10 +79,11 @@ export class RunValt {
       return { ok: false, error: 'Failed to load run data' } as const;
     }
 
-    const response = (await result.json()) as { eventName: string; run: Run };
+    const response = (await result.json()) as { eventName: string; titleRemarks: string | null; run: Run };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
+    this.store.titleRemarks = response.titleRemarks;
     this.store.run = response.run;
     this.store.initialized = true;
 
@@ -132,19 +136,26 @@ export class RunValt {
 
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data) as
+          | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
           | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
           | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
           | { type: 'TEAM_DISCONNECTED'; teamId: string };
 
         switch (message.type) {
+          case 'RUN_STATUS_CHANGED':
+            this.store.run.status = message.status;
+            break;
           case 'ACTIVE_ITEM':
-            this.handleACTIVE_ITEM(message.activeItem);
+            this.store.run.activeItem = message.activeItem;
             break;
           case 'TEAM_STATUS':
             this.handleTEAM_STATUS(message.teams);
             break;
           case 'TEAM_DISCONNECTED':
-            this.handleTEAM_DISCONNECTED(message.teamId);
+            if (this.store.teams[message.teamId]) {
+              this.store.teams[message.teamId]!.status = 'offline';
+            }
+
             break;
         }
       };
@@ -162,28 +173,45 @@ export class RunValt {
 
   async updateRunStatus(status: 'not_started' | 'in_progress' | 'paused' | 'completed') {
     this.ws?.send(JSON.stringify({ type: 'UPDATE_RUN_STATUS', status }));
-    this.store.run.status = status;
+
+    if (this.store.run.status === 'not_started' && status === 'in_progress') {
+      this.ws?.send(
+        JSON.stringify({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem: {
+            type: 'title',
+            title: 'PATHFINDER BIBLE EXPERIENCE',
+            remarks: this.store.titleRemarks
+          }
+        })
+      );
+    } else if (status === 'not_started') {
+      this.ws?.send(
+        JSON.stringify({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem: null
+        })
+      );
+    }
 
     return { ok: true } as const;
   }
 
-  async updateGracePeriod(gracePeriod: number) {
-    this.ws?.send(JSON.stringify({ type: 'UPDATE_GRACE_PERIOD', gracePeriod }));
-    this.store.run.gracePeriod = gracePeriod;
-    return { ok: true } as const;
-  }
-
-  handleACTIVE_ITEM(activeItem: ActiveItem) {
-    this.store.run.activeItem = activeItem;
-  }
-
-  handleTEAM_STATUS(teams: TeamStatus[]) {
+  private handleTEAM_STATUS(teams: TeamStatus[]) {
     for (const team of teams) {
       this.store.teams[team.id] = team;
     }
   }
+}
 
-  handleTEAM_DISCONNECTED(teamId: string) {
-    this.store.teams[teamId]!.status = 'offline';
+export const RunValtContext = createContext<RunValt | null>(null);
+
+export const useRunValt = () => {
+  const valt = useContext(RunValtContext);
+
+  if (!valt) {
+    throw new Error('useRunValt must be used within a RunValtContext.Provider');
   }
+
+  return valt;
 }
