@@ -14,15 +14,16 @@ export interface TeamStatus {
 }
 
 export interface Question {
-  questionId: string;
+  id: string;
   number: number;
   type: string;
   maxPoints: number;
   seconds: number;
+  translations: Array<{ languageCode: string; prompt: string }>;
 }
 
 export interface Slide {
-  slideId: string;
+  id: string;
   number: number;
   content: string;
 }
@@ -79,12 +80,22 @@ export class RunValt {
       return { ok: false, error: 'Failed to load run data' } as const;
     }
 
-    const response = (await result.json()) as { eventName: string; titleRemarks: string | null; run: Run };
+    const response = (await result.json()) as {
+      eventName: string;
+      titleRemarks: string | null;
+      run: Run;
+      questions: Question[];
+      slides: Slide[];
+      languages: Record<string, string>;
+    };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.titleRemarks = response.titleRemarks;
     this.store.run = response.run;
+    this.store.questions = response.questions;
+    this.store.slides = response.slides;
+    this.store.languages = response.languages;
     this.store.initialized = true;
 
     return await this.connectWebSocket();
