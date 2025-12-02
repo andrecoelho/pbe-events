@@ -13,15 +13,15 @@ const Title = ({
   }>;
 }) => {
   return (
-    <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
-      <div className='flex justify-center mt-10'>
+    <div className='absolute inset-0 flex flex-col text-base-100 gap-8 p-8'>
+      <div className='flex justify-center'>
         <img src={logo} className='h-28' />
       </div>
       <h1 className='text-6xl font-serif text-center'>{item.title}</h1>
       {item.remarks && <div className='text-2xl font-serif text-center whitespace-pre-wrap'>{item.remarks}</div>}
     </div>
   );
-}
+};
 
 const Slide = ({
   item
@@ -32,15 +32,20 @@ const Slide = ({
     content: string;
   }>;
 }) => {
+  const x = item.content.length;
+  const fontSize = Math.floor(0.000266 * x * x - 0.23307 * x + 65.2201);
+
   return (
-    <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
-      <div className='flex justify-center mt-10'>
+    <div className='absolute inset-0 flex flex-col text-base-100 gap-8 p-8'>
+      <div className='flex justify-center'>
         <img src={logo} className='h-28' />
       </div>
-      <div className='text-xl font-serif whitespace-pre-wrap text-center'>{item.content}</div>
+      <div className='flex flex-1 items-center justify-center text-center font-serif whitespace-pre-wrap' style={{ fontSize: `${fontSize}px` }}>
+        {item.content}
+      </div>
     </div>
   );
-}
+};
 
 const QuestionReading = ({
   item
@@ -126,7 +131,9 @@ const QuestionPrompt = ({
 
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
-      <div className={`absolute top-4 right-4 size-16 rounded-xl text-base-100 text-4xl font-bold flex items-center justify-center bg-gradient-to-br ${gradientClass} shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-colors duration-500`}>
+      <div
+        className={`absolute top-4 right-4 size-16 rounded-xl text-base-100 text-4xl font-bold flex items-center justify-center bg-gradient-to-br ${gradientClass} shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-colors duration-500`}
+      >
         {remainingSeconds}
       </div>
       <div className='flex items-center gap-10 mt-10'>
@@ -170,10 +177,48 @@ const QuestionAnswer = ({
   );
 };
 
+const NotStarted = () => {
+  return (
+    <div className='absolute inset-0 flex flex-col items-center justify-center text-base-100 gap-8 px-10'>
+      <img src={logo} className='h-28' />
+    </div>
+  );
+};
+
+const Paused = () => {
+  return (
+    <div className='absolute inset-0 flex flex-col items-center justify-center text-base-100 gap-8 px-10'>
+      <img src={logo} className='h-28' />
+      <h1 className='text-5xl text-center'>The event is paused.</h1>
+    </div>
+  );
+};
+
+const Completed = () => {
+  return (
+    <div className='absolute inset-0 flex flex-col items-center justify-center text-base-100 gap-8 px-10'>
+      <img src={logo} className='h-28' />
+      <h1 className='text-5xl text-center'>The event is completed.<br />Thank you!</h1>
+    </div>
+  );
+};
+
 export const ActiveItem = () => {
   const runValt = useContext(RunValtContext);
   const snap = useSnapshot(runValt!.store);
   const activeItem = snap.run.activeItem;
+
+  if (snap.run.status === 'not_started') {
+    return <NotStarted />;
+  }
+
+  if (snap.run.status === 'paused') {
+    return <Paused />;
+  }
+
+  if (snap.run.status === 'completed') {
+    return <Completed />;
+  }
 
   if (activeItem?.type === 'title') {
     return <Title item={activeItem} />;
