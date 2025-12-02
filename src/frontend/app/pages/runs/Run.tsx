@@ -70,7 +70,7 @@ const init = () => {
   };
 
   const handleOpenPresenter = () => {
-    window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,menubar=no,toolbar=no,location=no,status=no');
+    window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,popup=yes');
   };
 
   return {
