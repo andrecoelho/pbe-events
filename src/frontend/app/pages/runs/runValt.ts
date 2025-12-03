@@ -239,6 +239,7 @@ export class RunValt {
         switch (message.type) {
           case 'RUN_STATUS':
             this.store.run.status = message.status;
+            this.clearHasAnswers();
             break;
           case 'ACTIVE_ITEM':
             this.store.run.activeItem = message.activeItem;
