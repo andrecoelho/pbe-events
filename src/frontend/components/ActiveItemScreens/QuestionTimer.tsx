@@ -74,3 +74,5 @@ export const QuestionTimer = ({ startTime, seconds }: Props) => {
     </div>
   );
 };
+
+QuestionTimer.displayName = 'QuestionTimer';

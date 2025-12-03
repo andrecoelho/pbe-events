@@ -82,7 +82,7 @@ export class TeamValt {
     };
   }
 
-  submitAnswer(answer: string) {
+  submitAnswer(answer: string | boolean) {
     this.ws?.send(JSON.stringify({ type: 'SUBMIT_ANSWER', answer }));
   }
 
