@@ -7,7 +7,7 @@ import { useEffect, useMemo } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot } from 'valtio';
 import './Run.css';
-import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreen';
+import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
 
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',

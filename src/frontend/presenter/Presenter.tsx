@@ -1,4 +1,4 @@
-import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreen';
+import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
 import { PresenterValt } from '@/frontend/presenter/presenterValt';
 import { useMemo } from 'react';
 import logo from 'src/assets/favicon.svg';

@@ -6,7 +6,7 @@ interface PresenterStore {
   eventId: string;
   activeItem: ActiveItem | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, string>;
+  languages: Record<string, { id: string; code: string; name: string }>;
 }
 
 export class PresenterValt {

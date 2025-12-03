@@ -11,7 +11,7 @@ import { type Snapshot } from 'valtio';
 
 export const ActiveItemScreen = (props: {
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, { id: string; code: string; name: string }>;
+  languages: Snapshot<Record<string, { id: string; code: string; name: string }>>;
   activeItem: Snapshot<ActiveItem> | null;
 }) => {
   const activeItem = props.activeItem;
