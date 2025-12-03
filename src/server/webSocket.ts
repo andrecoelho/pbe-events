@@ -143,7 +143,7 @@ export class WebSocketServer {
         return textForbidden();
       }
 
-      if (this.server.upgrade(req, { role: 'presenter', session, eventId })) {
+      if (this.server.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
         return;
       }
     } else {
