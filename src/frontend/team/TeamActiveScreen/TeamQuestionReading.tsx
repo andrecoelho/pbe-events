@@ -1,11 +1,13 @@
 import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionTimer';
+import { useTeamValt } from '@/frontend/team/teamValt';
 import logo from 'src/assets/favicon.svg';
-import type { Snapshot } from 'valtio';
+import { useSnapshot, type Snapshot } from 'valtio';
 
-export const TeamQuestionReading = ({
-  item
-}: {
-  item: Snapshot<{
+export const TeamQuestionReading = () => {
+  const valt = useTeamValt();
+  const snap = useSnapshot(valt.store);
+
+  const activeItem = snap.activeItem as Snapshot<{
     type: 'question';
     id: string;
     number: number;
@@ -15,9 +17,8 @@ export const TeamQuestionReading = ({
     seconds: number;
     translations: Array<{ languageCode: string; prompt: string }>;
   }>;
-}) => {
-  // Show only the first translation
-  const translation = item.translations[0];
+
+  const translation = activeItem.translations.find((t) => t.languageCode === snap.team?.languageCode);
 
   if (!translation) {
     return null;
@@ -25,13 +26,13 @@ export const TeamQuestionReading = ({
 
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10 leading-loose'>
-      <QuestionTimer active={false} seconds={item.seconds} startTime={null} />
+      <QuestionTimer active={false} seconds={activeItem.seconds} />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />
-        <h1 className='text-5xl uppercase text-center font-serif'>Question #{item.number}</h1>
+        <h1 className='text-5xl uppercase text-center font-serif'>Question #{activeItem.number}</h1>
       </div>
       <div className='text-2xl font-serif leading-loose'>
-        ({item.maxPoints} pts.) &nbsp;
+        ({activeItem.maxPoints} pts.) &nbsp;
         {translation.prompt}
       </div>
     </div>

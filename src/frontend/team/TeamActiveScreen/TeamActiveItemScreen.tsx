@@ -36,15 +36,15 @@ export const TeamActiveItemScreen = () => {
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'reading') {
-    return <TeamQuestionReading item={activeItem} />;
+    return <TeamQuestionReading />;
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
-    return <TeamQuestionPrompt item={activeItem} />;
+    return <TeamQuestionPrompt />;
   }
 
-  if (activeItem?.type === 'question' && activeItem.phase === 'answer' && snap.languages) {
-    return <TeamQuestionAnswer item={activeItem} languages={snap.languages} />;
+  if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
+    return <TeamQuestionAnswer />;
   }
 
   return null;

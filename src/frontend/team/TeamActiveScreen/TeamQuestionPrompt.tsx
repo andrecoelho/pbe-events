@@ -168,48 +168,46 @@ export const FillInTheBlankAnswer = ({
 
 FillInTheBlankAnswer.displayName = 'FillInTheBlankAnswer';
 
-export const TeamQuestionPrompt = ({
-  item
-}: {
-  item: Snapshot<{
-    type: 'question';
-    id: string;
-    number: number;
-    questionType: 'PG' | 'PS' | 'TF' | 'FB';
-    maxPoints: number;
-    phase: 'prompt';
-    seconds: number;
-    startTime: string | null;
-    translations: Array<{ languageCode: string; prompt: string }>;
-  }>;
-}) => {
+export const TeamQuestionPrompt = () => {
   const valt = useTeamValt();
-  const { team } = valt.store;
+  const snap = useSnapshot(valt.store);
 
-  // Filter to only the team's selected language, fallback to first translation
-  const translation = item.translations.find((t) => t.languageCode === team?.languageCode) || item.translations[0];
+  const activeItem = snap.activeItem as Snapshot<{
+      type: 'question';
+      id: string;
+      number: number;
+      questionType: 'PG' | 'PS' | 'TF' | 'FB';
+      maxPoints: number;
+      phase: 'prompt';
+      seconds: number;
+      startTime: string | null;
+      translations: Array<{ languageCode: string; prompt: string }>;
+    }>;
+
+  const team = snap.team;
+  const translation = activeItem?.translations.find((t) => t.languageCode === team?.languageCode);
 
   return (
     <div className='absolute inset-0 flex flex-col gap-8 px-10'>
-      <QuestionTimer active startTime={item.startTime} seconds={item.seconds} />
+      <QuestionTimer active seconds={activeItem.seconds} startTime={activeItem.startTime} />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />
-        <h1 className='text-5xl uppercase text-center text-base-100 font-serif'>Question #{item.number}</h1>
+        <h1 className='text-5xl uppercase text-center text-base-100 font-serif'>Question #{activeItem.number}</h1>
       </div>
-      {translation && item.questionType !== 'FB' && (
+      {translation && activeItem.questionType !== 'FB' && (
         <div className='text-2xl font-serif text-base-100 leading-loose'>
-          ({item.maxPoints} pts.) &nbsp;
+          ({activeItem.maxPoints} pts.) &nbsp;
           {translation.prompt}
         </div>
       )}
       <div>
-        {(item.questionType === 'PG' || item.questionType === 'PS') && <GeneralAnswer />}
-        {item.questionType === 'TF' && <TrueFalseAnswer />}
-        {item.questionType === 'FB' && (
+        {(activeItem.questionType === 'PG' || activeItem.questionType === 'PS') && <GeneralAnswer />}
+        {activeItem.questionType === 'TF' && <TrueFalseAnswer />}
+        {activeItem.questionType === 'FB' && (
           <FillInTheBlankAnswer
-            translations={item.translations}
+            translations={activeItem.translations}
             languageCode={team?.languageCode || null}
-            maxPoints={item.maxPoints}
+            maxPoints={activeItem.maxPoints}
           />
         )}
       </div>

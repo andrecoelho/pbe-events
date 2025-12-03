@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 interface Props {
-  startTime: string | null; // ISO string or null
+  startTime?: string | null; // ISO string or null
   seconds: number; // total seconds for the timer
   active?: boolean; // whether to render the timer (default: true)
 }
