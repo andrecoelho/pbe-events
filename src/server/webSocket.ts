@@ -428,11 +428,15 @@ export class WebSocketServer {
             type: 'UPDATE_RUN_STATUS';
             status: 'not_started' | 'in_progress' | 'paused' | 'completed';
           }
+        | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number }
         | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem };
 
       switch (msg.type) {
         case 'UPDATE_RUN_STATUS':
           await this.handleUPDATE_RUN_STATUS(connection, msg.status);
+          break;
+        case 'UPDATE_GRACE_PERIOD':
+          await this.handleUPDATE_GRACE_PERIOD(connection, msg.gracePeriod);
           break;
         case 'SET_ACTIVE_ITEM':
           await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
@@ -740,6 +744,27 @@ export class WebSocketServer {
     connection.presenter.forEach((presenterWs) => presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status })));
 
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
+  }
+
+  private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
+    connection.run.gracePeriod = gracePeriod;
+
+    await sql`
+        UPDATE runs
+        SET grace_period = ${gracePeriod}
+        WHERE event_id = ${connection.eventId}
+      `;
+
+    connection.host?.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }));
+
+    connection.presenter.forEach((presenterWs) =>
+      presenterWs.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }))
+    );
+
+    await this.broadcastToAllLanguageChannels(connection.eventId, {
+      type: 'GRACE_PERIOD',
+      gracePeriod
+    });
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {

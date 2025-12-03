@@ -69,6 +69,14 @@ const init = () => {
     valt.disableTimer();
   };
 
+  const handleUpdateGracePeriod = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const gracePeriod = Number(event.target.value);
+
+    if (gracePeriod >= 0) {
+      await valt.updateGracePeriod(gracePeriod);
+    }
+  };
+
   const handleOpenPresenter = () => {
     window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,popup=yes');
   };
@@ -83,7 +91,8 @@ const init = () => {
     handlePreviousEvent,
     handleNextEvent,
     handleDisableTimer,
-    handleOpenPresenter
+    handleOpenPresenter,
+    handleUpdateGracePeriod
   };
 };
 
@@ -98,7 +107,8 @@ export const Run = () => {
     handlePreviousEvent,
     handleNextEvent,
     handleDisableTimer,
-    handleOpenPresenter
+    handleOpenPresenter,
+    handleUpdateGracePeriod
   } = useMemo(() => init(), []);
 
   const snap = useSnapshot(valt.store);
@@ -126,11 +136,23 @@ export const Run = () => {
           <div className='card shadow-xl w-200 mt-4 overflow-hidden'>
             {/* Header with accent gradient effect */}
             <div className='relative bg-gradient-to-r from-accent via-amber-400 to-orange-400 p-4'>
-              <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/25 via-transparent to-transparent'></div>
+              <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/25 via-transparent to-transparent' />
               <div className='relative flex items-center justify-between text-accent-content'>
                 <div className='flex items-baseline gap-2'>
                   <span className='text-sm uppercase tracking-wide opacity-70'>Teams</span>
                   <span className='text-sm font-semibold'>CONNECTION STATUS</span>
+                </div>
+                <div className='text-sm tracking-wide'>
+                  <span>GRACE PERIOD: </span>
+                  <span>
+                    <input
+                      type='number'
+                      value={snap.run.gracePeriod}
+                      className='w-10 pl-3 bg-base-100/50 rounded-md text-center'
+                      onChange={handleUpdateGracePeriod}
+                    />
+                    &nbsp;seconds
+                  </span>
                 </div>
                 <div className='badge bg-black/10 border-black/20 text-accent-content font-semibold px-3 py-2'>
                   {Object.values(snap.teams).filter((t) => t.status !== 'offline').length} active

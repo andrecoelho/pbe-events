@@ -296,6 +296,19 @@ export class RunValt {
     return { ok: true } as const;
   }
 
+  async updateGracePeriod(gracePeriod: number) {
+    this.ws?.send(
+      JSON.stringify({
+        type: 'UPDATE_GRACE_PERIOD',
+        gracePeriod
+      })
+    );
+
+    this.store.run.gracePeriod = gracePeriod;
+
+    return { ok: true } as const;
+  }
+
   clearHasAnswers() {
     for (const teamId in this.store.teams) {
       this.store.teams[teamId]!.hasAnswer = null;
