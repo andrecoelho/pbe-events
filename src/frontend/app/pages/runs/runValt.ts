@@ -231,13 +231,13 @@ export class RunValt {
 
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data) as
-          | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
+          | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
           | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
           | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
           | { type: 'ANSWER_RECEIVED'; teamId: string };
 
         switch (message.type) {
-          case 'RUN_STATUS_CHANGED':
+          case 'RUN_STATUS':
             this.store.run.status = message.status;
             break;
           case 'ACTIVE_ITEM':

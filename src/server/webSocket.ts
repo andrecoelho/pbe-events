@@ -249,7 +249,7 @@ export class WebSocketServer {
       connection.presenter.push(ws);
 
       ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
-      ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run.status }));
+      ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
       ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
@@ -294,7 +294,7 @@ export class WebSocketServer {
         // Subscribe to language channel if language selected
         if (team.code) {
           ws.subscribe(`${eventId}:${team.code}`);
-          ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run.status }));
+          ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
           ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
           // Send TEAM_CONNECTED to host
@@ -494,8 +494,8 @@ export class WebSocketServer {
     const { id, languageId } = ws.data;
 
     try {
-      const answers: { id: string; answer: string }[] = await sql`
-        SELECT a.id, a.answer
+      const answers: { question_id: string; answer: string }[] = await sql`
+        SELECT a.id, a.answer, a.question_id
         FROM answers a
         JOIN translations t ON t.id = a.translation_id
         WHERE a.question_id = ${connection.activeItem.id}
@@ -508,8 +508,8 @@ export class WebSocketServer {
 
         ws.send(
           JSON.stringify({
-            type: 'YOUR_ANSWER',
-            answerId: answer.id,
+            type: 'SAVED_ANSWER',
+            questionId: answer.question_id,
             answer: answer.answer
           })
         );
@@ -576,12 +576,12 @@ export class WebSocketServer {
       ws.send(
         JSON.stringify({
           type: 'TEAM_INFO',
-          team: { id, name, number, languageId, languageCode: code}
+          team: { id, name, number, languageId, languageCode: code }
         })
       );
 
       // Send run status and active item after language selection
-      ws.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status: connection.run.status }));
+      ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
       ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
       // Notify host
@@ -734,13 +734,13 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-    connection.host?.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status }));
+    connection.host?.send(JSON.stringify({ type: 'RUN_STATUS', status }));
 
     connection.presenter.forEach((presenterWs) =>
-      presenterWs.send(JSON.stringify({ type: 'RUN_STATUS_CHANGED', status }))
+      presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status }))
     );
 
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS_CHANGED', status });
+    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {

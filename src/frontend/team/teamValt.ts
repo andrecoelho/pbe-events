@@ -15,6 +15,7 @@ interface TeamStore {
     languageCode: string | null;
   };
   activeItem: ActiveItem | null;
+  answer: string | boolean | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   languages?: Record<string, { id: string; code: string; name: string }>;
 }
@@ -26,6 +27,7 @@ export class TeamValt {
   constructor() {
     this.store = proxy({
       activeItem: null,
+      answer: null,
       runStatus: 'not_started'
     });
   }
@@ -53,9 +55,10 @@ export class TeamValt {
             type: 'TEAM_INFO';
             team: { id: string; name: string; number: number; languageId: string | null; languageCode: string | null };
           }
-        | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
+        | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
         | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null }
-        | { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> };
+        | { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> }
+        | { type: 'SAVED_ANSWER'; questionId: string; answer: string | boolean };
 
       switch (message.type) {
         case 'EVENT_INFO':
@@ -64,7 +67,7 @@ export class TeamValt {
         case 'TEAM_INFO':
           this.store.team = message.team;
           break;
-        case 'RUN_STATUS_CHANGED':
+        case 'RUN_STATUS':
           this.store.runStatus = message.status;
 
           if (message.status === 'not_started') {
@@ -77,6 +80,15 @@ export class TeamValt {
           break;
         case 'LANGUAGES':
           this.store.languages = message.languages;
+          break;
+        case 'SAVED_ANSWER':
+          if (
+            this.store.activeItem &&
+            this.store.activeItem.type === 'question' &&
+            this.store.activeItem.id === message.questionId
+          ) {
+            this.store.answer = message.answer;
+          }
           break;
       }
     };

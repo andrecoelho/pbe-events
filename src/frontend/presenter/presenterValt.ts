@@ -51,7 +51,7 @@ export class PresenterValt {
       const message = JSON.parse(event.data);
 
       switch (message.type) {
-        case 'RUN_STATUS_CHANGED':
+        case 'RUN_STATUS':
           this.store.runStatus = message.status;
 
           if (message.status === 'not_started') {
