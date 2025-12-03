@@ -357,6 +357,7 @@ export class WebSocketServer {
       connection.presenter = connection.presenter.filter((presenterWs) => presenterWs !== ws);
     } else {
       const { id, languageCode } = ws.data;
+      const team = connection.teams.get(id)?.data;
 
       connection.teams.delete(id);
 
@@ -365,20 +366,20 @@ export class WebSocketServer {
         ws.unsubscribe(`${eventId}:${languageCode}`);
       }
 
-      const team = connection.teams.get(id)?.data;
-
       if (team) {
         // Notify host
         connection.host?.send(
           JSON.stringify({
             type: 'TEAM_STATUS',
-            team: {
-              id,
-              status: 'offline',
-              name: team.name,
-              number: team.number,
-              languageCode
-            }
+            teams: [
+              {
+                id,
+                status: 'offline',
+                name: team.name,
+                number: team.number,
+                languageCode
+              }
+            ]
           })
         );
       }
@@ -736,9 +737,7 @@ export class WebSocketServer {
 
     connection.host?.send(JSON.stringify({ type: 'RUN_STATUS', status }));
 
-    connection.presenter.forEach((presenterWs) =>
-      presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status }))
-    );
+    connection.presenter.forEach((presenterWs) => presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status })));
 
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
   }
