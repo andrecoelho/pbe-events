@@ -91,9 +91,9 @@ export const Team = () => {
           <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
         </div>
         <div className='absolute bottom-8 right-8 text-sm opacity-50 flex flex-col text-base-100'>
-          <div>Event: {snap.event?.name}</div>
-          <div>Team {snap.team?.number.toString().padStart(2, '0')} - {snap.team?.name}</div>
-          <div>Language: {snap.languages[snap.team.languageCode!]?.name}</div>
+          <div><span className='font-bold'>Event:</span> {snap.event?.name}</div>
+          <div><span className='font-bold'>Team:</span> {snap.team?.number.toString().padStart(2, '0')} &mdash; {snap.team?.name}</div>
+          <div><span className='font-bold'>Language:</span> {snap.languages[snap.team.languageCode!]?.name}</div>
         </div>
       </div>
     );
