@@ -1,4 +1,4 @@
-import { TeamActiveItemScreen } from '@/frontend/team/TeamActiveItemScreen';
+import { TeamActiveItemScreen } from '@/frontend/team/TeamActiveScreen/TeamActiveItemScreen';
 import { TeamValt, TeamValtContext } from '@/frontend/team/teamValt';
 import { useEffect, useMemo, useState } from 'react';
 import logo from 'src/assets/favicon.svg';

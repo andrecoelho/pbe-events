@@ -1,13 +1,13 @@
 import { Completed } from '@/frontend/components/ActiveItemScreens/Completed';
 import { NotStarted } from '@/frontend/components/ActiveItemScreens/NotStarted';
 import { Paused } from '@/frontend/components/ActiveItemScreens/Paused';
-import { QuestionAnswer } from '@/frontend/components/ActiveItemScreens/QuestionAnswer';
-import { QuestionReading } from '@/frontend/components/ActiveItemScreens/QuestionReading';
 import { Slide } from '@/frontend/components/ActiveItemScreens/Slide';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import { Title } from '@/frontend/components/ActiveItemScreens/Title';
 import { useSnapshot } from 'valtio';
-import { TeamQuestionPrompt } from '@/frontend/team/TeamQuestionPrompt';
+import { TeamQuestionPrompt } from '@/frontend/team/TeamActiveScreen/TeamQuestionPrompt';
+import { TeamQuestionReading } from '@/frontend/team/TeamActiveScreen/TeamQuestionReading';
+import { TeamQuestionAnswer } from '@/frontend/team/TeamActiveScreen/TeamQuestionAnswer';
 
 export const TeamActiveItemScreen = () => {
   const valt = useTeamValt();
@@ -36,7 +36,7 @@ export const TeamActiveItemScreen = () => {
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'reading') {
-    return <QuestionReading item={activeItem} />;
+    return <TeamQuestionReading item={activeItem} />;
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
@@ -44,7 +44,7 @@ export const TeamActiveItemScreen = () => {
   }
 
   if (activeItem?.type === 'question' && activeItem.phase === 'answer' && snap.languages) {
-    return <QuestionAnswer item={activeItem} languages={snap.languages} />;
+    return <TeamQuestionAnswer item={activeItem} languages={snap.languages} />;
   }
 
   return null;
