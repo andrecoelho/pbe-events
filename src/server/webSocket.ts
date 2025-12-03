@@ -285,7 +285,7 @@ export class WebSocketServer {
         ws.send(
           JSON.stringify({
             type: 'TEAM_INFO',
-            team: { id, name: team.name, number: team.number, languageId: ws.data.languageId }
+            team: { id, name: team.name, number: team.number, languageId: ws.data.languageId, languageCode: team.code }
           })
         );
 
@@ -578,7 +578,7 @@ export class WebSocketServer {
       ws.send(
         JSON.stringify({
           type: 'TEAM_INFO',
-          team: { id, name, number, languageId }
+          team: { id, name, number, languageId, languageCode: code}
         })
       );
 

@@ -90,6 +90,11 @@ export const Team = () => {
         <div className='absolute w-[800px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
           <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
         </div>
+        <div className='absolute bottom-8 right-8 text-sm opacity-50 flex flex-col text-base-100'>
+          <div>Event: {snap.event?.name}</div>
+          <div>Team {snap.team?.number.toString().padStart(2, '0')} - {snap.team?.name}</div>
+          <div>Language: {snap.languages[snap.team.languageCode!]?.name}</div>
+        </div>
       </div>
     );
   }

@@ -12,6 +12,7 @@ interface TeamStore {
     name: string;
     number: number;
     languageId: string | null;
+    languageCode: string | null;
   };
   activeItem: ActiveItem | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
@@ -48,7 +49,10 @@ export class TeamValt {
     this.ws.onmessage = (event) => {
       const message = JSON.parse(event.data) as
         | { type: 'EVENT_INFO'; event: { id: string; name: string } }
-        | { type: 'TEAM_INFO'; team: { id: string; name: string; number: number; languageId: string | null } }
+        | {
+            type: 'TEAM_INFO';
+            team: { id: string; name: string; number: number; languageId: string | null; languageCode: string | null };
+          }
         | { type: 'RUN_STATUS_CHANGED'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
         | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null }
         | { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> };
