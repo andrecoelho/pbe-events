@@ -147,9 +147,14 @@ export const Run = () => {
                   return (
                     <span key={teamId} className='relative inline-flex'>
                       <span className={`team-badge ${stateClass}`}>{formatTeamNumber(team.number)}</span>
-                      {team.hasAnswer && (
+                      {team.hasAnswer && team.hasAnswer === 'yes' && (
                         <span className='team-badge-check'>
                           <Icon name='check' className='size-3' />
+                        </span>
+                      )}
+                      {team.hasAnswer && team.hasAnswer === 'no' && (
+                        <span className='team-badge-no-answer'>
+                          <Icon name='x-mark' className='size-3' />
                         </span>
                       )}
                     </span>

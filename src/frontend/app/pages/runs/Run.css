@@ -21,11 +21,19 @@
     @apply absolute -top-1 -right-1 size-4 rounded-full bg-success text-base-100 flex items-center justify-center shadow-md border border-base-100;
   }
 
+  .team-badge-no-answer {
+    @apply absolute -top-1 -right-1 size-4 rounded-full bg-error text-base-100 flex items-center justify-center shadow-md border border-base-100;
+  }
+
   .team-badge--sm {
     @apply size-5 text-xs rounded-md ring-offset-0;
   }
 
   .team-badge--sm + .team-badge-check {
+    @apply size-2.5 -top-0.5 -right-0.5;
+  }
+
+  .team-badge--sm + .team-badge-no-answer {
     @apply size-2.5 -top-0.5 -right-0.5;
   }
 }

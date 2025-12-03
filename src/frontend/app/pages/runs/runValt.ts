@@ -10,7 +10,7 @@ export interface TeamStatus {
   number: number;
   status: 'offline' | 'connected' | 'ready';
   languageCode: string | null;
-  hasAnswer: boolean;
+  hasAnswer: 'yes' | 'no' | null;
 }
 
 export interface Question {
@@ -242,18 +242,13 @@ export class RunValt {
             break;
           case 'ACTIVE_ITEM':
             this.store.run.activeItem = message.activeItem;
-
-            // Clear all teams' hasAnswer field when active item changes
-            for (const teamId in this.store.teams) {
-              this.store.teams[teamId]!.hasAnswer = false;
-            }
             break;
           case 'TEAM_STATUS':
             this.handleTEAM_STATUS(message.teams);
             break;
           case 'ANSWER_RECEIVED':
             if (this.store.teams[message.teamId]) {
-              this.store.teams[message.teamId]!.hasAnswer = true;
+              this.store.teams[message.teamId]!.hasAnswer = 'yes';
             }
 
             break;
@@ -300,6 +295,20 @@ export class RunValt {
     return { ok: true } as const;
   }
 
+  clearHasAnswers() {
+    for (const teamId in this.store.teams) {
+      this.store.teams[teamId]!.hasAnswer = null;
+    }
+  }
+
+  fillHasAnswers() {
+    for (const teamId in this.store.teams) {
+      if (this.store.teams[teamId]!.hasAnswer === null) {
+        this.store.teams[teamId]!.hasAnswer = 'no';
+      }
+    }
+  }
+
   next() {
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
@@ -312,6 +321,14 @@ export class RunValt {
 
         if (updatedItem.phase === 'prompt') {
           updatedItem.startTime = new Date().toISOString();
+        }
+
+        if (nextItem.phase === 'reading') {
+          this.clearHasAnswers();
+        }
+
+        if (nextItem.phase === 'answer') {
+          this.fillHasAnswers();
         }
 
         this.ws?.send(
@@ -332,6 +349,8 @@ export class RunValt {
   }
 
   previous() {
+    this.clearHasAnswers();
+
     if (this.store.currentIndex > 0) {
       this.store.currentIndex--;
 

@@ -715,7 +715,7 @@ export class WebSocketServer {
       `;
 
     // Notify host
-    connection.host?.send(JSON.stringify({ type: 'ANSWER_RECEIVED', id }));
+    connection.host?.send(JSON.stringify({ type: 'ANSWER_RECEIVED', teamId: id }));
   }
 
   private async handleUPDATE_RUN_STATUS(
