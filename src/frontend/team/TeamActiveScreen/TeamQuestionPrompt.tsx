@@ -30,6 +30,11 @@ function parsePromptWithBlanks(prompt: string): Array<{ type: 'text' | 'blank'; 
 export const GeneralAnswer = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   const handleAnswerChange = debounce((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     valt.submitAnswer(e.target.value);
@@ -38,6 +43,7 @@ export const GeneralAnswer = () => {
   return (
     <div className='card bg-base-100 text-base-content'>
       <textarea
+        ref={textareaRef}
         className='w-full h-16 p-2 border rounded'
         placeholder='Type your answer here...'
         onChange={handleAnswerChange}
@@ -53,6 +59,7 @@ export const TrueFalseAnswer = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store);
   const [answer, setAnswer] = useState<boolean | null>(null);
+  const trueButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Don't overwrite local state if already set
@@ -60,6 +67,10 @@ export const TrueFalseAnswer = () => {
       setAnswer(snap.answer ? JSON.parse(snap.answer as string) : null);
     }
   }, [snap.answer]);
+
+  useEffect(() => {
+    trueButtonRef.current?.focus();
+  }, []);
 
   const handleAnswerTrue = () => {
     setAnswer(true);
@@ -75,6 +86,7 @@ export const TrueFalseAnswer = () => {
     <div className='text-center'>
       <div className='join'>
         <button
+          ref={trueButtonRef}
           className={`btn btn-xl join-item btn-active ${answer === true ? 'btn-success' : ''}`}
           onClick={handleAnswerTrue}
         >
@@ -121,6 +133,10 @@ export const FillInTheBlankAnswer = ({
       setSavedAnswers(parsed);
     }
   }, [snap.answer]);
+
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
+  }, []);
 
   const translation = translations.find((t) => t.languageCode === languageCode);
 
