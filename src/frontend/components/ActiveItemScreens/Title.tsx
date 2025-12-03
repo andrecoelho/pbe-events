@@ -15,7 +15,7 @@ export const Title = ({
       <div className='flex justify-center'>
         <img src={logo} className='h-28' />
       </div>
-      <h1 className='text-6xl font-serif text-center'>{item.title}</h1>
+      <h1 className='text-6xl font-serif font-bold text-center'>{item.title}</h1>
       {item.remarks && <div className='text-2xl font-serif text-center whitespace-pre-wrap'>{item.remarks}</div>}
     </div>
   );

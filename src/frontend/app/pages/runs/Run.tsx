@@ -117,13 +117,13 @@ export const Run = () => {
           <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
 
           {/* Current Slide */}
-          <div className='card shadow-md w-180 h-135 bg-primary relative flex items-center justify-center'>
+          <div className='card shadow-md w-200 h-150 bg-primary relative flex items-center justify-center'>
             <img src={logo} className='opacity-10' />
             <ActiveItemScreen activeItem={snap.run.activeItem} languages={snap.languages} runStatus={snap.run.status} />
           </div>
 
           {/* Team connection status */}
-          <div className='card shadow-xl w-180 mt-4 overflow-hidden'>
+          <div className='card shadow-xl w-200 mt-4 overflow-hidden'>
             {/* Header with accent gradient effect */}
             <div className='relative bg-gradient-to-r from-accent via-amber-400 to-orange-400 p-4'>
               <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/25 via-transparent to-transparent'></div>
