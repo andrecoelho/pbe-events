@@ -5,26 +5,25 @@ import { QuestionAnswer } from '@/frontend/components/ActiveItemScreens/Question
 import { QuestionPrompt } from '@/frontend/components/ActiveItemScreens/QuestionPrompt';
 import { QuestionReading } from '@/frontend/components/ActiveItemScreens/QuestionReading';
 import { Slide } from '@/frontend/components/ActiveItemScreens/Slide';
+import { useTeamValt } from '@/frontend/team/teamValt';
 import { Title } from '@/frontend/components/ActiveItemScreens/Title';
-import type { ActiveItem } from '@/types';
-import { type Snapshot } from 'valtio';
+import { useSnapshot } from 'valtio';
 
-export const ActiveItemScreen = (props: {
-  runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
-  languages: Record<string, { id: string; code: string; name: string }>;
-  activeItem: Snapshot<ActiveItem> | null;
-}) => {
-  const activeItem = props.activeItem;
+export const TeamActiveItemScreen = () => {
+  const valt = useTeamValt();
+  const snap = useSnapshot(valt.store);
 
-  if (props.runStatus === 'not_started') {
+  const activeItem = snap.activeItem;
+
+  if (snap.runStatus === 'not_started') {
     return <NotStarted />;
   }
 
-  if (props.runStatus === 'paused') {
+  if (snap.runStatus === 'paused') {
     return <Paused />;
   }
 
-  if (props.runStatus === 'completed') {
+  if (snap.runStatus === 'completed') {
     return <Completed />;
   }
 
@@ -44,11 +43,11 @@ export const ActiveItemScreen = (props: {
     return <QuestionPrompt item={activeItem} />;
   }
 
-  if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
-    return <QuestionAnswer item={activeItem} languages={props.languages} />;
+  if (activeItem?.type === 'question' && activeItem.phase === 'answer' && snap.languages) {
+    return <QuestionAnswer item={activeItem} languages={snap.languages} />;
   }
 
   return null;
 };
 
-ActiveItemScreen.displayName = 'ActiveItemScreen';
+TeamActiveItemScreen.displayName = 'TeamActiveItemScreen';

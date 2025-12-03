@@ -1,5 +1,5 @@
-import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreen';
-import { TeamValt } from '@/frontend/team/teamValt';
+import { TeamActiveItemScreen } from '@/frontend/team/TeamActiveItemScreen';
+import { TeamValt, TeamValtContext } from '@/frontend/team/teamValt';
 import { useMemo } from 'react';
 import logo from 'src/assets/favicon.svg';
 import '../base.css';
@@ -85,17 +85,26 @@ export const Team = () => {
 
   if (snap.team?.languageId && snap.languages) {
     return (
-      <div className='fixed inset-0 flex justify-center items-center bg-primary'>
-        <img src={logo} className='opacity-10' />
-        <div className='absolute w-[800px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
-          <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+      <TeamValtContext.Provider value={valt}>
+        <div className='fixed inset-0 flex justify-center items-center bg-primary'>
+          <img src={logo} className='opacity-10' />
+          <div className='absolute w-[800px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
+            <TeamActiveItemScreen />
+          </div>
+          <div className='absolute bottom-8 right-8 text-sm opacity-50 flex flex-col text-base-100'>
+            <div>
+              <span className='font-bold'>Event:</span> {snap.event?.name}
+            </div>
+            <div>
+              <span className='font-bold'>Team:</span> {snap.team?.number.toString().padStart(2, '0')} &mdash;{' '}
+              {snap.team?.name}
+            </div>
+            <div>
+              <span className='font-bold'>Language:</span> {snap.languages[snap.team.languageCode!]?.name}
+            </div>
+          </div>
         </div>
-        <div className='absolute bottom-8 right-8 text-sm opacity-50 flex flex-col text-base-100'>
-          <div><span className='font-bold'>Event:</span> {snap.event?.name}</div>
-          <div><span className='font-bold'>Team:</span> {snap.team?.number.toString().padStart(2, '0')} &mdash; {snap.team?.name}</div>
-          <div><span className='font-bold'>Language:</span> {snap.languages[snap.team.languageCode!]?.name}</div>
-        </div>
-      </div>
+      </TeamValtContext.Provider>
     );
   }
 };

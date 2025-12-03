@@ -455,8 +455,6 @@ export class WebSocketServer {
     `;
 
     if (run) {
-      console.log('Initializing event connection for event:', eventId, run);
-
       // Fetch languages for the event
       const languages: { id: string; code: string; name: string }[] = await sql`
         SELECT id, code, name
