@@ -87,7 +87,9 @@ export const Team = () => {
     return (
       <div className='fixed inset-0 flex justify-center items-center bg-primary'>
         <img src={logo} className='opacity-10' />
-        <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+        <div className='absolute w-[800px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
+          <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+        </div>
       </div>
     );
   }
