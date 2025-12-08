@@ -753,7 +753,14 @@ export class WebSocketServer {
       `;
 
     // Notify
-    const message = JSON.stringify({ type: 'ANSWER_RECEIVED', teamId: id, answerId, answer, translationId });
+    const message = JSON.stringify({
+      type: 'ANSWER_RECEIVED',
+      teamId: id,
+      questionId: connection.activeItem.id,
+      translationId,
+      answerId,
+      answer,
+    });
 
     connection.host?.send(message);
     connection.judges.forEach((judgeWs) => judgeWs.send(message));

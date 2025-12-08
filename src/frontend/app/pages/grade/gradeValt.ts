@@ -9,7 +9,22 @@ export interface Question {
   type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
-  translations: Array<{ languageCode: string; prompt: string; answer: string; clarification: string }>;
+  translations: {
+    languageCode: string;
+    prompt: string;
+    answer: string;
+    clarification: string;
+  }[];
+  answers: Record<
+    string,
+    {
+      answerId: string;
+      teamId: string;
+      teamNumber: number;
+      points: number | null;
+      autoPoints: number | null;
+    }
+  >;
 }
 
 interface GradeStore {
@@ -20,18 +35,7 @@ interface GradeStore {
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   activeItem: ActiveItem | null;
   languages: Record<string, { id: string; code: string; name: string }>;
-  answers: Record<
-    string,
-    Record<
-      string,
-      {
-        teamId: string;
-        teamNumber: number;
-        points: number | null;
-        autoPoints: number | null;
-      }
-    >
-  >;
+  questions: Question[];
 }
 
 export class GradeValt {
@@ -42,14 +46,14 @@ export class GradeValt {
 
   constructor() {
     this.store = proxy({
-      activeItem: null,
-      answers: {},
-      connectionState: 'disconnected',
+      initialized: false,
       eventId: '',
       eventName: '',
-      initialized: false,
+      connectionState: 'disconnected',
+      runStatus: 'not_started',
+      activeItem: null,
       languages: {},
-      runStatus: 'not_started'
+      questions: []
     });
   }
 
@@ -61,16 +65,31 @@ export class GradeValt {
     }
   };
 
-  init = (eventId: string) => {
+  init = async (eventId: string) => {
     this.store.eventId = eventId;
+
+    // Fetch questions and answers from the API
+    const response = await fetch(`/api/events/${eventId}/answers`);
+    const data = await response.json();
+
+    if (data.eventName) {
+      this.store.eventName = data.eventName;
+    }
+
+    if (data.questions) {
+      this.store.questions = data.questions;
+    }
+
+    this.store.initialized = true;
+
     this.connectWebSocket();
-  }
+  };
 
   disconnectWebSocket = () => {
     this.ws?.close();
     this.ws = null;
     this.store.connectionState = 'disconnected';
-  }
+  };
 
   connectWebSocket = () => {
     const { promise, resolve, reject } = Promise.withResolvers<{ ok: true } | { ok: false; error: string }>();

@@ -2,8 +2,9 @@ import './validate-app-data';
 
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
-import team from '@/frontend/team/team.html';
 import presenter from '@/frontend/presenter/presenter.html';
+import team from '@/frontend/team/team.html';
+import { answersRoutes } from '@/server/routes/answers';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
 import { languagesRoutes } from '@/server/routes/languages';
@@ -35,6 +36,7 @@ const server = Bun.serve({
     [`/${teamNounce}`]: team,
     [`/${presenterNounce}`]: presenter,
     ...authRoutes,
+    ...answersRoutes,
     ...sessionRoutes,
     ...eventsRoutes,
     ...permissionRoutes,
