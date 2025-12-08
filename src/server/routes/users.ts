@@ -1,10 +1,9 @@
-import { sql } from 'bun';
 import { getSession } from '@/server/session';
 import type { Routes, User } from '@/server/types';
 import { apiBadRequest, apiData, apiNotFound, apiUnauthorized } from '@/server/utils/responses';
-import type { BunRequest } from 'bun';
-import { join } from 'node:path';
+import { type BunRequest, sql } from 'bun';
 import { unlink } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export const userRoutes: Routes = {
   '/api/users': {
