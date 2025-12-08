@@ -25,20 +25,28 @@ export type HostWebsocketData = {
   eventId: string;
 };
 
+export type JudgeWebsocketData = {
+  role: 'judge';
+  session: Session;
+  eventId: string;
+  wsId: string;
+};
+
 export type PresenterWebsocketData = {
   role: 'presenter';
   session: Session;
   eventId: string;
 };
 
-export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWebsocketData;
+export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWebsocketData | JudgeWebsocketData;
 
 export interface EventConnection {
   eventId: string;
   eventName: string;
   host: ServerWebSocket<HostWebsocketData> | null;
-  presenter: ServerWebSocket<PresenterWebsocketData>[];
+  presenters: ServerWebSocket<PresenterWebsocketData>[];
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
+  judges: Map<string, ServerWebSocket<JudgeWebsocketData>>;
   run: Run;
   activeItem: ActiveItem | null;
   languages?: Record<string, { id: string; code: string; name: string }>;
@@ -78,6 +86,10 @@ export class WebSocketServer {
     return ws.data.role === 'host';
   }
 
+  private isJudgeWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<JudgeWebsocketData> {
+    return ws.data.role === 'judge';
+  }
+
   private isPresenterWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<PresenterWebsocketData> {
     return ws.data.role === 'presenter';
   }
@@ -92,7 +104,7 @@ export class WebSocketServer {
       return textBadRequest('Missing eventId or role');
     }
 
-    if (role !== 'host' && role !== 'team' && role !== 'presenter') {
+    if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge') {
       return textBadRequest('Invalid role');
     }
 
@@ -108,12 +120,10 @@ export class WebSocketServer {
         return textUnauthorized();
       }
 
-      // Check if host is already connected
       if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
         return textBadRequest('Host already connected');
       }
 
-      // Validate session and permissions for host
       const permissions: { role_id: string }[] = await sql`
           SELECT role_id
           FROM permissions
@@ -125,7 +135,25 @@ export class WebSocketServer {
       }
 
       if (this.server.upgrade(req, { data: { role: 'host', session, eventId } })) {
-        return;
+        return textServerError('WebSocket upgrade failed');
+      }
+    } else if (role === 'judge') {
+      if (!session) {
+        return textUnauthorized();
+      }
+
+      const permissions: { role_id: string }[] = await sql`
+          SELECT role_id
+          FROM permissions
+          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('judge', 'admin', 'owner')
+        `;
+
+      if (permissions.length === 0) {
+        return textForbidden();
+      }
+
+      if (this.server.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
+        return textServerError('WebSocket upgrade failed');
       }
     } else if (role === 'presenter') {
       if (!session) {
@@ -176,7 +204,7 @@ export class WebSocketServer {
           }
         })
       ) {
-        return;
+        return textServerError('WebSocket upgrade failed');
       }
     }
 
@@ -187,14 +215,14 @@ export class WebSocketServer {
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
     const { eventId } = ws.data;
 
-    if (!eventId) {
-      ws.close();
-      return;
+    // Initialize connection tracking if needed
+    if (eventId && !this.eventConnections.has(eventId)) {
+      await this.initializeEventConnection(eventId);
     }
 
-    // Initialize connection tracking if needed
     if (!this.eventConnections.has(eventId)) {
-      await this.initializeEventConnection(eventId);
+      ws.close();
+      return;
     }
 
     const connection = this.eventConnections.get(eventId)!;
@@ -202,61 +230,25 @@ export class WebSocketServer {
     if (this.isHostWebSocket(ws)) {
       connection.host = ws;
 
-      // Get all teams for this event
-      const allTeams: { id: string; name: string; number: number }[] =
-        await sql`SELECT id, name, number FROM teams WHERE event_id = ${eventId}`;
-
-      // Build status array for all teams
-      const teamStatuses = allTeams.map((team) => {
-        const teamWs = connection.teams.get(team.id);
-
-        if (!teamWs) {
-          // Team is not connected
-          return {
-            id: team.id,
-            name: team.name,
-            number: team.number,
-            status: 'offline',
-            languageCode: null
-          };
-        }
-
-        // Team is connected - check if they have selected a language
-        if (teamWs.data.languageCode) {
-          return {
-            id: team.id,
-            name: team.name,
-            number: team.number,
-            status: 'ready',
-            languageCode: teamWs.data.languageCode
-          };
-        }
-
-        // Team is connected but no language selected
-        return {
-          id: team.id,
-          name: team.name,
-          number: team.number,
-          status: 'connected',
-          languageCode: null
-        };
-      });
-
-      // Send team status message to the newly connected host
-      ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
-      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+      this.sendTeamStatuses(ws, connection);
+      this.sendActiveItem(ws, connection);
+    } else if (this.isJudgeWebSocket(ws)) {
+      connection.judges.set(ws.data.wsId, ws);
+      this.sendLanguages(ws, connection);
+      this.sendRunStatus(ws, connection);
+      this.sendActiveItem(ws, connection);
     } else if (this.isPresenterWebSocket(ws)) {
-      connection.presenter.push(ws);
-
-      ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
-      ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
-      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+      connection.presenters.push(ws);
+      this.sendLanguages(ws, connection);
+      this.sendRunStatus(ws, connection);
+      this.sendActiveItem(ws, connection);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
 
       // Close existing connection if team reconnecting
       if (connection.teams.has(id)) {
         connection.teams.get(id)?.close();
+        connection.teams.delete(id);
       }
 
       connection.teams.set(id, ws);
@@ -353,8 +345,10 @@ export class WebSocketServer {
 
     if (role === 'host') {
       connection.host = null;
+    } else if (role === 'judge') {
+      connection.judges.delete(ws.data.session.user_id);
     } else if (role === 'presenter') {
-      connection.presenter = connection.presenter.filter((presenterWs) => presenterWs !== ws);
+      connection.presenters = connection.presenters.filter((presenterWs) => presenterWs !== ws);
     } else {
       const { id, languageCode } = ws.data;
       const team = connection.teams.get(id)?.data;
@@ -386,7 +380,12 @@ export class WebSocketServer {
     }
 
     // Clean up empty connections
-    if (!connection.host && connection.teams.size === 0 && connection.presenter.length === 0) {
+    if (
+      !connection.host &&
+      connection.teams.size === 0 &&
+      connection.presenters.length === 0 &&
+      connection.judges.size === 0
+    ) {
       this.eventConnections.delete(eventId);
     }
   };
@@ -467,20 +466,54 @@ export class WebSocketServer {
         WHERE event_id = ${eventId}
       `;
 
-      this.eventConnections.set(eventId, {
-        eventId,
-        eventName: run.name,
-        host: null,
-        presenter: [],
-        teams: new Map(),
-        run: {
-          status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
-          gracePeriod: run.grace_period
-        },
-        activeItem: run.active_item,
-        languages: Object.fromEntries(languages.map((lang) => [lang.code, lang]))
-      });
+      if (languages.length > 0) {
+        this.eventConnections.set(eventId, {
+          eventId,
+          eventName: run.name,
+          host: null,
+          presenters: [],
+          judges: new Map(),
+          teams: new Map(),
+          run: {
+            status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
+            gracePeriod: run.grace_period
+          },
+          activeItem: run.active_item,
+          languages: Object.fromEntries(languages.map((lang) => [lang.code, lang]))
+        });
+      }
     }
+  }
+
+  sendActiveItem(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
+    ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+  }
+
+  sendRunStatus(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
+    ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
+  }
+
+  sendLanguages(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
+    ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+  }
+
+  async sendTeamStatuses(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): Promise<void> {
+    const teams: { id: string; number: number }[] =
+      await sql`SELECT id, number FROM teams WHERE event_id = ${connection.eventId}`;
+
+    const teamStatuses = teams.map((team) => {
+      const teamWs = connection.teams.get(team.id);
+      const teamStatus = !teamWs ? 'offline' : teamWs.data.languageCode ? 'ready' : 'connected';
+
+      return {
+        id: team.id,
+        number: team.number,
+        status: teamStatus,
+        languageCode: teamWs?.data.languageCode || null
+      };
+    });
+
+    ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
   }
 
   private async sendExistingAnswerToTeam(
@@ -523,15 +556,15 @@ export class WebSocketServer {
   }
 
   async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
-    const languages: { code: string }[] = await sql`
-        SELECT DISTINCT code FROM languages WHERE event_id = ${eventId}
-      `;
-
     const messageStr = JSON.stringify(message);
 
-    languages.forEach((lang) => {
-      this.server.publish(`${eventId}:${lang.code}`, messageStr);
-    });
+    const eventLanguages = this.eventConnections.get(eventId)?.languages;
+
+    if (eventLanguages) {
+      Object.values(eventLanguages).forEach((lang) => {
+        this.server.publish(`${eventId}:${lang.code}`, messageStr);
+      });
+    }
   }
 
   private async handleSELECT_LANGUAGE(
@@ -719,8 +752,11 @@ export class WebSocketServer {
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
       `;
 
-    // Notify host
-    connection.host?.send(JSON.stringify({ type: 'ANSWER_RECEIVED', teamId: id }));
+    // Notify
+    const message = JSON.stringify({ type: 'ANSWER_RECEIVED', teamId: id, answerId, answer, translationId });
+
+    connection.host?.send(message);
+    connection.judges.forEach((judgeWs) => judgeWs.send(message));
   }
 
   private async handleUPDATE_RUN_STATUS(
@@ -741,7 +777,7 @@ export class WebSocketServer {
 
     connection.host?.send(JSON.stringify({ type: 'RUN_STATUS', status }));
 
-    connection.presenter.forEach((presenterWs) => presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status })));
+    connection.presenters.forEach((presenterWs) => presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status })));
 
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
   }
@@ -757,7 +793,7 @@ export class WebSocketServer {
 
     connection.host?.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }));
 
-    connection.presenter.forEach((presenterWs) =>
+    connection.presenters.forEach((presenterWs) =>
       presenterWs.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }))
     );
 
@@ -776,14 +812,9 @@ export class WebSocketServer {
       WHERE event_id = ${connection.eventId}
     `;
 
-    connection.host?.send(
-      JSON.stringify({
-        type: 'ACTIVE_ITEM',
-        activeItem: connection.activeItem
-      })
-    );
+    connection.host?.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
 
-    connection.presenter.forEach((presenterWs) =>
+    connection.presenters.forEach((presenterWs) =>
       presenterWs.send(
         JSON.stringify({
           type: 'ACTIVE_ITEM',

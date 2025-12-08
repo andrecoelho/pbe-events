@@ -3,6 +3,7 @@ import '../base.css';
 import { AppValt, AppValtContext } from '@/frontend/app/appValt';
 import { NavBar } from '@/frontend/app/NavBar';
 import { Events } from '@/frontend/app/pages/events/Events';
+import { Grade } from '@/frontend/app/pages/grade/Grade';
 import { Languages } from '@/frontend/app/pages/languages/Languages';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
 import { Questions } from '@/frontend/app/pages/questions/Questions';
@@ -23,6 +24,7 @@ const routes: Routes = new Map([
   [/^\/slides/, Slides],
   [/^\/run/, Run],
   [/^\/settings/, Settings],
+  [/^\/grade/, Grade],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 

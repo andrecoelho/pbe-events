@@ -142,9 +142,14 @@ export const EventCard = memo((props: Props) => {
             </a>
           )}
           {canGrade && (
-            <button className='tooltip tooltip-neutral' data-tip='Grade' aria-label={`Grade event ${props.event.name}`}>
-              <Icon name='scale' className='text-amber-600 hover:brightness-75 opacity-20' />
-            </button>
+            <a
+              className='tooltip tooltip-neutral'
+              data-tip='Grade'
+              aria-label={`Grade event ${props.event.name}`}
+              href={`/grade/${props.event.id}`}
+            >
+              <Icon name='scale' className='text-amber-600 hover:brightness-75' />
+            </a>
           )}
           {canEdit && (
             <button
