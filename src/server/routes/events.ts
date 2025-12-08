@@ -2,14 +2,7 @@ import { sql } from 'bun';
 import type { Routes } from '@/server/types';
 import { getSession } from '@/server/session';
 import type { BunRequest } from 'bun';
-import {
-  apiBadRequest,
-  apiData,
-  apiForbidden,
-  apiNotFound,
-  apiServerError,
-  apiUnauthorized
-} from '@/server/utils/responses';
+import { apiBadRequest, apiData, apiForbidden, apiServerError, apiUnauthorized } from '@/server/utils/responses';
 
 interface EventWithRole {
   id: string;

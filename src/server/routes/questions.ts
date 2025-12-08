@@ -1,7 +1,5 @@
-import { sql } from 'bun';
-import type { Routes } from '@/server/types';
 import { getSession } from '@/server/session';
-import type { BunRequest } from 'bun';
+import type { Routes } from '@/server/types';
 import {
   apiBadRequest,
   apiData,
@@ -10,6 +8,7 @@ import {
   apiServerError,
   apiUnauthorized
 } from '@/server/utils/responses';
+import { type BunRequest, sql } from 'bun';
 
 // Types for the YAML import
 interface LanguageDefinition {
@@ -304,7 +303,9 @@ async function importQuestions(
 
       await sql`
         INSERT INTO translations (id, prompt, answer, clarification, language_id, question_id)
-        VALUES (${translationId}, ${translation.prompt.trim()}, ${answerValue}, ${translation.clarification ? translation.clarification.trim() : null}, ${languageId}, ${questionId})
+        VALUES (${translationId}, ${translation.prompt.trim()}, ${answerValue}, ${
+        translation.clarification ? translation.clarification.trim() : null
+      }, ${languageId}, ${questionId})
       `;
     }
 
@@ -1035,7 +1036,16 @@ export const questionsRoutes: Routes = {
       const translationId = req.params.translationId;
 
       // Get the question translation to verify it exists
-      const translations = await sql<{ id: string; prompt: string; answer: string; clarification: string; language_id: string; question_id: string }[]>`
+      const translations = await sql<
+        {
+          id: string;
+          prompt: string;
+          answer: string;
+          clarification: string;
+          language_id: string;
+          question_id: string;
+        }[]
+      >`
         SELECT id, prompt, answer, clarification, language_id, question_id
         FROM translations
         WHERE id = ${translationId}
@@ -1055,7 +1065,9 @@ export const questionsRoutes: Routes = {
       };
 
       // Get the parent question to check permissions
-      const questions = await sql<{ id: string; number: number; type: string; max_points: number; seconds: number; event_id: string }[]>`
+      const questions = await sql<
+        { id: string; number: number; type: string; max_points: number; seconds: number; event_id: string }[]
+      >`
         SELECT id, number, type, max_points, seconds, event_id
         FROM questions
         WHERE id = ${questionTranslation.questionId}

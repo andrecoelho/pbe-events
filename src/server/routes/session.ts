@@ -1,7 +1,7 @@
-import { sql } from 'bun';
 import { getSession } from '@/server/session';
-import type { User, Routes } from '@/server/types';
+import type { Routes, User } from '@/server/types';
 import { apiData, apiNotFound, apiUnauthorized } from '@/server/utils/responses';
+import { sql } from 'bun';
 
 export const sessionRoutes: Routes = {
   '/api/session': {

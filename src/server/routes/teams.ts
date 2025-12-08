@@ -1,9 +1,9 @@
-import { sql } from 'bun';
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import { apiData, apiForbidden, apiUnauthorized, apiBadRequest } from '@/server/utils/responses';
+import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
+import { sql } from 'bun';
 
 interface Team {
   id: string;
@@ -73,9 +73,7 @@ export const teamsRoutes: Routes = {
         WHERE event_id = ${eventId}
       `;
 
-      const teamNumber = teams.length > 0
-        ? Math.max(...teams.map((t: Team) => t.number)) + 1
-        : 1;
+      const teamNumber = teams.length > 0 ? Math.max(...teams.map((t: Team) => t.number)) + 1 : 1;
 
       const id = Bun.randomUUIDv7();
 

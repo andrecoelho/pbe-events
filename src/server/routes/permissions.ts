@@ -1,9 +1,8 @@
-import { sql } from 'bun';
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
 import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import type { BunRequest } from 'bun';
+import { type BunRequest, sql } from 'bun';
 
 interface UserPermission {
   user_id: string;

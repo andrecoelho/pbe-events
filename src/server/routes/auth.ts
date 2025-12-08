@@ -1,7 +1,7 @@
-import { sql } from 'bun';
 import { createSession, deleteSession } from '@/server/session';
 import type { Routes, User } from '@/server/types';
 import { apiBadRequest, apiData, apiUnauthorized } from '@/server/utils/responses';
+import { sql } from 'bun';
 import { join } from 'node:path';
 
 export const authRoutes: Routes = {

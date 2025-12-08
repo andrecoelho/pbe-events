@@ -18,7 +18,6 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
         }
 
         const { eventId } = req.params;
-
         const event = await querySelectEvent(eventId, session.user_id);
 
         if (!event) {

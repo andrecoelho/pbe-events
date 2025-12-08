@@ -1,9 +1,9 @@
-import { sql } from 'bun';
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import { apiData, apiForbidden, apiUnauthorized, apiBadRequest } from '@/server/utils/responses';
+import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
+import { sql } from 'bun';
 
 interface Language {
   id: string;
