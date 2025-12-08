@@ -113,11 +113,7 @@ export const Run = () => {
 
   const snap = useSnapshot(valt.store);
 
-  useEffect(() => {
-    return () => {
-      valt.disconnectWebSocket();
-    };
-  }, [valt]);
+  useEffect(() => () => valt.cleanup(), [valt]);
 
   return (
     <RunValtContext.Provider value={valt}>

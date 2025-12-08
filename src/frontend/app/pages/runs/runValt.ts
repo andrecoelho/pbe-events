@@ -6,7 +6,6 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 export interface TeamStatus {
   id: string;
-  name: string;
   number: number;
   status: 'offline' | 'connected' | 'ready';
   languageCode: string | null;
@@ -68,6 +67,14 @@ export class RunValt {
       languages: {},
       teams: {}
     });
+  }
+
+  cleanup() {
+    this.disconnectWebSocket();
+
+    if (this.reconnectTimeout) {
+      window.clearTimeout(this.reconnectTimeout);
+    }
   }
 
   async init(eventId: string) {
@@ -182,7 +189,12 @@ export class RunValt {
 
     this.store.initialized = true;
 
-    return await this.connectWebSocket();
+    try {
+      return await this.connectWebSocket();
+    } catch (error) {
+      console.error('WebSocket connection error:', error);
+      return { ok: false, error: (error as Error).message } as const;
+    }
   }
 
   connectWebSocket = () => {
@@ -265,6 +277,8 @@ export class RunValt {
 
   disconnectWebSocket() {
     this.ws?.close();
+    this.ws = null;
+    this.store.connectionState = 'disconnected';
   }
 
   async updateRunStatus(status: 'not_started' | 'in_progress' | 'paused' | 'completed') {
