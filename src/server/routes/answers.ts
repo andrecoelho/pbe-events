@@ -36,6 +36,7 @@ export const answersRoutes: Routes = {
         seconds: number;
         translation_id: string;
         language_code: string;
+        language_name: string;
         prompt: string;
         answer: string;
         clarification: string;
@@ -48,6 +49,7 @@ export const answersRoutes: Routes = {
           q.seconds,
           tr.id as translation_id,
           l.code as language_code,
+          l.name as language_name,
           tr.prompt,
           tr.answer,
           tr.clarification
@@ -94,6 +96,7 @@ export const answersRoutes: Routes = {
           seconds: number;
           translations: {
             languageCode: string;
+            languageName: string;
             prompt: string;
             answer: string;
             clarification: string;
@@ -127,6 +130,7 @@ export const answersRoutes: Routes = {
 
         questionsMap.get(row.id)!.translations.push({
           languageCode: row.language_code,
+          languageName: row.language_name,
           prompt: row.prompt,
           answer: row.answer,
           clarification: row.clarification

@@ -11,6 +11,7 @@ export interface Question {
   seconds: number;
   translations: {
     languageCode: string;
+    languageName: string;
     prompt: string;
     answer: string;
     clarification: string;
@@ -36,6 +37,7 @@ interface GradeStore {
   activeItem: ActiveItem | null;
   languages: Record<string, { id: string; code: string; name: string }>;
   questions: Question[];
+  selectedQuestionId?: string;
 }
 
 export class GradeValt {
@@ -78,6 +80,7 @@ export class GradeValt {
 
     if (data.questions) {
       this.store.questions = data.questions;
+      this.store.selectedQuestionId = data.questions.length > 0 ? data.questions[0].id : undefined;
     }
 
     this.store.initialized = true;
@@ -158,5 +161,25 @@ export class GradeValt {
     }
 
     return promise;
+  };
+
+  selectQuestion = (questionId: string) => {
+    this.store.selectedQuestionId = questionId;
+  };
+
+  selectNextQuestion = () => {
+    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestionId);
+
+    if (currentIndex >= 0 && currentIndex < this.store.questions.length - 1) {
+      this.store.selectedQuestionId = this.store.questions[currentIndex + 1]!.id;
+    }
+  };
+
+  selectPreviousQuestion = () => {
+    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestionId);
+
+    if (currentIndex > 0) {
+      this.store.selectedQuestionId = this.store.questions[currentIndex - 1]!.id;
+    }
   };
 }
