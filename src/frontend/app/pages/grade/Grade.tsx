@@ -126,8 +126,18 @@ export const Grade = () => {
             })}
           </div>
 
-          {!selectedQuestion && (
-            <div className='flex-2 flex justify-center items-center text-xl'>Select a question to grade</div>
+          {snap.questions.length === 0 && (
+            <div className='flex-1 flex items-center justify-center'>
+              <div className='text-center'>
+                <p className='text-neutral-500 text-lg mb-4'>
+                  There are no questions in this event. Please add questions before grading.
+                </p>
+                <a href={`/questions/${snap.eventId}`} className='btn btn-primary'>
+                  <Icon name='light-bulb' className='size-4' />
+                  Configure Questions
+                </a>
+              </div>
+            </div>
           )}
 
           {selectedQuestion && (

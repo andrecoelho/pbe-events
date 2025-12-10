@@ -82,7 +82,7 @@ export const Questions = memo(() => {
           {valt.store.initialized && Object.keys(snap.languages).length === 0 && (
             <div className='flex-1 flex items-center justify-center'>
               <div className='text-center'>
-                <p className='text-neutral text-lg mb-4'>
+                <p className='text-neutral-500 text-lg mb-4'>
                   No languages configured for this event. Please add languages before creating questions.
                 </p>
                 <a href={`/languages/${snap.eventId}`} className='btn btn-primary'>

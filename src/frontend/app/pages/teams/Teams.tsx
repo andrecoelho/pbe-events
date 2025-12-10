@@ -48,6 +48,8 @@ export function Teams() {
   const { valt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink } = useMemo(init, []);
   const snap = useSnapshot(valt.store);
 
+  const languageCount = Object.keys(snap.languages).length;
+
   useEffect(() => {
     return () => {
       valt.cleanup();
@@ -59,65 +61,84 @@ export function Teams() {
       <div className='flex-1 overflow-auto p-8'>
         <h1 className='text-3xl font-bold mb-1 text-center'>Event Teams</h1>
         <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
-        <div className='overflow-x-auto'>
-          <table className='table'>
-            <thead>
-              <tr>
-                <th className='col-number'>#</th>
-                <th className='col-name'>Name</th>
-                <th className='col-language'>Language</th>
-                <th className='col-actions'>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {snap.teams.map((team) => (
-                <tr key={team.id}>
-                  <td className='col-number'>{team.number}</td>
-                  <td className='col-name'>{team.name}</td>
-                  <td className='col-language'>{team.languageName}</td>
-                  <td className='col-actions'>
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip='Edit'
-                      onClick={() => handleEditTeam(team)}
-                      aria-label={`Edit team ${team.name}`}
-                    >
-                      <Icon name='pencil-square' className='text-accent cursor-pointer hover:brightness-75' />
-                    </button>
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip={snap.copiedTeamIds.has(team.id) ? 'Copied!' : 'Copy Connection Link'}
-                      onClick={() => handleCopyTeamLink(team)}
-                      aria-label={`Connection link for team ${team.name}`}
-                    >
-                      <Icon
-                        name={snap.copiedTeamIds.has(team.id) ? 'check' : 'link'}
-                        className={`${
-                          snap.copiedTeamIds.has(team.id) ? 'text-success' : 'text-info'
-                        } cursor-pointer hover:brightness-75`}
-                      />
-                    </button>
-                    <button
-                      className='tooltip tooltip-neutral'
-                      data-tip='Delete'
-                      onClick={() => handleRemoveTeam(team)}
-                      aria-label={`Delete team ${team.name}`}
-                    >
-                      <Icon name='trash' className='text-error cursor-pointer hover:brightness-75' />
-                    </button>
-                  </td>
+
+        {snap.initialized && languageCount === 0 && (
+          <div className='flex-1 flex items-center justify-center mt-40'>
+            <div className='text-center'>
+              <p className='text-neutral-500 text-lg mb-4'>
+                No languages configured for this event. Please add languages before adding teams.
+              </p>
+              <a href={`/languages/${snap.eventId}`} className='btn btn-primary'>
+                <Icon name='language' className='size-4' />
+                Configure Languages
+              </a>
+            </div>
+          </div>
+        )}
+
+        {snap.initialized && languageCount > 0 && (
+          <div className='overflow-x-auto'>
+            <table className='table'>
+              <thead>
+                <tr>
+                  <th className='col-number'>#</th>
+                  <th className='col-name'>Name</th>
+                  <th className='col-language'>Language</th>
+                  <th className='col-actions'>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {snap.teams.map((team) => (
+                  <tr key={team.id}>
+                    <td className='col-number'>{team.number}</td>
+                    <td className='col-name'>{team.name}</td>
+                    <td className='col-language'>{team.languageName}</td>
+                    <td className='col-actions'>
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip='Edit'
+                        onClick={() => handleEditTeam(team)}
+                        aria-label={`Edit team ${team.name}`}
+                      >
+                        <Icon name='pencil-square' className='text-accent cursor-pointer hover:brightness-75' />
+                      </button>
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip={snap.copiedTeamIds.has(team.id) ? 'Copied!' : 'Copy Connection Link'}
+                        onClick={() => handleCopyTeamLink(team)}
+                        aria-label={`Connection link for team ${team.name}`}
+                      >
+                        <Icon
+                          name={snap.copiedTeamIds.has(team.id) ? 'check' : 'link'}
+                          className={`${
+                            snap.copiedTeamIds.has(team.id) ? 'text-success' : 'text-info'
+                          } cursor-pointer hover:brightness-75`}
+                        />
+                      </button>
+                      <button
+                        className='tooltip tooltip-neutral'
+                        data-tip='Delete'
+                        onClick={() => handleRemoveTeam(team)}
+                        aria-label={`Delete team ${team.name}`}
+                      >
+                        <Icon name='trash' className='text-error cursor-pointer hover:brightness-75' />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button className='btn btn-primary' disabled={!snap.initialized} onClick={handleAddTeam}>
-          <Icon name='plus' className='size-4' />
-          Add Team
-        </button>
-      </footer>
+      {snap.initialized && languageCount > 0 && (
+        <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
+          <button className='btn btn-primary' disabled={!snap.initialized} onClick={handleAddTeam}>
+            <Icon name='plus' className='size-4' />
+            Add Team
+          </button>
+        </footer>
+      )}
     </div>
   );
 }
