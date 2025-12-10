@@ -564,9 +564,7 @@ export class WebSocketServer {
     const eventLanguages = this.eventConnections.get(eventId)?.languages;
 
     if (eventLanguages) {
-      Object.values(eventLanguages).forEach((lang) => {
-        this.server.publish(`${eventId}:${lang.code}`, message);
-      });
+      Object.values(eventLanguages).forEach((lang) => this.server.publish(`${eventId}:${lang.code}`, message));
     }
   }
 
