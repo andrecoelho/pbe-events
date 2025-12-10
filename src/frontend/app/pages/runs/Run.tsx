@@ -118,9 +118,11 @@ export const Run = () => {
   return (
     <RunValtContext.Provider value={valt}>
       <div className='Run bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
-        <div className='flex-1 overflow-auto p-8 place-items-center'>
-          <h1 className='text-3xl font-bold mb-1 text-center'>Event Run</h1>
-          <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
+        <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
+          <h1 className='text-3xl font-bold mb-1 text-center'>
+            Run &nbsp;
+            <span className='text-neutral brightness-75'>{snap.eventName}</span>
+          </h1>
 
           {/* Current Slide */}
           <div className='card shadow-md w-200 h-150 bg-primary relative flex items-center justify-center'>
