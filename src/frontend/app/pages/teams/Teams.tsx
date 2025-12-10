@@ -5,7 +5,7 @@ import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Teams.css';
 import { teamsModal } from './TeamsModal';
-import { TeamsValt } from './teamsValt';
+import { TeamsValt, type Team } from './teamsValt';
 
 const init = () => {
   const valt = new TeamsValt();
@@ -25,11 +25,11 @@ const init = () => {
     await teamsModal.open(valt);
   };
 
-  const handleEditTeam = async (team: { id: string; name: string; number: number }) => {
+  const handleEditTeam = async (team: Team) => {
     await teamsModal.open(valt, team);
   };
 
-  const handleRemoveTeam = async (team: { id: string; name: string; number: number }) => {
+  const handleRemoveTeam = async (team: Team) => {
     const confirmation = await confirmModal.open(`Are you sure you want to delete team "${team.name}"?`);
 
     if (confirmation) {
@@ -37,7 +37,7 @@ const init = () => {
     }
   };
 
-  const handleCopyTeamLink = async (team: { id: string; name: string; number: number }) => {
+  const handleCopyTeamLink = async (team: Team) => {
     await valt.copyTeamLink(team.id);
   };
 
@@ -65,6 +65,7 @@ export function Teams() {
               <tr>
                 <th className='col-number'>#</th>
                 <th className='col-name'>Name</th>
+                <th className='col-language'>Language</th>
                 <th className='col-actions'>Actions</th>
               </tr>
             </thead>
@@ -73,6 +74,7 @@ export function Teams() {
                 <tr key={team.id}>
                   <td className='col-number'>{team.number}</td>
                   <td className='col-name'>{team.name}</td>
+                  <td className='col-language'>{team.languageName}</td>
                   <td className='col-actions'>
                     <button
                       className='tooltip tooltip-neutral'

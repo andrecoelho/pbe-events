@@ -54,7 +54,8 @@ CREATE TABLE languages (
   name TEXT NOT NULL,
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (code, event_id)
+  UNIQUE (code, event_id),
+  UNIQUE (event_id, id)
 );
 
 CREATE TABLE teams (
@@ -62,9 +63,10 @@ CREATE TABLE teams (
   number INTEGER NOT NULL,
   name TEXT NOT NULL,
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  language_id TEXT REFERENCES languages(id),
+  language_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (event_id, name)
+  UNIQUE (event_id, name),
+  FOREIGN KEY (event_id, language_id) REFERENCES languages(event_id, id) ON DELETE RESTRICT
 );
 
 CREATE TABLE questions (

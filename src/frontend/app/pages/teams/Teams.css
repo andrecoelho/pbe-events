@@ -9,6 +9,10 @@
     @apply text-center;
   }
 
+  .col-language {
+    width: 150px;
+  }
+
   .col-actions {
     @apply flex justify-center gap-4;
   }

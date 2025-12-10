@@ -10,7 +10,15 @@ interface Team {
   name: string;
   number: number;
   event_id: string;
+  language_id: string;
+  language_name: string;
   created_at: number;
+}
+
+interface Language {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export const teamsRoutes: Routes = {
@@ -30,12 +38,28 @@ export const teamsRoutes: Routes = {
       }
 
       const teams: Team[] = await sql`
-        SELECT id, name, number, event_id, created_at
-        FROM teams
-        WHERE event_id = ${eventId}
+        SELECT
+          t.id,
+          t.name,
+          t.number,
+          t.event_id,
+          t.language_id,
+          l.name as language_name,
+          t.created_at
+        FROM teams t
+        LEFT JOIN languages l ON l.id = t.language_id
+        WHERE t.event_id = ${eventId}
+        ORDER BY t.number
       `;
 
-      return apiData({ eventName: event.name, teams });
+      const languages: Language[] = await sql`
+        SELECT id, code, name
+        FROM languages
+        WHERE event_id = ${eventId}
+        ORDER BY code
+      `;
+
+      return apiData({ eventName: event.name, teams, languages });
     },
 
     POST: async (req: BunRequest<'/api/events/:id/teams'>) => {
@@ -52,8 +76,22 @@ export const teamsRoutes: Routes = {
         return apiForbidden();
       }
 
-      const body = (await req.json()) as { name: string };
+      const body = (await req.json()) as { name: string; languageId: string };
       const name = body.name.trim();
+      const languageId = body.languageId;
+
+      if (!languageId) {
+        return apiBadRequest('Language is required');
+      }
+
+      // Validate language exists and belongs to this event
+      const languages: { id: string }[] = await sql`
+        SELECT id FROM languages WHERE id = ${languageId} AND event_id = ${eventId}
+      `;
+
+      if (languages.length === 0) {
+        return apiBadRequest('Invalid language selected');
+      }
 
       if (!name) {
         return apiBadRequest('Team name is required');
@@ -77,9 +115,13 @@ export const teamsRoutes: Routes = {
 
       const id = Bun.randomUUIDv7();
 
-      await sql`INSERT INTO teams (id, event_id, name, number) VALUES (${id}, ${eventId}, ${name}, ${teamNumber})`;
+      await sql`INSERT INTO teams (id, event_id, name, number, language_id) VALUES (${id}, ${eventId}, ${name}, ${teamNumber}, ${languageId})`;
 
-      return apiData({ id, number: teamNumber });
+      // Fetch language name for response
+      const languageResult: { name: string }[] = await sql`SELECT name FROM languages WHERE id = ${languageId}`;
+      const languageName = languageResult[0]?.name || '';
+
+      return apiData({ id, number: teamNumber, languageId, languageName });
     },
 
     PATCH: async (req: BunRequest<'/api/events/:id/teams'>) => {
@@ -96,8 +138,22 @@ export const teamsRoutes: Routes = {
         return apiForbidden();
       }
 
-      const body = (await req.json()) as { id: string; name: string; number: number };
+      const body = (await req.json()) as { id: string; name: string; number: number; languageId: string };
       const name = body.name.trim();
+      const languageId = body.languageId;
+
+      if (!languageId) {
+        return apiBadRequest('Language is required');
+      }
+
+      // Validate language exists and belongs to this event
+      const languages: { id: string }[] = await sql`
+        SELECT id FROM languages WHERE id = ${languageId} AND event_id = ${eventId}
+      `;
+
+      if (languages.length === 0) {
+        return apiBadRequest('Invalid language selected');
+      }
 
       if (!name) {
         return apiBadRequest('Team name is required');
@@ -111,7 +167,7 @@ export const teamsRoutes: Routes = {
         return apiBadRequest('A team with this name already exists');
       }
 
-      await sql`UPDATE teams SET name = ${name}, number = ${body.number} WHERE id = ${body.id}`;
+      await sql`UPDATE teams SET name = ${name}, number = ${body.number}, language_id = ${languageId} WHERE id = ${body.id}`;
 
       return apiData();
     },

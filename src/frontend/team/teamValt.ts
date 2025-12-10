@@ -10,9 +10,8 @@ interface TeamStore {
   team?: {
     id: string;
     name: string;
-    number: number;
-    languageId: string | null;
-    languageCode: string | null;
+    languageId: string;
+    languageCode: string;
   };
   activeItem: ActiveItem | null;
   isTimeUp: boolean;
@@ -57,7 +56,7 @@ export class TeamValt {
         | { type: 'EVENT_INFO'; event: { id: string; name: string } }
         | {
             type: 'TEAM_INFO';
-            team: { id: string; name: string; number: number; languageId: string | null; languageCode: string | null };
+            team: { id: string; name: string; languageId: string; languageCode: string };
           }
         | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
         | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null }
@@ -120,10 +119,6 @@ export class TeamValt {
 
   submitAnswer(answer: string | boolean) {
     this.ws?.send(JSON.stringify({ type: 'SUBMIT_ANSWER', answer }));
-  }
-
-  selectLanguage(languageId: string) {
-    this.ws?.send(JSON.stringify({ type: 'SELECT_LANGUAGE', languageId }));
   }
 
   timeUp() {

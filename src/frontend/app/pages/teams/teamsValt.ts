@@ -1,15 +1,26 @@
 import { proxy } from 'valtio';
 
-interface TeamsStore {
+export interface Language {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  number: number;
+  languageId: string | null;
+  languageName: string;
+}
+
+export interface TeamsStore {
   initialized: boolean;
   eventId: string;
   eventName: string;
   copiedTeamIds: Set<string>;
-  teams: {
-    id: string;
-    name: string;
-    number: number;
-  }[];
+  languages: Language[];
+  teams: Team[];
 }
 
 export class TeamsValt {
@@ -17,7 +28,14 @@ export class TeamsValt {
   private copyTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
-    this.store = proxy({ initialized: false, eventId: '', eventName: '', teams: [], copiedTeamIds: new Set() });
+    this.store = proxy({
+      initialized: false,
+      eventId: '',
+      eventName: '',
+      languages: [],
+      teams: [],
+      copiedTeamIds: new Set()
+    });
   }
 
   async init(eventId: string) {
@@ -27,26 +45,42 @@ export class TeamsValt {
       return { ok: false, error: 'Failed to load teams' } as const;
     }
 
-    const response = (await result.json()) as { eventName: string; teams: TeamsStore['teams'] };
+    const response = (await result.json()) as {
+      eventName: string;
+      teams: TeamsStore['teams'];
+      languages: TeamsStore['languages'];
+    };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
+    this.store.languages = response.languages;
     this.store.teams = response.teams;
     this.store.initialized = true;
 
     return { ok: true } as const;
   }
 
-  async addTeam(name: string) {
+  async addTeam(name: string, languageId: string) {
     const result = await fetch(`/api/events/${this.store.eventId}/teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, languageId })
     });
 
     if (result.status === 200) {
-      const response = (await result.json()) as { id: string; number: number };
-      this.store.teams.push({ id: response.id, name, number: response.number });
+      const response = (await result.json()) as {
+        id: string;
+        number: number;
+        languageId: string;
+        languageName: string;
+      };
+      this.store.teams.push({
+        id: response.id,
+        name,
+        number: response.number,
+        languageId: response.languageId,
+        languageName: response.languageName
+      });
       return { ok: true };
     }
 
@@ -55,7 +89,7 @@ export class TeamsValt {
     return { ok: false, error: response.error };
   }
 
-  async updateTeam(id: string, name: string, number: number) {
+  async updateTeam(id: string, name: string, number: number, languageId: string) {
     const team = this.store.teams.find((t) => t.id === id);
 
     if (!team) {
@@ -65,12 +99,20 @@ export class TeamsValt {
     const result = await fetch(`/api/events/${this.store.eventId}/teams`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name, number })
+      body: JSON.stringify({ id, name, number, languageId })
     });
 
     if (result.status === 200) {
       team.name = name;
       team.number = number;
+      team.languageId = languageId;
+
+      // Update language name from store
+      const language = this.store.languages.find((l) => l.id === languageId);
+
+      if (language) {
+        team.languageName = language.name;
+      }
 
       return { ok: true };
     }

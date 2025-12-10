@@ -13,10 +13,12 @@ interface Team {
   id: string;
   name: string;
   number: number;
+  languageId: string | null;
 }
 
 interface Store {
   name: string;
+  languageId: string;
   validationError?: string;
   isSubmitting: boolean;
 }
@@ -24,6 +26,7 @@ interface Store {
 const init = (teamsValt: TeamsValt, team?: Team) => {
   const store = proxy<Store>({
     name: team?.name || '',
+    languageId: team?.languageId || '',
     validationError: undefined,
     isSubmitting: false
   });
@@ -32,6 +35,11 @@ const init = (teamsValt: TeamsValt, team?: Team) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     store.name = e.target.value;
+    store.validationError = undefined;
+  };
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    store.languageId = e.target.value;
     store.validationError = undefined;
   };
 
@@ -49,9 +57,9 @@ const init = (teamsValt: TeamsValt, team?: Team) => {
       let result: { ok: boolean; error?: string };
 
       if (team) {
-        result = await teamsValt.updateTeam(team.id, store.name, team.number);
+        result = await teamsValt.updateTeam(team.id, store.name, team.number, store.languageId);
       } else {
-        result = await teamsValt.addTeam(store.name);
+        result = await teamsValt.addTeam(store.name, store.languageId);
       }
 
       if (result.ok) {
@@ -68,25 +76,27 @@ const init = (teamsValt: TeamsValt, team?: Team) => {
     store,
     handleCancel,
     handleChange,
+    handleLanguageChange,
     handleSubmit
   };
 };
 
 function TeamsModal(props: Props) {
-  const { store, handleCancel, handleChange, handleSubmit } = useMemo(
+  const { store, handleCancel, handleChange, handleLanguageChange, handleSubmit } = useMemo(
     () => init(props.teamsValt, props.team),
     [props.teamsValt, props.team]
   );
 
-  const snap = useSnapshot(store);
-  const isValid = snap.name.trim().length > 0 && !snap.isSubmitting;
+  const localSnap = useSnapshot(store);
+  const teamsValtSnap = useSnapshot(props.teamsValt.store);
+  const isValid = localSnap.name.trim().length > 0 && localSnap.languageId.length > 0 && !localSnap.isSubmitting;
 
   return (
     <div className='modal-box w-[600px] max-w-[600px]'>
       <h3 className='font-bold text-lg mb-4'>{props.team ? 'Edit Team Name' : 'Add Team'}</h3>
       <form onSubmit={handleSubmit}>
-        <div className='flex flex-col gap-2 items-center'>
-          <div className='w-full'>
+        <div className='flex gap-2 items-center'>
+          <div className='flex-1'>
             <label className='input validator w-full'>
               <Icon name='user-group' className='size-4 text-stone-400' />
               <input
@@ -96,24 +106,46 @@ function TeamsModal(props: Props) {
                 className='placeholder:text-stone-400'
                 placeholder='Team name'
                 required
-                aria-invalid={snap.validationError ? 'true' : 'false'}
-                value={snap.name}
+                aria-invalid={localSnap.validationError ? 'true' : 'false'}
+                value={localSnap.name}
                 onChange={handleChange}
               />
             </label>
-            {snap.validationError && (
+            {localSnap.validationError && (
               <p className='validator-hint'>
-                <span>{snap.validationError}</span>
+                <span>{localSnap.validationError}</span>
               </p>
             )}
           </div>
+          <div className='flex-none w-48'>
+            <label className='form-control w-full'>
+              <select
+                name='language'
+                className='select select-bordered w-full'
+                value={localSnap.languageId}
+                onChange={handleLanguageChange}
+                required
+                aria-invalid={localSnap.validationError ? 'true' : 'false'}
+              >
+                <option value='' disabled>
+                  Choose a language
+                </option>
+
+                {teamsValtSnap.languages.map((language) => (
+                  <option key={language.id} value={language.id}>
+                    {language.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
         <div className='modal-action flex justify-between'>
-          <button type='button' className='btn btn-secondary' onClick={handleCancel} disabled={snap.isSubmitting}>
+          <button type='button' className='btn btn-secondary' onClick={handleCancel} disabled={localSnap.isSubmitting}>
             Cancel
           </button>
           <button type='submit' className='btn btn-primary' disabled={!isValid}>
-            {snap.isSubmitting ? 'Saving...' : 'Save'}
+            {localSnap.isSubmitting ? 'Saving...' : 'Save'}
           </button>
         </div>
       </form>
