@@ -239,8 +239,8 @@ export const Grade = () => {
             Previous
           </button>
           <button className='btn btn-neutral' onClick={handleSelectNextQuestion}>
-            <Icon name='chevron-right' className='size-4' />
             Next
+            <Icon name='chevron-right' className='size-4' />
           </button>
         </div>
         <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>
