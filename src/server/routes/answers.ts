@@ -66,6 +66,7 @@ export const answersRoutes: Routes = {
         answer_id: string | null;
         answer: string | null;
         translation_id: string | null;
+        language_code: string | null;
         team_id: string;
         team_number: number;
         points_awarded: number | null;
@@ -76,6 +77,7 @@ export const answersRoutes: Routes = {
           a.id as answer_id,
           a.answer,
           a.translation_id,
+          l.code as language_code,
           t.id as team_id,
           t.number as team_number,
           a.points_awarded,
@@ -83,6 +85,8 @@ export const answersRoutes: Routes = {
         FROM questions q
         CROSS JOIN teams t
         LEFT JOIN answers a ON a.question_id = q.id AND a.team_id = t.id
+        LEFT JOIN translations tr ON a.translation_id = tr.id
+        LEFT JOIN languages l ON tr.language_id = l.id
         WHERE q.event_id = ${eventId} AND t.event_id = ${eventId}
         ORDER BY q.number, t.number
       `;
@@ -108,6 +112,7 @@ export const answersRoutes: Routes = {
             {
               answerId: string | null;
               answerText: string | null;
+              languageCode: string | null;
               teamId: string;
               teamNumber: number;
               points: number | null;
@@ -147,6 +152,7 @@ export const answersRoutes: Routes = {
           question.answers[row.team_id] = {
             answerId: row.answer_id || null,
             answerText: row.answer || null,
+            languageCode: row.language_code || null,
             teamId: row.team_id,
             teamNumber: row.team_number,
             points: row.points_awarded,

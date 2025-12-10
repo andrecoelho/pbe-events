@@ -723,10 +723,12 @@ export class WebSocketServer {
     }
 
     // Get translation ID
-    const translations: { id: string }[] = await sql`
-        SELECT id FROM translations
-        WHERE question_id = ${connection.activeItem.id}
-          AND language_id = ${languageId}
+    const translations: { id: string; language_code: string }[] = await sql`
+        SELECT tr.id, l.code as language_code
+        FROM translations tr
+        JOIN languages l ON tr.language_id = l.id
+        WHERE tr.question_id = ${connection.activeItem.id}
+          AND tr.language_id = ${languageId}
       `;
 
     if (translations.length === 0) {
@@ -742,6 +744,7 @@ export class WebSocketServer {
     }
 
     const translationId = translations[0]!.id;
+    const languageCode = translations[0]!.language_code;
     const teamNumber = ws.data.number;
     const answerId = Bun.randomUUIDv7();
 
@@ -763,6 +766,7 @@ export class WebSocketServer {
       teamNumber,
       questionId: connection.activeItem.id,
       translationId,
+      languageCode,
       answerId: finalAnswerId,
       answerText: answer
     });

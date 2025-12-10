@@ -164,8 +164,8 @@ export const Grade = () => {
                   <thead>
                     <tr>
                       <th>Team #</th>
+                      <th>Language</th>
                       <th>Answer</th>
-                      <th>Auto Points</th>
                       <th>Points</th>
                       <th>Actions</th>
                     </tr>
@@ -174,8 +174,8 @@ export const Grade = () => {
                     {Object.entries(selectedQuestion.answers).map(([key, answer]) => (
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
+                        <td className='font-mono text-xs'>{answer.languageCode?.toUpperCase() || ''}</td>
                         <td className='font-mono text-sm'>{answer.answerText}</td>
-                        <td>{answer.autoPoints}</td>
                         <td>
                           {answer.answerId && (
                             <input

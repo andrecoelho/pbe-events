@@ -21,6 +21,7 @@ export interface Question {
     {
       answerId: string | null;
       answerText: string | null;
+      languageCode: string | null;
       teamId: string;
       teamNumber: number;
       points: number | null;
@@ -148,6 +149,7 @@ export class GradeValt {
               teamNumber: number;
               questionId: string;
               translationId: string;
+              languageCode: string;
               answerId: string;
               answerText: string;
             };
@@ -171,6 +173,7 @@ export class GradeValt {
                 question.answers[message.teamId] = {
                   answerId: message.answerId,
                   answerText: message.answerText,
+                  languageCode: message.languageCode,
                   teamId: message.teamId,
                   teamNumber: message.teamNumber,
                   points: null,
