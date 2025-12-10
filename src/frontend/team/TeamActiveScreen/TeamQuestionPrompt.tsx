@@ -1,7 +1,8 @@
 import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionTimer';
 import { useTeamValt } from '@/frontend/team/teamValt';
+import type { ActiveItem } from '@/types';
 import { debounce } from 'lodash';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot, type Snapshot } from 'valtio';
 
@@ -41,10 +42,11 @@ export const GeneralAnswer = () => {
   }, 1000);
 
   return (
-    <div className='card bg-base-100 text-base-content'>
+    <div className={`card bg-base-100 text-base-content ${snap.isTimeUp ? 'opacity-50' : ''}`}>
       <textarea
         ref={textareaRef}
         className='w-full h-16 p-2 border rounded'
+        disabled={snap.isTimeUp}
         placeholder='Type your answer here...'
         onChange={handleAnswerChange}
         defaultValue={typeof snap.answer === 'string' ? snap.answer : ''}
@@ -84,16 +86,22 @@ export const TrueFalseAnswer = () => {
 
   return (
     <div className='text-center'>
-      <div className='join'>
+      <div className='flex gap-8 justify-center'>
         <button
           ref={trueButtonRef}
-          className={`btn btn-xl join-item btn-active ${answer === true ? 'btn-success' : ''}`}
+          disabled={snap.isTimeUp}
+          className={`h-30 w-60 rounded-2xl text-4xl shadow-md ${
+            snap.isTimeUp ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
+          } ${answer === true ? 'bg-success' : 'bg-neutral'}`}
           onClick={handleAnswerTrue}
         >
           True
         </button>
         <button
-          className={`btn btn-xl join-item btn-active ${answer === false ? 'btn-error' : ''}`}
+          className={`h-30 w-60 rounded-2xl text-4xl shadow-md ${
+            snap.isTimeUp ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
+          } ${answer === false ? 'bg-error' : 'bg-neutral'}`}
+          disabled={snap.isTimeUp}
           onClick={handleAnswerFalse}
         >
           False
@@ -171,8 +179,11 @@ export const FillInTheBlankAnswer = ({
             ref={(el) => {
               inputRefs.current[part.index!] = el;
             }}
+            disabled={snap.isTimeUp}
             type='text'
-            className='input input-bordered input-sm mx-1 w-40 inline-block text-xl'
+            className={`input input-bordered input-sm mx-1 w-40 inline-block text-xl ${
+              snap.isTimeUp ? 'opacity-50' : ''
+            }`}
             defaultValue={savedAnswers[part.index!] || ''}
             onChange={handleInputChange}
           />
@@ -188,24 +199,22 @@ export const TeamQuestionPrompt = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store);
 
-  const activeItem = snap.activeItem as Snapshot<{
-      type: 'question';
-      id: string;
-      number: number;
-      questionType: 'PG' | 'PS' | 'TF' | 'FB';
-      maxPoints: number;
-      phase: 'prompt';
-      seconds: number;
-      startTime: string | null;
-      translations: Array<{ languageCode: string; prompt: string }>;
-    }>;
+  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
+  const translation = activeItem?.translations.find((t) => t.languageCode === snap.team?.languageCode);
 
-  const team = snap.team;
-  const translation = activeItem?.translations.find((t) => t.languageCode === team?.languageCode);
+  const handleTimeUp = useCallback(() => {
+    valt.timeUp();
+  }, [valt]);
 
   return (
     <div className='absolute inset-0 flex flex-col gap-8 px-10'>
-      <QuestionTimer active seconds={activeItem.seconds} startTime={activeItem.startTime} />
+      <QuestionTimer
+        active
+        seconds={activeItem.seconds}
+        startTime={activeItem.startTime}
+        gracePeriod={snap.gracePeriod}
+        onTimeUp={handleTimeUp}
+      />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />
         <h1 className='text-5xl uppercase text-center text-base-100 font-serif'>Question #{activeItem.number}</h1>
@@ -222,7 +231,7 @@ export const TeamQuestionPrompt = () => {
         {activeItem.questionType === 'FB' && (
           <FillInTheBlankAnswer
             translations={activeItem.translations}
-            languageCode={team?.languageCode || null}
+            languageCode={snap.team?.languageCode || null}
             maxPoints={activeItem.maxPoints}
           />
         )}

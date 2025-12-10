@@ -15,6 +15,8 @@ interface TeamStore {
     languageCode: string | null;
   };
   activeItem: ActiveItem | null;
+  isTimeUp: boolean;
+  gracePeriod: number;
   answer: string | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   languages?: Record<string, { id: string; code: string; name: string }>;
@@ -28,6 +30,8 @@ export class TeamValt {
     this.store = proxy({
       activeItem: null,
       answer: null,
+      isTimeUp: false,
+      gracePeriod: 0,
       runStatus: 'not_started'
     });
   }
@@ -58,7 +62,8 @@ export class TeamValt {
         | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
         | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null }
         | { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> }
-        | { type: 'SAVED_ANSWER'; questionId: string; answer: string };
+        | { type: 'SAVED_ANSWER'; questionId: string; answer: string }
+        | { type: 'GRACE_PERIOD'; gracePeriod: number };
 
       switch (message.type) {
         case 'EVENT_INFO':
@@ -78,9 +83,27 @@ export class TeamValt {
         case 'ACTIVE_ITEM':
           this.store.activeItem = message.activeItem;
           this.store.answer = null;
+
+          // Check if grace period has expired
+          if (
+            message.activeItem?.type === 'question' &&
+            message.activeItem.phase === 'prompt' &&
+            message.activeItem.startTime
+          ) {
+            const startTimeMs = new Date(message.activeItem.startTime).getTime();
+            const nowMs = Date.now();
+            const elapsedSeconds = Math.floor((nowMs - startTimeMs) / 1000);
+            const remainingSeconds = message.activeItem.seconds - elapsedSeconds;
+            this.store.isTimeUp = remainingSeconds <= -this.store.gracePeriod;
+          } else {
+            this.store.isTimeUp = false;
+          }
           break;
         case 'LANGUAGES':
           this.store.languages = message.languages;
+          break;
+        case 'GRACE_PERIOD':
+          this.store.gracePeriod = message.gracePeriod;
           break;
         case 'SAVED_ANSWER':
           if (
@@ -101,6 +124,10 @@ export class TeamValt {
 
   selectLanguage(languageId: string) {
     this.ws?.send(JSON.stringify({ type: 'SELECT_LANGUAGE', languageId }));
+  }
+
+  timeUp() {
+    this.store.isTimeUp = true;
   }
 }
 

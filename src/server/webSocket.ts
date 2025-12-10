@@ -281,13 +281,14 @@ export class WebSocketServer {
           })
         );
 
-        ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+        this.sendLanguages(ws, connection);
 
         // Subscribe to language channel if language selected
         if (team.code) {
           ws.subscribe(`${eventId}:${team.code}`);
-          ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
-          ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+          this.sendRunStatus(ws, connection);
+          this.sendActiveItem(ws, connection);
+          this.sendGracePeriod(ws, connection);
 
           // Send TEAM_CONNECTED to host
           connection.host?.send(
@@ -514,6 +515,10 @@ export class WebSocketServer {
     });
 
     ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+  }
+
+  sendGracePeriod(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
+    ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
   }
 
   private async sendExistingAnswerToTeam(
@@ -796,8 +801,7 @@ export class WebSocketServer {
     connection.host?.send(message);
     connection.presenters.forEach((presenterWs) => presenterWs.send(message));
     connection.judges.forEach((judgeWs) => judgeWs.send(message));
-
-    await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
+    await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
@@ -809,16 +813,11 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-    connection.host?.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }));
+    const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
-    connection.presenters.forEach((presenterWs) =>
-      presenterWs.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod }))
-    );
-
-    await this.broadcastToAllLanguageChannels(connection.eventId, {
-      type: 'GRACE_PERIOD',
-      gracePeriod
-    });
+    connection.host?.send(message);
+    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
+    await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {
@@ -835,10 +834,6 @@ export class WebSocketServer {
     connection.host?.send(message);
     connection.presenters.forEach((presenterWs) => presenterWs.send(message));
     connection.judges.forEach((judgeWs) => judgeWs.send(message));
-
-    await this.broadcastToAllLanguageChannels(connection.eventId, {
-      type: 'ACTIVE_ITEM',
-      activeItem: connection.activeItem
-    });
+    await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 }

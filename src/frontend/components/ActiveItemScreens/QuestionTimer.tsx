@@ -4,9 +4,11 @@ interface Props {
   startTime?: string | null; // ISO string or null
   seconds: number; // total seconds for the timer
   active?: boolean; // whether to render the timer (default: true)
+  gracePeriod?: number; // optional grace period in seconds
+  onTimeUp?: () => void; // optional callback when time is up
 }
 
-export const QuestionTimer = ({ startTime, seconds, active = true }: Props) => {
+export const QuestionTimer = ({ startTime, seconds, active = true, gracePeriod = 0, onTimeUp }: Props) => {
   const [remainingSeconds, setRemainingSeconds] = useState(() => {
     if (!active || !startTime) {
       return seconds;
@@ -16,7 +18,7 @@ export const QuestionTimer = ({ startTime, seconds, active = true }: Props) => {
     const startTimeMs = new Date(startTime).getTime();
     const nowMs = Date.now();
     const elapsedSeconds = Math.floor((nowMs - startTimeMs) / 1000);
-    const remaining = Math.max(0, seconds - elapsedSeconds);
+    const remaining = Math.max(-gracePeriod, seconds - elapsedSeconds);
 
     return remaining;
   });
@@ -30,25 +32,32 @@ export const QuestionTimer = ({ startTime, seconds, active = true }: Props) => {
     const startTimeMs = new Date(startTime).getTime();
     const nowMs = Date.now();
     const elapsedSeconds = Math.floor((nowMs - startTimeMs) / 1000);
-    const remaining = Math.max(0, seconds - elapsedSeconds);
+    const remaining = Math.max(-gracePeriod, seconds - elapsedSeconds);
 
     setRemainingSeconds(remaining);
 
     // Set up interval to count down
     const interval = setInterval(() => {
       setRemainingSeconds((prev) => {
-        if (prev <= 0) {
+        const next = prev - 1;
+
+        // Check if we've exceeded the total time + grace period
+        if (next <= -gracePeriod) {
           clearInterval(interval);
+
+          if (onTimeUp) {
+            onTimeUp();
+          }
           return 0;
         }
 
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
     // Clean up on unmount
     return () => clearInterval(interval);
-  }, [seconds, startTime, active]);
+  }, [seconds, startTime, active, gracePeriod, onTimeUp]);
 
   // Calculate percentage remaining
   const totalSeconds = seconds;
@@ -75,7 +84,7 @@ export const QuestionTimer = ({ startTime, seconds, active = true }: Props) => {
     <div
       className={`absolute top-4 right-4 size-16 rounded-xl text-base-100 text-4xl font-bold flex items-center justify-center bg-gradient-to-br ${gradientClass} shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-colors duration-500`}
     >
-      {!active ? seconds : startTime ? remainingSeconds : '∞'}
+      {!active ? seconds : startTime ? Math.max(0, remainingSeconds) : '∞'}
     </div>
   );
 };
