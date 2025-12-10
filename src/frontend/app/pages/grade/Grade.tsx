@@ -151,8 +151,12 @@ export const Grade = () => {
               <div className='text-2xl font-bold flex justify-between'>
                 <span>Question #{selectedQuestion.number}</span>
                 <div className='flex gap-4'>
-                  <span className='badge badge-xl bg-neutral/50 text-base-content/80'>{selectedQuestion.maxPoints} pts.</span>
-                  <span className='badge badge-xl bg-neutral/70 text-base-content/80'>{selectedQuestion.seconds} secs.</span>
+                  <span className='badge badge-xl bg-neutral/50 text-base-content/80'>
+                    {selectedQuestion.maxPoints} pts.
+                  </span>
+                  <span className='badge badge-xl bg-neutral/70 text-base-content/80'>
+                    {selectedQuestion.seconds} secs.
+                  </span>
                 </div>
               </div>
               {selectedQuestion.translations.map((translation) => (
@@ -192,13 +196,15 @@ export const Grade = () => {
                     {Object.entries(selectedQuestion.answers).map(([key, answer]) => (
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
-                        <td className='font-mono text-xs'>{answer.languageCode?.toUpperCase() || ''}</td>
-                        <td className='font-mono text-sm'>{answer.answerText}</td>
+                        <td className='font-mono text-xs'>
+                          {answer.languageCode && <span className='badge badge-neutral'>{answer.languageCode.toUpperCase()}</span>}
+                        </td>
+                        <td className='font-mono text-base'>{answer.answerText}</td>
                         <td>
                           {answer.answerId && (
                             <input
                               type='number'
-                              className='input input-sm input-bordered w-20'
+                              className='input input-sm input-bordered w-20 font-mono text-base'
                               value={answer.points ?? ''}
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
