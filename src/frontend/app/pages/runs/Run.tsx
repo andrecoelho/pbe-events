@@ -1,5 +1,6 @@
 import type { TeamStatus } from '@/frontend/app/pages/runs/runValt';
 import { RunValt, RunValtContext } from '@/frontend/app/pages/runs/runValt';
+import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
@@ -7,7 +8,6 @@ import { useEffect, useMemo } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot } from 'valtio';
 import './Run.css';
-import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
 
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',
@@ -188,22 +188,40 @@ export const Run = () => {
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--offline'>04</span>
               </span>
-              <span>Offline team</span>
+              <span>Offline</span>
             </div>
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
-                <span className='team-badge team-badge--sm team-badge--connected'>11</span>
+                <span className='team-badge team-badge--sm team-badge--offline'>04</span>
+                <span className='team-badge-no-answer'>
+                  <Icon name='x-mark' className='size-2' />
+                </span>
               </span>
-              <span>Connected, not ready</span>
+              <span>Offline + No Answer</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <span className='relative inline-flex'>
+                <span className='team-badge team-badge--sm team-badge--ready'>23</span>
+              </span>
+              <span>Connected</span>
             </div>
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--ready'>23</span>
                 <span className='team-badge-check'>
-                  <Icon name='check' className='size-1.5' />
+                  <Icon name='check' className='size-2' />
                 </span>
               </span>
-              <span>Ready + answered</span>
+              <span>Connected + Answer</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <span className='relative inline-flex'>
+                <span className='team-badge team-badge--sm team-badge--ready'>23</span>
+                <span className='team-badge-no-answer'>
+                  <Icon name='x-mark' className='size-2' />
+                </span>
+              </span>
+              <span>Connected + No Answer</span>
             </div>
           </div>
         </div>
