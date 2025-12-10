@@ -131,10 +131,10 @@ export const Grade = () => {
                 </span>
               </div>
               {selectedQuestion.translations.map((translation) => (
-                <div key={translation.languageCode} className='mt-2 border-1 border-neutral-400 p-2 rounded-lg'>
-                  <div className='font-bold'>
-                    {translation.languageName} ({translation.languageCode.toUpperCase()}):
-                  </div>
+                <fieldset key={translation.languageCode} className='fieldset bg-neutral/30 border-neutral-400 rounded-lg border mt-2 p-2 text-sm'>
+                  <legend className='fieldset-legend'>
+                    {translation.languageName} ({translation.languageCode.toUpperCase()})
+                  </legend>
                   <div>{translation.prompt}</div>
                   <div className='border-t-1 border-dashed border-neutral-400 mt-2'>
                     <span className='font-extralight'>Answer:</span>
@@ -143,7 +143,7 @@ export const Grade = () => {
                     &nbsp;
                     {translation.clarification ? `(${translation.clarification})` : ''}
                   </div>
-                </div>
+                </fieldset>
               ))}
 
               <div className='mt-4'>
