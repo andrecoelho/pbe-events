@@ -560,14 +560,12 @@ export class WebSocketServer {
     } catch {}
   }
 
-  async broadcastToAllLanguageChannels(eventId: string, message: any): Promise<void> {
-    const messageStr = JSON.stringify(message);
-
+  async broadcastToAllLanguageChannels(eventId: string, message: string): Promise<void> {
     const eventLanguages = this.eventConnections.get(eventId)?.languages;
 
     if (eventLanguages) {
       Object.values(eventLanguages).forEach((lang) => {
-        this.server.publish(`${eventId}:${lang.code}`, messageStr);
+        this.server.publish(`${eventId}:${lang.code}`, message);
       });
     }
   }
