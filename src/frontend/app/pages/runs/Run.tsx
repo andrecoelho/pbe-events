@@ -194,7 +194,7 @@ export const Run = () => {
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--offline'>04</span>
                 <span className='team-badge-no-answer'>
-                  <Icon name='x-mark' className='size-2' />
+                  <Icon name='x-mark' />
                 </span>
               </span>
               <span>Offline + No Answer</span>
@@ -209,7 +209,7 @@ export const Run = () => {
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--ready'>23</span>
                 <span className='team-badge-check'>
-                  <Icon name='check' className='size-2' />
+                  <Icon name='check' />
                 </span>
               </span>
               <span>Connected + Answer</span>
@@ -218,7 +218,7 @@ export const Run = () => {
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--ready'>23</span>
                 <span className='team-badge-no-answer'>
-                  <Icon name='x-mark' className='size-2' />
+                  <Icon name='x-mark' />
                 </span>
               </span>
               <span>Connected + No Answer</span>
