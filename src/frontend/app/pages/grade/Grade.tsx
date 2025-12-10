@@ -85,6 +85,15 @@ export const Grade = () => {
     ? snap.questions.find((q) => q.id === snap.selectedQuestionId) || null
     : null;
 
+  const runStatusConfig = {
+    not_started: { label: 'Not Started', color: 'badge-neutral' },
+    in_progress: { label: 'In Progress', color: 'badge-info' },
+    paused: { label: 'Paused', color: 'badge-warning' },
+    completed: { label: 'Completed', color: 'badge-success' }
+  };
+
+  const statusInfo = runStatusConfig[snap.runStatus] || { label: snap.runStatus, color: 'badge-neutral' };
+
   useEffect(() => () => gradeValt.cleanup(), [gradeValt]);
 
   return (
@@ -131,7 +140,10 @@ export const Grade = () => {
                 </span>
               </div>
               {selectedQuestion.translations.map((translation) => (
-                <fieldset key={translation.languageCode} className='fieldset bg-neutral/30 border-neutral-400 rounded-lg border mt-2 p-2 text-sm'>
+                <fieldset
+                  key={translation.languageCode}
+                  className='fieldset bg-neutral/30 border-neutral-400 rounded-lg border mt-2 p-2 text-sm'
+                >
                   <legend className='fieldset-legend'>
                     {translation.languageName} ({translation.languageCode.toUpperCase()})
                   </legend>
@@ -220,7 +232,7 @@ export const Grade = () => {
         </div>
       </div>
 
-      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between shadow-md-top'>
+      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top'>
         <div className='flex gap-2'>
           <button className='btn btn-neutral' onClick={handleSelectPreviousQuestion}>
             <Icon name='chevron-left' className='size-4' />
@@ -231,6 +243,7 @@ export const Grade = () => {
             Next
           </button>
         </div>
+        <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>
       </footer>
     </div>
   );

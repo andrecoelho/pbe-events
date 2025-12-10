@@ -787,9 +787,11 @@ export class WebSocketServer {
         WHERE event_id = ${connection.eventId}
       `;
 
-    connection.host?.send(JSON.stringify({ type: 'RUN_STATUS', status }));
+    const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
-    connection.presenters.forEach((presenterWs) => presenterWs.send(JSON.stringify({ type: 'RUN_STATUS', status })));
+    connection.host?.send(message);
+    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
+    connection.judges.forEach((judgeWs) => judgeWs.send(message));
 
     await this.broadcastToAllLanguageChannels(connection.eventId, { type: 'RUN_STATUS', status });
   }
