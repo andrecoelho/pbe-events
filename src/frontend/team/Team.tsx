@@ -123,8 +123,7 @@ export const Team = () => {
               <span className='font-bold'>Event:</span> {snap.event?.name}
             </div>
             <div>
-              <span className='font-bold'>Team:</span> {snap.team?.number.toString().padStart(2, '0')} &mdash;{' '}
-              {snap.team?.name}
+              <span className='font-bold'>Team:</span> {snap.team?.name}
             </div>
             <div>
               <span className='font-bold'>Language:</span> {snap.languages[snap.team.languageCode!]?.name}
