@@ -3,11 +3,11 @@
 .Grade {
   .question-badge {
     @apply size-10 rounded-xl text-base-100 text-lg font-semibold flex items-center justify-center bg-gradient-to-br shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-transform cursor-pointer;
-    @apply from-gray-500 via-gray-700 to-slate-900 opacity-75;
+    @apply from-gray-300 via-gray-500 to-slate-600 opacity-75;
   }
 
   .question-badge:hover {
-    @apply ring-2 ring-secondary;
+    @apply ring-2 ring-accent;
   }
 
   .question-badge--selected {
@@ -16,5 +16,9 @@
 
   .question-badge--active {
     @apply from-info via-sky-500 to-indigo-500;
+  }
+
+  .question-badge--active-selected {
+    @apply from-orange-400 via-green-300 to-indigo-500 text-base-content;
   }
 }

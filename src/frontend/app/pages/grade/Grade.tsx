@@ -115,7 +115,13 @@ export const Grade = () => {
                   key={question.id}
                   tabIndex={0}
                   className={`question-badge ${
-                    isSelected ? 'question-badge--selected' : isActive ? 'question-badge--active' : ''
+                    isSelected && isActive
+                      ? 'question-badge--active-selected'
+                      : isSelected
+                      ? 'question-badge--selected'
+                      : isActive
+                      ? 'question-badge--active'
+                      : ''
                   }`}
                   data-question-id={question.id}
                   onClick={handleSelectQuestion}
@@ -126,7 +132,7 @@ export const Grade = () => {
             })}
           </div>
 
-          {snap.questions.length === 0 && (
+          {snap.initialized && snap.questions.length === 0 && (
             <div className='flex-1 flex items-center justify-center'>
               <div className='text-center'>
                 <p className='text-neutral-500 text-lg mb-4'>
@@ -140,14 +146,14 @@ export const Grade = () => {
             </div>
           )}
 
-          {selectedQuestion && (
+          {snap.initialized && selectedQuestion && (
             <div className='flex-2 pl-4'>
-              <div className='text-2xl font-bold'>
+              <div className='text-2xl font-bold flex justify-between'>
                 <span>Question #{selectedQuestion.number}</span>
-                &nbsp;
-                <span className='text-base-content/50'>
-                  ({selectedQuestion.maxPoints} pts. {selectedQuestion.seconds} secs.)
-                </span>
+                <div className='flex gap-4'>
+                  <span className='badge badge-xl bg-neutral/50 text-base-content/80'>{selectedQuestion.maxPoints} pts.</span>
+                  <span className='badge badge-xl bg-neutral/70 text-base-content/80'>{selectedQuestion.seconds} secs.</span>
+                </div>
               </div>
               {selectedQuestion.translations.map((translation) => (
                 <fieldset
@@ -158,12 +164,14 @@ export const Grade = () => {
                     {translation.languageName} ({translation.languageCode.toUpperCase()})
                   </legend>
                   <div>{translation.prompt}</div>
-                  <div className='border-t-1 border-dashed border-neutral-400 mt-2'>
+                  <div className='border-t-1 border-dashed border-neutral-400 mt-2 pt-2'>
                     <span className='font-extralight'>Answer:</span>
                     &nbsp;
-                    {translation.answer}
-                    &nbsp;
-                    {translation.clarification ? `(${translation.clarification})` : ''}
+                    <span className='badge bg-success/20'>
+                      {translation.answer}
+                      &nbsp;
+                      {translation.clarification ? `(${translation.clarification})` : ''}
+                    </span>
                   </div>
                 </fieldset>
               ))}
@@ -242,7 +250,7 @@ export const Grade = () => {
         </div>
       </div>
 
-      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top'>
+      <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top z-1'>
         <div className='flex gap-2'>
           <button className='btn btn-neutral' onClick={handleSelectPreviousQuestion}>
             <Icon name='chevron-left' className='size-4' />
