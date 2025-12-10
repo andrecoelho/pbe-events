@@ -17,9 +17,10 @@ export interface Question {
     clarification: string;
   }[];
   answers: Record<
-    string,
+    string, // teamId
     {
-      answerId: string;
+      answerId: string | null;
+      answerText: string | null;
       teamId: string;
       teamNumber: number;
       points: number | null;
@@ -35,7 +36,6 @@ interface GradeStore {
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   activeItem: ActiveItem | null;
-  languages: Record<string, { id: string; code: string; name: string }>;
   questions: Question[];
   selectedQuestionId?: string;
 }
@@ -142,7 +142,15 @@ export class GradeValt {
         const message = JSON.parse(event.data) as
           | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
           | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
-          | { type: 'ANSWER_RECEIVED'; teamId: string };
+          | {
+              type: 'ANSWER_RECEIVED';
+              teamId: string;
+              teamNumber: number;
+              questionId: string;
+              translationId: string;
+              answerId: string;
+              answerText: string;
+            };
 
         switch (message.type) {
           case 'RUN_STATUS':
@@ -152,6 +160,25 @@ export class GradeValt {
             this.store.activeItem = message.activeItem;
             break;
           case 'ANSWER_RECEIVED':
+            const question = this.store.questions.find((q) => q.id === message.questionId);
+
+            if (question) {
+              const answer = question.answers[message.answerId];
+
+              if (answer) {
+                answer.answerText = message.answerText;
+              } else {
+                question.answers[message.teamId] = {
+                  answerId: message.answerId,
+                  answerText: message.answerText,
+                  teamId: message.teamId,
+                  teamNumber: message.teamNumber,
+                  points: null,
+                  autoPoints: null
+                };
+              }
+            }
+
             break;
         }
       };
@@ -180,6 +207,30 @@ export class GradeValt {
 
     if (currentIndex > 0) {
       this.store.selectedQuestionId = this.store.questions[currentIndex - 1]!.id;
+    }
+  };
+
+  updatePoints = (questionId: string, teamId: string, points: number | null) => {
+    const question = this.store.questions.find((q) => q.id === questionId);
+
+    if (question && question.answers[teamId] && (points === null || (points >= 0 && points <= question.maxPoints))) {
+      question.answers[teamId]!.points = points;
+    }
+  };
+
+  giveMaxPoints = (questionId: string, teamId: string) => {
+    const question = this.store.questions.find((q) => q.id === questionId);
+
+    if (question && question.answers[teamId]) {
+      question.answers[teamId]!.points = question.maxPoints;
+    }
+  };
+
+  giveZeroPoints = (questionId: string, teamId: string) => {
+    const question = this.store.questions.find((q) => q.id === questionId);
+
+    if (question && question.answers[teamId]) {
+      question.answers[teamId]!.points = 0;
     }
   };
 }

@@ -742,24 +742,29 @@ export class WebSocketServer {
     }
 
     const translationId = translations[0]!.id;
+    const teamNumber = ws.data.number;
     const answerId = Bun.randomUUIDv7();
 
     // Upsert answer
-    await sql`
+    const result: { id: string }[] = await sql`
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
         VALUES (${answerId}, ${answer}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
+        RETURNING id
       `;
+
+    const finalAnswerId = result[0]!.id;
 
     // Notify
     const message = JSON.stringify({
       type: 'ANSWER_RECEIVED',
       teamId: id,
+      teamNumber,
       questionId: connection.activeItem.id,
       translationId,
-      answerId,
-      answer,
+      answerId: finalAnswerId,
+      answerText: answer
     });
 
     connection.host?.send(message);
@@ -819,16 +824,11 @@ export class WebSocketServer {
       WHERE event_id = ${connection.eventId}
     `;
 
-    connection.host?.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
 
-    connection.presenters.forEach((presenterWs) =>
-      presenterWs.send(
-        JSON.stringify({
-          type: 'ACTIVE_ITEM',
-          activeItem: connection.activeItem
-        })
-      )
-    );
+    connection.host?.send(message);
+    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
+    connection.judges.forEach((judgeWs) => judgeWs.send(message));
 
     await this.broadcastToAllLanguageChannels(connection.eventId, {
       type: 'ACTIVE_ITEM',

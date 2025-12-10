@@ -60,28 +60,30 @@ export const answersRoutes: Routes = {
         ORDER BY q.number, l.code
       `;
 
-      // Query all answers
+      // Query all teams with their answers (answers can be null)
       const answersData: {
         question_id: string;
-        answer_id: string;
-        translation_id: string;
+        answer_id: string | null;
+        answer: string | null;
+        translation_id: string | null;
         team_id: string;
         team_number: number;
         points_awarded: number | null;
         auto_points_awarded: number | null;
       }[] = await sql`
         SELECT
-          a.question_id,
+          q.id as question_id,
           a.id as answer_id,
+          a.answer,
           a.translation_id,
-          a.team_id,
+          t.id as team_id,
           t.number as team_number,
           a.points_awarded,
           a.auto_points_awarded
-        FROM answers a
-        JOIN questions q ON a.question_id = q.id
-        JOIN teams t ON a.team_id = t.id
-        WHERE q.event_id = ${eventId}
+        FROM questions q
+        CROSS JOIN teams t
+        LEFT JOIN answers a ON a.question_id = q.id AND a.team_id = t.id
+        WHERE q.event_id = ${eventId} AND t.event_id = ${eventId}
         ORDER BY q.number, t.number
       `;
 
@@ -104,7 +106,8 @@ export const answersRoutes: Routes = {
           answers: Record<
             string,
             {
-              answerId: string;
+              answerId: string | null;
+              answerText: string | null;
               teamId: string;
               teamNumber: number;
               points: number | null;
@@ -137,12 +140,13 @@ export const answersRoutes: Routes = {
         });
       }
 
-      // Then, add answers to questions
+      // Then, add answers to questions (including null answers for teams without responses)
       for (const row of answersData) {
         const question = questionsMap.get(row.question_id);
         if (question) {
-          question.answers[row.translation_id] = {
-            answerId: row.answer_id,
+          question.answers[row.team_id] = {
+            answerId: row.answer_id || null,
+            answerText: row.answer || null,
             teamId: row.team_id,
             teamNumber: row.team_number,
             points: row.points_awarded,
