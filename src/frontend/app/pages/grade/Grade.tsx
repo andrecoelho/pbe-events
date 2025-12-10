@@ -2,6 +2,7 @@ import { GradeValt } from '@/frontend/app/pages/grade/gradeValt';
 import { Icon } from '@/frontend/components/Icon';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
+import './Grade.css';
 
 const init = () => {
   const url = new URL(window.location.href);
@@ -87,28 +88,33 @@ export const Grade = () => {
   useEffect(() => () => gradeValt.cleanup(), [gradeValt]);
 
   return (
-    <div className='bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
+    <div className='Grade bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
         <h1 className='text-3xl font-bold mb-1 text-center'>
-          Grade Event &nbsp;
+          Grade &nbsp;
           <span className='text-neutral brightness-75'>{snap.eventName}</span>
         </h1>
 
         <div className='flex w-full h-[calc(100%-24px)]'>
-          <div className='bg-neutral/30 flex-none flex flex-col flex-wrap gap-1 p-2'>
-            {snap.questions.map((question) => (
-              <div
-                key={question.id}
-                tabIndex={0}
-                className={`size-10 border-2 flex justify-center items-center cursor-pointer hover:border-secondary ${
-                  snap.selectedQuestionId === question.id ? 'bg-blue-200' : ''
-                }`}
-                data-question-id={question.id}
-                onClick={handleSelectQuestion}
-              >
-                {question.number}
-              </div>
-            ))}
+          <div className='flex-none flex flex-col flex-wrap gap-1 p-2'>
+            {snap.questions.map((question) => {
+              const isActive = snap.activeItem?.type === 'question' && snap.activeItem.id === question.id;
+              const isSelected = snap.selectedQuestionId === question.id;
+
+              return (
+                <div
+                  key={question.id}
+                  tabIndex={0}
+                  className={`question-badge ${
+                    isSelected ? 'question-badge--selected' : isActive ? 'question-badge--active' : ''
+                  }`}
+                  data-question-id={question.id}
+                  onClick={handleSelectQuestion}
+                >
+                  {question.number}
+                </div>
+              );
+            })}
           </div>
 
           {!selectedQuestion && (
