@@ -36,7 +36,7 @@ const init = () => {
     const value = event.currentTarget.value;
 
     if (teamId && questionId) {
-      gradeValt.updatePoints(questionId, teamId, value === '' ? null : Number(value));
+      gradeValt.updatePoints(questionId, teamId, value === '' ? null : parseInt(value));
     }
   };
 
