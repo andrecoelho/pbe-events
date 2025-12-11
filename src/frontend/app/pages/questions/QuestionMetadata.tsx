@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import type { Snapshot } from 'valtio';
-import { useQuestionsValt, type Question, type QuestionType } from './questionsValt';
+import { useSnapshot } from 'valtio';
+import { useQuestionsValt, type QuestionType } from './questionsValt';
 
 const QUESTION_TYPES = [
   { value: 'PG', label: 'Points General' },
@@ -9,12 +9,10 @@ const QUESTION_TYPES = [
   { value: 'FB', label: 'Fill in the Blank' }
 ];
 
-interface QuestionMetadataProps {
-  question: Snapshot<Question>;
-}
-
-export const QuestionMetadata = memo(({ question }: QuestionMetadataProps) => {
+export const QuestionMetadata = memo(() => {
   const questionsValt = useQuestionsValt();
+  const snap = useSnapshot(questionsValt.store, { sync: true });
+  const question = snap.selectedQuestion;
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
     await questionsValt.updateQuestion(question, { type });

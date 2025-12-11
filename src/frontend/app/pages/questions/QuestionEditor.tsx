@@ -6,7 +6,7 @@ import { useQuestionsValt, type IQuestionTranslation, type Question } from './qu
 
 export const QuestionEditor = memo(() => {
   const questionsValt = useQuestionsValt();
-  const snap = useSnapshot(questionsValt.store, { sync: true });
+  const snap = useSnapshot(questionsValt.store);
   const selectedQuestion = snap.selectedQuestion;
 
   if (!selectedQuestion) {
@@ -21,7 +21,7 @@ export const QuestionEditor = memo(() => {
     <div className='QuestionEditor flex-1 overflow-y-auto h-full'>
       <h3 className='text-xl font-bold mb-4'>Question {selectedQuestion.number}</h3>
 
-      <QuestionMetadata question={selectedQuestion} />
+      <QuestionMetadata />
 
       <div className='QuestionTranslations'>
         <div className='flex flex-col gap-4'>
