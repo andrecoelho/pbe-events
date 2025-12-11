@@ -31,8 +31,7 @@ export const QuestionEditor = memo(() => {
               return (
                 <QuestionTranslation
                   key={translation.languageCode}
-                  question={selectedQuestion}
-                  translation={translation}
+                  languageCode={translation.languageCode}
                 />
               );
             })}

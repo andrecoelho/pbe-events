@@ -4,17 +4,19 @@ import { useQuestionsValt, type IQuestionTranslation, type Question } from './qu
 import { useSnapshot, type Snapshot } from 'valtio';
 
 interface Props {
-  question: Snapshot<Question>;
-  translation: Snapshot<IQuestionTranslation>;
+  languageCode: string;
 }
 
-export const QuestionTranslation = memo(({ question, translation }: Props) => {
+export const QuestionTranslation = memo(({ languageCode }: Props) => {
   const questionsValt = useQuestionsValt();
   const snap = useSnapshot(questionsValt.store, { sync: true });
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);
   const clarificationRef = useRef<HTMLInputElement>(null);
+
+  const question = snap.selectedQuestion!;
+  const translation = question.translations[languageCode]!;
 
   const handleTranslationChange = useCallback(
     debounce(
