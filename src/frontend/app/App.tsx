@@ -7,6 +7,7 @@ import { Grade } from '@/frontend/app/pages/grade/Grade';
 import { Languages } from '@/frontend/app/pages/languages/Languages';
 import { Permissions } from '@/frontend/app/pages/permissions/Permissions';
 import { Questions } from '@/frontend/app/pages/questions/Questions';
+import { Results } from '@/frontend/app/pages/results/Results';
 import { Run } from '@/frontend/app/pages/runs/Run';
 import { Settings } from '@/frontend/app/pages/settings/Settings';
 import { Slides } from '@/frontend/app/pages/slides/Slides';
@@ -25,6 +26,7 @@ const routes: Routes = new Map([
   [/^\/run/, Run],
   [/^\/settings/, Settings],
   [/^\/grade/, Grade],
+  [/^\/results/, Results],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 
