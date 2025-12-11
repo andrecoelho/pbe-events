@@ -1,7 +1,7 @@
 import { debounce } from 'lodash';
 import { memo, useCallback, useRef } from 'react';
 import { useQuestionsValt, type IQuestionTranslation, type Question } from './questionsValt';
-import { useSnapshot, type Snapshot } from 'valtio';
+import { useSnapshot } from 'valtio';
 
 interface Props {
   languageCode: string;

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionMetadata } from './QuestionMetadata';
 import { QuestionTranslation } from './QuestionTranslation';
-import { useQuestionsValt, type IQuestionTranslation, type Question } from './questionsValt';
+import { useQuestionsValt } from './questionsValt';
 
 export const QuestionEditor = memo(() => {
   const questionsValt = useQuestionsValt();
