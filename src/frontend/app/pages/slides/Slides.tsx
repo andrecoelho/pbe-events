@@ -71,7 +71,8 @@ export function Slides() {
     init,
     []
   );
-  const snap = useSnapshot(valt.store);
+
+  const snap = useSnapshot(valt.store, { sync: true });
 
   return (
     <div className='Slides bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
