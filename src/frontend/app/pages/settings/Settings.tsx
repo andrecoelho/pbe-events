@@ -2,7 +2,7 @@ import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useAppValt } from '@/frontend/app/appValt';
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { SettingsValt, SettingsValtContext } from './settingsValt';
 import './Settings.css';
