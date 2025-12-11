@@ -34,16 +34,16 @@ export const Settings = memo(() => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (email === '') {
-      setEmail(snap.user?.email);
+    if (email === '' && snap.user?.email) {
+      setEmail(snap.user.email);
     }
 
-    if (firstName === '') {
-      setFirstName(snap.user?.firstName);
+    if (firstName === '' && snap.user?.firstName) {
+      setFirstName(snap.user.firstName);
     }
 
-    if (lastName === '') {
-      setLastName(snap.user?.lastName);
+    if (lastName === '' && snap.user?.lastName) {
+      setLastName(snap.user.lastName);
     }
   }, [snap.user?.email, snap.user?.firstName, snap.user?.lastName]);
 
