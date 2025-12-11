@@ -58,6 +58,15 @@ const init = () => {
     }
   };
 
+  const handleClearPoints = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const teamId = event.currentTarget.getAttribute('data-team-id');
+    const questionId = event.currentTarget.getAttribute('data-question-id');
+
+    if (teamId && questionId) {
+      gradeValt.updatePoints(questionId, teamId, null);
+    }
+  };
+
   return {
     gradeValt,
     handleSelectQuestion,
@@ -65,7 +74,8 @@ const init = () => {
     handleSelectPreviousQuestion,
     handlePointsChange,
     handleGiveMaxPoints,
-    handleGiveZeroPoints
+    handleGiveZeroPoints,
+    handleClearPoints
   };
 };
 
@@ -77,7 +87,8 @@ export const Grade = () => {
     handleSelectPreviousQuestion,
     handlePointsChange,
     handleGiveMaxPoints,
-    handleGiveZeroPoints
+    handleGiveZeroPoints,
+    handleClearPoints
   } = useMemo(init, []);
   const snap = useSnapshot(gradeValt.store);
 
@@ -242,6 +253,21 @@ export const Grade = () => {
                               <Icon
                                 name='hand-thumb-down'
                                 className='size-6 cursor-pointer text-error hover:brightness-150'
+                              />
+                            </button>
+                          )}
+                          {answer.answerId && (
+                            <button
+                              className='tooltip tooltip-neutral'
+                              data-tip='Clear Points'
+                              data-team-id={answer.teamId}
+                              data-question-id={selectedQuestion.id}
+                              onClick={handleClearPoints}
+                              aria-label='Clear Points'
+                            >
+                              <Icon
+                                name='x-circle'
+                                className='size-6 cursor-pointer text-amber-600 hover:brightness-150'
                               />
                             </button>
                           )}

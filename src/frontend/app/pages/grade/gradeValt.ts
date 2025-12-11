@@ -153,7 +153,7 @@ export class GradeValt {
               answerId: string;
               answerText: string;
             }
-          | { type: 'POINTS_UPDATED'; questionId: string; teamId: string; points: number | null };
+          | { type: 'POINTS_UPDATED'; answerId: string; questionId: string; teamId: string; points: number | null };
 
         switch (message.type) {
           case 'RUN_STATUS':
@@ -191,7 +191,7 @@ export class GradeValt {
             if (question) {
               const answer = question.answers[message.teamId];
 
-              if (answer) {
+              if (answer && answer.answerId === message.answerId && answer.points !== message.points) {
                 answer.points = message.points;
               }
             }
@@ -230,39 +230,38 @@ export class GradeValt {
 
   updatePoints = (questionId: string, teamId: string, points: number | null) => {
     const question = this.store.questions.find((q) => q.id === questionId);
+    const answer = question?.answers[teamId];
 
-    if (question && question.answers[teamId] && (points === null || (points >= 0 && points <= question.maxPoints))) {
-      question.answers[teamId]!.points = points;
-      this.notifyPointsUpdated(questionId, teamId, points);
+    if (answer && answer.answerId && (points === null || (points >= 0 && points <= question.maxPoints))) {
+      answer.points = points;
+
+      this.notifyPointsUpdated(questionId, answer.answerId, points);
     }
   };
 
   giveMaxPoints = (questionId: string, teamId: string) => {
     const question = this.store.questions.find((q) => q.id === questionId);
+    const answer = question?.answers[teamId];
 
-    if (question && question.answers[teamId]) {
-      question.answers[teamId]!.points = question.maxPoints;
-      this.notifyPointsUpdated(questionId, teamId, question.maxPoints);
+    if (answer && answer.answerId) {
+      answer.points = question.maxPoints;
+
+      this.notifyPointsUpdated(question.id, answer.answerId, question.maxPoints);
     }
   };
 
   giveZeroPoints = (questionId: string, teamId: string) => {
     const question = this.store.questions.find((q) => q.id === questionId);
+    const answer = question?.answers[teamId];
 
-    if (question && question.answers[teamId]) {
-      question.answers[teamId]!.points = 0;
-      this.notifyPointsUpdated(questionId, teamId, 0);
+    if (answer && answer.answerId) {
+      answer.points = 0;
+
+      this.notifyPointsUpdated(question.id, answer.answerId, 0);
     }
   };
 
-  notifyPointsUpdated = (questionId: string, teamId: string, points: number | null) => {
-    this.ws?.send(
-      JSON.stringify({
-        type: 'UPDATE_POINTS',
-        questionId,
-        teamId,
-        points
-      })
-    );
+  notifyPointsUpdated = (questionId: string, answerId: string, points: number | null) => {
+    this.ws?.send(JSON.stringify({ type: 'UPDATE_POINTS', questionId, answerId, points }));
   };
 }

@@ -442,14 +442,13 @@ export class WebSocketServer {
     if (role === 'judge') {
       const msg = JSON.parse(message as string) as {
         type: 'UPDATE_POINTS';
-        questionId: string;
-        teamId: string;
+        answerId: string;
         points: number | null;
       };
 
       switch (msg.type) {
         case 'UPDATE_POINTS':
-          await this.handleUPDATE_POINTS(connection, msg.questionId, msg.teamId, msg.points);
+          await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
           break;
       }
     }
@@ -767,20 +766,27 @@ export class WebSocketServer {
 
   private async handleUPDATE_POINTS(
     connection: EventConnection,
-    questionId: string,
-    teamId: string,
+    answerId: string,
     points: number | null
   ): Promise<void> {
-    await sql`
+    const result: { question_id: string; team_id: string }[] = await sql`
       UPDATE answers
       SET points_awarded = ${points}
-      WHERE question_id = ${questionId} AND team_id = ${teamId}
+      WHERE id = ${answerId}
+      RETURNING question_id, team_id
     `;
+
+    const answer = result[0];
+
+    if (!answer) {
+      return;
+    }
 
     const message = JSON.stringify({
       type: 'POINTS_UPDATED',
-      questionId,
-      teamId,
+      answerId,
+      questionId: answer.question_id,
+      teamId: answer.team_id,
       points
     });
 
