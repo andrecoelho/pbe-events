@@ -208,7 +208,9 @@ export const Grade = () => {
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
                         <td className='font-mono text-xs'>
-                          {answer.languageCode && <span className='badge badge-neutral'>{answer.languageCode.toUpperCase()}</span>}
+                          {answer.languageCode && (
+                            <span className='badge badge-neutral'>{answer.languageCode.toUpperCase()}</span>
+                          )}
                         </td>
                         <td className='font-mono text-base'>{answer.answerText}</td>
                         <td>
