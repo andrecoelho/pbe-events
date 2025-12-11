@@ -22,7 +22,11 @@ const ResultsContent = () => {
   }, [valt, snap.initialized]);
 
   if (!snap.initialized) {
-    return <Loading />;
+    return (
+      <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
+        <Loading />
+      </div>
+    );
   }
 
   if (snap.teams.length === 0) {
