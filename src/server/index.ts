@@ -10,6 +10,7 @@ import { eventsRoutes } from '@/server/routes/events';
 import { languagesRoutes } from '@/server/routes/languages';
 import { permissionRoutes } from '@/server/routes/permissions';
 import { questionsRoutes } from '@/server/routes/questions';
+import { resultsRoutes } from '@/server/routes/results';
 import { createRunsRoutes } from '@/server/routes/runs';
 import { sessionRoutes } from '@/server/routes/session';
 import { slidesRoutes } from '@/server/routes/slides';
@@ -45,6 +46,7 @@ const server = Bun.serve({
     ...userRoutes,
     ...questionsRoutes,
     ...slidesRoutes,
+    ...resultsRoutes,
     ...createRunsRoutes(wsServer)
   },
   async fetch(req): Promise<Response | undefined> {
