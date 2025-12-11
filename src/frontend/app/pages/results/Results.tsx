@@ -125,7 +125,7 @@ const ResultsContent = () => {
             <span>≥ {THIRD_THRESHOLD}%</span>
           </div>
           <div className='flex items-center gap-2'>
-            <div className='w-4 h-4 bg-base-content rounded'></div>
+            <div className='w-4 h-4 bg-neutral rounded'></div>
             <span>&lt; {THIRD_THRESHOLD}%</span>
           </div>
         </div>
