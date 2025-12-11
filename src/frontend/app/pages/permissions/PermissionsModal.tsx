@@ -134,7 +134,7 @@ function PermissionsModal(props: Props) {
     handleSave
   } = useMemo(() => init(props.permissionsValt, props.user), [props.permissionsValt]);
 
-  const snap = useSnapshot(store);
+  const snap = useSnapshot(store, { sync: true });
   const isValid = snap.user?.roleId !== undefined;
 
   return (

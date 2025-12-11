@@ -87,7 +87,7 @@ function TeamsModal(props: Props) {
     [props.teamsValt, props.team]
   );
 
-  const localSnap = useSnapshot(store);
+  const localSnap = useSnapshot(store, { sync: true });
   const teamsValtSnap = useSnapshot(props.teamsValt.store);
   const isValid = localSnap.name.trim().length > 0 && localSnap.languageId.length > 0 && !localSnap.isSubmitting;
 

@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function LanguageRow({ language, valt, isAddMode, onCancelAdd }: Props) {
-  const snap = useSnapshot(valt.store);
+  const snap = useSnapshot(valt.store, { sync: true });
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [codeError, setCodeError] = useState('');
