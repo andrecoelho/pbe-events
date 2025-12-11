@@ -24,14 +24,28 @@ export const Settings = memo(() => {
   const snap = useSnapshot(valt.store);
   const appValt = useAppValt();
 
-  const [email, setEmail] = useState(snap.user.email);
-  const [firstName, setFirstName] = useState(snap.user.firstName);
-  const [lastName, setLastName] = useState(snap.user.lastName);
+  const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (email === '') {
+      setEmail(snap.user?.email);
+    }
+
+    if (firstName === '') {
+      setFirstName(snap.user?.firstName);
+    }
+
+    if (lastName === '') {
+      setLastName(snap.user?.lastName);
+    }
+  }, [snap.user?.email, snap.user?.firstName, snap.user?.lastName]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
