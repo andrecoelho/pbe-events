@@ -10,7 +10,7 @@ interface Props {
 
 export const QuestionTranslation = memo(({ question, translation }: Props) => {
   const questionsValt = useQuestionsValt();
-  const snap = useSnapshot(questionsValt.store);
+  const snap = useSnapshot(questionsValt.store, { sync: true });
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLInputElement>(null);

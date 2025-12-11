@@ -30,7 +30,7 @@ function parsePromptWithBlanks(prompt: string): Array<{ type: 'text' | 'blank'; 
 
 export const GeneralAnswer = () => {
   const valt = useTeamValt();
-  const snap = useSnapshot(valt.store);
+  const snap = useSnapshot(valt.store, { sync: true });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ GeneralAnswer.displayName = 'GeneralAnswer';
 
 export const TrueFalseAnswer = () => {
   const valt = useTeamValt();
-  const snap = useSnapshot(valt.store);
+  const snap = useSnapshot(valt.store, { sync: true });
   const [answer, setAnswer] = useState<boolean | null>(null);
   const trueButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -123,7 +123,7 @@ export const FillInTheBlankAnswer = ({
   maxPoints: number;
 }) => {
   const valt = useTeamValt();
-  const snap = useSnapshot(valt.store);
+  const snap = useSnapshot(valt.store, { sync: true });
   const [savedAnswers, setSavedAnswers] = useState<Record<number, string>>({});
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 

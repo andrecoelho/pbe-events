@@ -6,7 +6,7 @@ import { useQuestionsValt, type IQuestionTranslation, type Question } from './qu
 
 export const QuestionEditor = memo(() => {
   const questionsValt = useQuestionsValt();
-  const snap = useSnapshot(questionsValt.store);
+  const snap = useSnapshot(questionsValt.store, { sync: true });
   const selectedQuestion = snap.selectedQuestion;
 
   if (!selectedQuestion) {
