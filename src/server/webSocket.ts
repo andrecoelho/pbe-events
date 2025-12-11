@@ -438,6 +438,21 @@ export class WebSocketServer {
           break;
       }
     }
+
+    if (role === 'judge') {
+      const msg = JSON.parse(message as string) as {
+        type: 'UPDATE_POINTS';
+        questionId: string;
+        teamId: string;
+        points: number | null;
+      };
+
+      switch (msg.type) {
+        case 'UPDATE_POINTS':
+          await this.handleUPDATE_POINTS(connection, msg.questionId, msg.teamId, msg.points);
+          break;
+      }
+    }
   };
 
   private async initializeEventConnection(eventId: string): Promise<void> {
@@ -748,5 +763,28 @@ export class WebSocketServer {
     connection.presenters.forEach((presenterWs) => presenterWs.send(message));
     connection.judges.forEach((judgeWs) => judgeWs.send(message));
     await this.broadcastToAllLanguageChannels(connection.eventId, message);
+  }
+
+  private async handleUPDATE_POINTS(
+    connection: EventConnection,
+    questionId: string,
+    teamId: string,
+    points: number | null
+  ): Promise<void> {
+    await sql`
+      UPDATE answers
+      SET points_awarded = ${points}
+      WHERE question_id = ${questionId} AND team_id = ${teamId}
+    `;
+
+    const message = JSON.stringify({
+      type: 'POINTS_UPDATED',
+      questionId,
+      teamId,
+      points
+    });
+
+    connection.host?.send(message);
+    connection.judges.forEach((judgeWs) => judgeWs.send(message));
   }
 }

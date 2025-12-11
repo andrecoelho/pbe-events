@@ -152,7 +152,8 @@ export class GradeValt {
               languageCode: string;
               answerId: string;
               answerText: string;
-            };
+            }
+          | { type: 'POINTS_UPDATED'; questionId: string; teamId: string; points: number | null };
 
         switch (message.type) {
           case 'RUN_STATUS':
@@ -161,7 +162,7 @@ export class GradeValt {
           case 'ACTIVE_ITEM':
             this.store.activeItem = message.activeItem;
             break;
-          case 'ANSWER_RECEIVED':
+          case 'ANSWER_RECEIVED': {
             const question = this.store.questions.find((q) => q.id === message.questionId);
 
             if (question) {
@@ -183,6 +184,20 @@ export class GradeValt {
             }
 
             break;
+          }
+          case 'POINTS_UPDATED': {
+            const question = this.store.questions.find((q) => q.id === message.questionId);
+
+            if (question) {
+              const answer = question.answers[message.teamId];
+
+              if (answer) {
+                answer.points = message.points;
+              }
+            }
+
+            break;
+          }
         }
       };
     } catch (error) {
@@ -218,6 +233,7 @@ export class GradeValt {
 
     if (question && question.answers[teamId] && (points === null || (points >= 0 && points <= question.maxPoints))) {
       question.answers[teamId]!.points = points;
+      this.notifyPointsUpdated(questionId, teamId, points);
     }
   };
 
@@ -226,6 +242,7 @@ export class GradeValt {
 
     if (question && question.answers[teamId]) {
       question.answers[teamId]!.points = question.maxPoints;
+      this.notifyPointsUpdated(questionId, teamId, question.maxPoints);
     }
   };
 
@@ -234,6 +251,18 @@ export class GradeValt {
 
     if (question && question.answers[teamId]) {
       question.answers[teamId]!.points = 0;
+      this.notifyPointsUpdated(questionId, teamId, 0);
     }
+  };
+
+  notifyPointsUpdated = (questionId: string, teamId: string, points: number | null) => {
+    this.ws?.send(
+      JSON.stringify({
+        type: 'UPDATE_POINTS',
+        questionId,
+        teamId,
+        points
+      })
+    );
   };
 }
