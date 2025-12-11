@@ -36,6 +36,18 @@ export const EventCard = memo((props: Props) => {
     }
   };
 
+  const handleDuplicateEvent = async () => {
+    const newName = await eventNameModal.open();
+
+    if (newName) {
+      try {
+        await valt.duplicateEvent(props.event.id, newName);
+      } catch (error: unknown) {
+        alertModal.open(`An error occurred: ${(error as Error).message}`);
+      }
+    }
+  };
+
   const handleDeleteEvent = async () => {
     const confirmation = await confirmModal.open(
       `Are you sure you want to delete the event "${props.event.name}"? This action cannot be undone.`
@@ -68,9 +80,10 @@ export const EventCard = memo((props: Props) => {
             <button
               className='tooltip tooltip-neutral'
               data-tip='Duplicate'
+              onClick={handleDuplicateEvent}
               aria-label={`Duplicate event ${props.event.name}`}
             >
-              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75 opacity-20' />
+              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75' />
             </button>
             {canDelete && (
               <button

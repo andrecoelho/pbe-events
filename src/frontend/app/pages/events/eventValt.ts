@@ -90,6 +90,23 @@ export class EventsValt {
 
     this.store.events = this.store.events.filter((e) => e.id !== id);
   }
+
+  async duplicateEvent(id: string, name: string) {
+    const result = await fetch(`/api/events/${id}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+
+    const response = await result.json();
+
+    if (response.error) {
+      throw new Error(response.error || 'Failed to duplicate event');
+    }
+
+    this.store.events.push({ id: response.id, name: response.name, roleId: response.roleId });
+    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
+  }
 }
 
 export const EventsValtContext = createContext<EventsValt>(new EventsValt());
