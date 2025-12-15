@@ -14,6 +14,10 @@ export const QuestionMetadata = memo(() => {
   const snap = useSnapshot(questionsValt.store, { sync: true });
   const question = snap.selectedQuestion;
 
+  if (!question) {
+    return null;
+  }
+
   const handleQuestionTypeChange = async (type: QuestionType) => {
     await questionsValt.updateQuestion(question, { type });
   };
