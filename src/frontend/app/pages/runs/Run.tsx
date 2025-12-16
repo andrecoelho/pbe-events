@@ -109,11 +109,11 @@ export const Run = () => {
     handleDisableTimer,
     handleOpenPresenter,
     handleUpdateGracePeriod
-  } = useMemo(() => init(), []);
+  } = useMemo(init, []);
 
   const snap = useSnapshot(valt.store);
 
-  useEffect(() => () => valt.cleanup(), [valt]);
+  useEffect(() => valt.cleanup, [valt]);
 
   return (
     <RunValtContext.Provider value={valt}>
@@ -127,11 +127,21 @@ export const Run = () => {
           {/* Current Slide */}
           <div className='card shadow-md w-200 h-150 bg-primary relative flex items-center justify-center'>
             <img src={logo} className='opacity-10' />
-            <ActiveItemScreen activeItem={snap.run.activeItem} languages={snap.languages} runStatus={snap.run.status} />
+            {snap.connectionState === 'connected' && (
+              <ActiveItemScreen
+                activeItem={snap.run.activeItem}
+                languages={snap.languages}
+                runStatus={snap.run.status}
+              />
+            )}
           </div>
 
           {/* Team connection status */}
-          <div className='card shadow-xl w-200 mt-4 overflow-hidden'>
+          <div
+            className={`card shadow-xl w-200 mt-4 overflow-hidden ${
+              snap.connectionState !== 'connected' ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
             {/* Header with accent gradient effect */}
             <div className='relative bg-gradient-to-r from-accent via-amber-400 to-orange-400 p-4'>
               <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/25 via-transparent to-transparent' />
@@ -145,6 +155,7 @@ export const Run = () => {
                   <span>
                     <input
                       type='number'
+                      disabled={snap.connectionState !== 'connected'}
                       value={snap.run.gracePeriod}
                       className='w-10 pl-3 bg-base-100/50 rounded-md text-center'
                       onChange={handleUpdateGracePeriod}
@@ -158,7 +169,7 @@ export const Run = () => {
               </div>
             </div>
             {/* White body for team badges */}
-            <div className='bg-base-100 p-5'>
+            <div className={`bg-base-100 p-5 ${snap.connectionState !== 'connected' ? 'opacity-50' : ''}`}>
               <div className='flex flex-wrap gap-3'>
                 {Object.keys(snap.teams).map((teamId) => {
                   const team = snap.teams[teamId]!;
@@ -185,7 +196,11 @@ export const Run = () => {
           </div>
 
           {/* Team connection status legend */}
-          <div className='mt-3 text-xs text-neutral flex gap-6 flex-wrap'>
+          <div
+            className={`mt-3 text-xs text-neutral flex gap-6 flex-wrap ${
+              snap.connectionState !== 'connected' ? 'opacity-50' : ''
+            }`}
+          >
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
                 <span className='team-badge team-badge--sm team-badge--offline'>04</span>
@@ -229,67 +244,108 @@ export const Run = () => {
         </div>
 
         <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between shadow-md-top'>
-          <div className='flex gap-2'>
-            {snap.run.status === 'not_started' && (
-              <button className='btn btn-success' onClick={handleStartEvent}>
-                <Icon name='play' className='size-4' />
-                Start
-              </button>
-            )}
-            {snap.run.status === 'paused' && (
-              <button className='btn btn-success' onClick={handleResumeEvent}>
-                <Icon name='play' className='size-4' />
-                Resume
-              </button>
-            )}
-            {snap.run.status === 'in_progress' && (
-              <button className='btn btn-info' onClick={handlePauseEvent}>
-                <Icon name='pause' className='size-4' />
-                Pause
-              </button>
-            )}
-            {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
-              <button className='btn btn-error' onClick={handleCompleteEvent}>
-                <Icon name='stop' className='size-4' />
-                Complete
-              </button>
-            )}
-            {snap.run.status === 'completed' && (
-              <button className='btn btn-warning' onClick={handleResetEvent}>
+          {snap.connectionState === 'connecting' && (
+            <div className='flex items-center gap-2 text-yellow-600'>
+              <span className='alert alert-info'>
+                <Icon name='information-circle' className='size-5' />
+                Connecting to event &hellip;
+              </span>
+            </div>
+          )}
+
+          {snap.connectionState === 'error' && (
+            <div className='flex items-center gap-2 text-red-600'>
+              <span className='alert alert-error'>
+                <Icon name='x-circle' className='size-5' />
+                Connection error.
+              </span>
+
+              <button className='btn btn-primary'>
                 <Icon name='arrow-path' className='size-4' />
-                Reset
+                Reconnect
               </button>
-            )}
+            </div>
+          )}
 
-            {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' onClick={handlePreviousEvent}>
-                <Icon name='chevron-left' className='size-4' />
-                Previous
+          {snap.connectionState === 'disconnected' && (
+            <div className='flex items-center gap-2 text-red-600'>
+              <span className='alert alert-warning'>
+                <Icon name='exclamation-triangle' className='size-5' />
+                Disconnected.
+              </span>
+
+              <button className='btn btn-primary'>
+                <Icon name='arrow-path' className='size-4' />
+                Reconnect
               </button>
-            )}
+            </div>
+          )}
 
-            {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' onClick={handleNextEvent}>
-                Next
-                <Icon name='chevron-right' className='size-4' />
-              </button>
-            )}
-          </div>
-
-          <div className='flex gap-2'>
-            {snap.run.activeItem &&
-              snap.run.activeItem.type === 'question' &&
-              snap.run.activeItem.phase === 'prompt' && (
-                <button className='btn btn-outline' onClick={handleDisableTimer}>
-                  ∞ Disable Timer
+          {snap.connectionState === 'connected' && (
+            <div className='flex gap-2'>
+              {snap.run.status === 'not_started' && (
+                <button className='btn btn-success' onClick={handleStartEvent}>
+                  <Icon name='play' className='size-4' />
+                  Start
+                </button>
+              )}
+              {snap.run.status === 'paused' && (
+                <button className='btn btn-success' onClick={handleResumeEvent}>
+                  <Icon name='play' className='size-4' />
+                  Resume
+                </button>
+              )}
+              {snap.run.status === 'in_progress' && (
+                <button className='btn btn-info' onClick={handlePauseEvent}>
+                  <Icon name='pause' className='size-4' />
+                  Pause
+                </button>
+              )}
+              {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
+                <button className='btn btn-error' onClick={handleCompleteEvent}>
+                  <Icon name='stop' className='size-4' />
+                  Complete
+                </button>
+              )}
+              {snap.run.status === 'completed' && (
+                <button className='btn btn-warning' onClick={handleResetEvent}>
+                  <Icon name='arrow-path' className='size-4' />
+                  Reset
                 </button>
               )}
 
-            <button className='btn btn-accent' onClick={handleOpenPresenter}>
-              <Icon name='presentation-chart-bar' className='size-4' />
-              Presenter
-            </button>
-          </div>
+              {snap.run.status === 'in_progress' && (
+                <button className='btn btn-neutral' onClick={handlePreviousEvent}>
+                  <Icon name='chevron-left' className='size-4' />
+                  Previous
+                </button>
+              )}
+
+              {snap.run.status === 'in_progress' && (
+                <button className='btn btn-neutral' onClick={handleNextEvent}>
+                  Next
+                  <Icon name='chevron-right' className='size-4' />
+                </button>
+              )}
+            </div>
+          )}
+
+          {snap.connectionState === 'connected' && (
+            <div className='flex gap-2'>
+              {snap.run.activeItem &&
+                snap.run.activeItem.type === 'question' &&
+                snap.run.activeItem.phase === 'prompt' && (
+                  <button className='btn btn-outline' onClick={handleDisableTimer}>
+                    ∞ Disable Timer
+                  </button>
+                )}
+
+              <button className='btn btn-accent' onClick={handleOpenPresenter}>
+                <Icon name='presentation-chart-bar' className='size-4' />
+                Presenter
+              </button>
+            </div>
+          )}
         </footer>
       </div>
     </RunValtContext.Provider>

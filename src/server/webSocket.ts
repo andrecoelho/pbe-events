@@ -407,7 +407,9 @@ export class WebSocketServer {
 
     // Handle team messages
     if (role === 'team') {
-      const msg = JSON.parse(message as string) as { type: 'SUBMIT_ANSWER'; answer: string };
+      const msg = JSON.parse(message as string) as { type: 'SUBMIT_ANSWER'; answer: string; __ACK__: string };
+
+      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
       switch (msg.type) {
         case 'SUBMIT_ANSWER':
@@ -422,9 +424,12 @@ export class WebSocketServer {
         | {
             type: 'UPDATE_RUN_STATUS';
             status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+            __ACK__: string;
           }
-        | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number }
-        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem };
+        | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
+        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem; __ACK__: string };
+
+      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
       switch (msg.type) {
         case 'UPDATE_RUN_STATUS':
@@ -444,7 +449,10 @@ export class WebSocketServer {
         type: 'UPDATE_POINTS';
         answerId: string;
         points: number | null;
+        __ACK__: string;
       };
+
+      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
       switch (msg.type) {
         case 'UPDATE_POINTS':

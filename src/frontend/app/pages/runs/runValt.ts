@@ -1,3 +1,4 @@
+import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
@@ -38,18 +39,22 @@ interface RunStore {
   eventId: string;
   eventName: string;
   run: Run;
-  connectionState: 'disconnected' | 'connecting' | 'connected' | 'closed' | 'error';
+  connectionState: WebSocketStatus;
   items: ActiveItem[];
   currentIndex: number;
   languages: Record<string, { id: string; code: string; name: string }>;
   teams: Record<string, TeamStatus>;
 }
 
+type WebSocketRunMessage =
+  | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
+  | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
+  | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
+  | (WebSocketMessage & { type: 'ANSWER_RECEIVED'; teamId: string });
+
 export class RunValt {
   store: RunStore;
-  private ws: WebSocket | null = null;
-  private reconnectAttempts: number = 0;
-  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private ws: WebSocketManager<WebSocketRunMessage> | null = null;
 
   constructor() {
     this.store = proxy({
@@ -69,15 +74,7 @@ export class RunValt {
     });
   }
 
-  cleanup() {
-    this.disconnectWebSocket();
-
-    if (this.reconnectTimeout) {
-      window.clearTimeout(this.reconnectTimeout);
-    }
-  }
-
-  async init(eventId: string) {
+  init = async (eventId: string) => {
     const result = await fetch(`/api/events/${eventId}/run`);
 
     if (result.status !== 200) {
@@ -189,100 +186,49 @@ export class RunValt {
 
     this.store.initialized = true;
 
-    try {
-      return await this.connectWebSocket();
-    } catch (error) {
-      console.error('WebSocket connection error:', error);
-      return { ok: false, error: (error as Error).message } as const;
-    }
-  }
-
-  connectWebSocket = () => {
-    const { promise, resolve, reject } = Promise.withResolvers<{ ok: true } | { ok: false; error: string }>();
-
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      resolve({ ok: true } as const);
-      return promise;
-    }
-
-    this.store.connectionState = 'connecting';
-
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
     wsUrl.search = new URLSearchParams({ role: 'host', eventId: this.store.eventId }).toString();
 
-    try {
-      const ws = new WebSocket(wsUrl.toString());
+    this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
-      ws.onopen = () => {
-        this.ws = ws;
-        this.store.connectionState = 'connected';
-        this.reconnectAttempts = 0;
+    this.ws.connect();
 
-        resolve({ ok: true } as const);
-      };
-
-      ws.onclose = () => {
-        this.store.connectionState = 'closed';
-        this.ws = null;
-      };
-
-      ws.onerror = () => {
-        if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          const delay = Math.pow(2, this.reconnectAttempts) * 1000;
-
-          this.reconnectAttempts++;
-
-          this.reconnectTimeout = setTimeout(this.connectWebSocket, delay);
-        } else {
-          this.store.connectionState = 'error';
-          reject({ ok: false, error: 'WebSocket connection failed' } as const);
-        }
-      };
-
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data) as
-          | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
-          | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
-          | { type: 'TEAM_STATUS'; teams: TeamStatus[] }
-          | { type: 'ANSWER_RECEIVED'; teamId: string };
-
-        switch (message.type) {
-          case 'RUN_STATUS':
-            this.store.run.status = message.status;
-            this.clearHasAnswers();
-            break;
-          case 'ACTIVE_ITEM':
-            this.store.run.activeItem = message.activeItem;
-            break;
-          case 'TEAM_STATUS':
-            this.handleTEAM_STATUS(message.teams);
-            break;
-          case 'ANSWER_RECEIVED':
-            if (this.store.teams[message.teamId]) {
-              this.store.teams[message.teamId]!.hasAnswer = 'yes';
-            }
-
-            break;
-        }
-      };
-    } catch (error) {
-      this.store.connectionState = 'error';
-      reject({ ok: false, error: 'WebSocket connection failed' } as const);
-    }
-
-    return promise;
+    return { ok: true } as const;
   };
 
-  disconnectWebSocket() {
-    this.ws?.close();
-    this.ws = null;
-    this.store.connectionState = 'disconnected';
-  }
+  onStatusChange = (status: WebSocketStatus) => {
+    this.store.connectionState = status;
+  };
 
-  async updateRunStatus(status: 'not_started' | 'in_progress' | 'paused' | 'completed') {
-    this.ws?.send(JSON.stringify({ type: 'UPDATE_RUN_STATUS', status }));
+  onMessage = (message: WebSocketRunMessage) => {
+    switch (message.type) {
+      case 'RUN_STATUS':
+        this.store.run.status = message.status;
+        this.clearHasAnswers();
+        break;
+      case 'ACTIVE_ITEM':
+        this.store.run.activeItem = message.activeItem;
+        break;
+      case 'TEAM_STATUS':
+        this.handleTEAM_STATUS(message.teams);
+        break;
+      case 'ANSWER_RECEIVED':
+        if (this.store.teams[message.teamId]) {
+          this.store.teams[message.teamId]!.hasAnswer = 'yes';
+        }
+
+        break;
+    }
+  };
+
+  cleanup = () => {
+    this.ws?.destroy();
+  };
+
+  updateRunStatus = async (status: 'not_started' | 'in_progress' | 'paused' | 'completed') => {
+    this.ws?.sendMessage({ type: 'UPDATE_RUN_STATUS', status });
 
     if (this.store.run.status === 'not_started' && status === 'in_progress') {
       // Start at the first item (title)
@@ -291,53 +237,47 @@ export class RunValt {
       const activeItem = this.store.items[0];
 
       if (activeItem) {
-        this.ws?.send(
-          JSON.stringify({
-            type: 'SET_ACTIVE_ITEM',
-            activeItem
-          })
-        );
+        this.ws?.sendMessage({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem
+        });
       }
     } else if (status === 'completed') {
-      this.ws?.send(
-        JSON.stringify({
-          type: 'SET_ACTIVE_ITEM',
-          activeItem: null
-        })
-      );
+      this.ws?.sendMessage({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: null
+      });
     }
 
     return { ok: true } as const;
-  }
+  };
 
-  async updateGracePeriod(gracePeriod: number) {
-    this.ws?.send(
-      JSON.stringify({
-        type: 'UPDATE_GRACE_PERIOD',
-        gracePeriod
-      })
-    );
+  updateGracePeriod = async (gracePeriod: number) => {
+    this.ws?.sendMessage({
+      type: 'UPDATE_GRACE_PERIOD',
+      gracePeriod
+    });
 
     this.store.run.gracePeriod = gracePeriod;
 
     return { ok: true } as const;
-  }
+  };
 
-  clearHasAnswers() {
+  clearHasAnswers = () => {
     for (const teamId in this.store.teams) {
       this.store.teams[teamId]!.hasAnswer = null;
     }
-  }
+  };
 
-  fillHasAnswers() {
+  fillHasAnswers = () => {
     for (const teamId in this.store.teams) {
       if (this.store.teams[teamId]!.hasAnswer === null) {
         this.store.teams[teamId]!.hasAnswer = 'no';
       }
     }
-  }
+  };
 
-  next() {
+  next = () => {
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
 
@@ -359,24 +299,20 @@ export class RunValt {
           this.fillHasAnswers();
         }
 
-        this.ws?.send(
-          JSON.stringify({
-            type: 'SET_ACTIVE_ITEM',
-            activeItem: updatedItem
-          })
-        );
+        this.ws?.sendMessage({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem: updatedItem
+        });
       } else {
-        this.ws?.send(
-          JSON.stringify({
-            type: 'SET_ACTIVE_ITEM',
-            activeItem: nextItem
-          })
-        );
+        this.ws?.sendMessage({
+          type: 'SET_ACTIVE_ITEM',
+          activeItem: nextItem
+        });
       }
     }
-  }
+  };
 
-  previous() {
+  previous = () => {
     this.clearHasAnswers();
 
     if (this.store.currentIndex > 0) {
@@ -384,29 +320,25 @@ export class RunValt {
 
       const prevItem = this.store.items[this.store.currentIndex]!;
 
-      this.ws?.send(
-        JSON.stringify({
-          type: 'SET_ACTIVE_ITEM',
-          activeItem: prevItem
-        })
-      );
-    }
-  }
-
-  disableTimer() {
-    this.ws?.send(
-      JSON.stringify({
+      this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
-        activeItem: this.store.items[this.store.currentIndex]
-      })
-    );
-  }
+        activeItem: prevItem
+      });
+    }
+  };
 
-  private handleTEAM_STATUS(teams: TeamStatus[]) {
+  disableTimer = () => {
+    this.ws?.sendMessage({
+      type: 'SET_ACTIVE_ITEM',
+      activeItem: this.store.items[this.store.currentIndex]
+    });
+  };
+
+  private handleTEAM_STATUS = (teams: TeamStatus[]) => {
     for (const team of teams) {
       this.store.teams[team.id] = team;
     }
-  }
+  };
 }
 
 export const RunValtContext = createContext<RunValt | null>(null);
