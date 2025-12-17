@@ -243,42 +243,33 @@ export const Run = () => {
           </div>
         </div>
 
-        <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between shadow-md-top'>
+        <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top'>
           {snap.connectionState === 'connecting' && (
-            <div className='flex items-center gap-2 text-yellow-600'>
-              <span className='alert alert-info'>
-                <Icon name='information-circle' className='size-5' />
-                Connecting to event &hellip;
-              </span>
-            </div>
+            <span className='alert alert-info w-lg'>
+              <Icon name='information-circle' className='size-5' />
+              Connecting to event &hellip;
+            </span>
           )}
 
           {snap.connectionState === 'error' && (
-            <div className='flex items-center gap-2 text-red-600'>
-              <span className='alert alert-error'>
-                <Icon name='x-circle' className='size-5' />
-                Connection error.
-              </span>
-
-              <button className='btn btn-primary'>
-                <Icon name='arrow-path' className='size-4' />
-                Reconnect
-              </button>
-            </div>
+            <span className='alert alert-error w-lg'>
+              <Icon name='x-circle' className='size-5' />
+              Connection error.
+            </span>
           )}
 
           {snap.connectionState === 'disconnected' && (
-            <div className='flex items-center gap-2 text-red-600'>
-              <span className='alert alert-warning'>
-                <Icon name='exclamation-triangle' className='size-5' />
-                Disconnected.
-              </span>
+            <span className='alert alert-warning w-lg'>
+              <Icon name='exclamation-triangle' className='size-5' />
+              Disconnected.
+            </span>
+          )}
 
-              <button className='btn btn-primary'>
-                <Icon name='arrow-path' className='size-4' />
-                Reconnect
-              </button>
-            </div>
+          {(snap.connectionState === 'disconnected' || snap.connectionState === 'error') && (
+            <button className='btn btn-primary'>
+              <Icon name='arrow-path' className='size-4' />
+              Reconnect
+            </button>
           )}
 
           {snap.connectionState === 'connected' && (
