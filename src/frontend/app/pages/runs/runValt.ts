@@ -66,7 +66,7 @@ export class RunValt {
         gracePeriod: 0,
         activeItem: null
       },
-      connectionState: 'disconnected',
+      connectionState: 'init',
       items: [],
       currentIndex: -1,
       languages: {},
@@ -186,16 +186,24 @@ export class RunValt {
 
     this.store.initialized = true;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
-
-    wsUrl.search = new URLSearchParams({ role: 'host', eventId: this.store.eventId }).toString();
-
-    this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
-
-    this.ws.connect();
+    this.connect();
 
     return { ok: true } as const;
+  };
+
+  connect = () => {
+    if (this.ws) {
+      this.ws.connect();
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
+
+      wsUrl.search = new URLSearchParams({ role: 'host', eventId: this.store.eventId }).toString();
+
+      this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
+
+      this.ws.connect();
+    }
   };
 
   onStatusChange = (status: WebSocketStatus) => {

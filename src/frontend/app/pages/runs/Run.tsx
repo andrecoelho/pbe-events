@@ -81,6 +81,10 @@ const init = () => {
     window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,popup=yes');
   };
 
+  const handleReconnect = () => {
+    valt.connect();
+  };
+
   return {
     valt,
     handleStartEvent,
@@ -92,7 +96,8 @@ const init = () => {
     handleNextEvent,
     handleDisableTimer,
     handleOpenPresenter,
-    handleUpdateGracePeriod
+    handleUpdateGracePeriod,
+    handleReconnect
   };
 };
 
@@ -108,10 +113,27 @@ export const Run = () => {
     handleNextEvent,
     handleDisableTimer,
     handleOpenPresenter,
-    handleUpdateGracePeriod
+    handleUpdateGracePeriod,
+    handleReconnect
   } = useMemo(init, []);
 
   const snap = useSnapshot(valt.store);
+
+  const activeTeamsCount = useMemo(
+    () => Object.values(snap.teams).filter((t) => t.status !== 'offline').length,
+    [snap.teams]
+  );
+
+  const sortedTeams = useMemo(
+    () =>
+      Object.keys(snap.teams).sort((a, b) => {
+        const teamA = snap.teams[a]!;
+        const teamB = snap.teams[b]!;
+
+        return teamA.number === teamB.number ? 0 : teamA.number < teamB.number ? -1 : 1;
+      }),
+    [snap.teams]
+  );
 
   useEffect(() => valt.cleanup, [valt]);
 
@@ -164,14 +186,14 @@ export const Run = () => {
                   </span>
                 </div>
                 <div className='badge bg-black/10 border-black/20 text-accent-content font-semibold px-3 py-2'>
-                  {Object.values(snap.teams).filter((t) => t.status !== 'offline').length} active
+                  {activeTeamsCount} active
                 </div>
               </div>
             </div>
             {/* White body for team badges */}
             <div className={`bg-base-100 p-5 ${snap.connectionState !== 'connected' ? 'opacity-50' : ''}`}>
               <div className='flex flex-wrap gap-3'>
-                {Object.keys(snap.teams).map((teamId) => {
+                {sortedTeams.map((teamId) => {
                   const team = snap.teams[teamId]!;
                   const stateClass = TEAM_STATE_CLASSES[team.status] ?? TEAM_STATE_CLASSES.offline;
 
@@ -258,15 +280,15 @@ export const Run = () => {
             </span>
           )}
 
-          {snap.connectionState === 'disconnected' && (
+          {snap.connectionState === 'offline' && (
             <span className='alert alert-warning w-lg'>
               <Icon name='exclamation-triangle' className='size-5' />
-              Disconnected.
+              Your internet is down.
             </span>
           )}
 
-          {(snap.connectionState === 'disconnected' || snap.connectionState === 'error') && (
-            <button className='btn btn-primary'>
+          {snap.connectionState === 'error' && (
+            <button className='btn btn-primary' onClick={handleReconnect}>
               <Icon name='arrow-path' className='size-4' />
               Reconnect
             </button>

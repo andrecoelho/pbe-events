@@ -4,7 +4,7 @@ const PING_INTERVAL_MS = 30000;
 const ACK_TIMEOUT_MS = 5000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
-export type WebSocketStatus = 'connected' | 'disconnected' | 'connecting' | 'error';
+export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
   reconnectTimer: number | null = null;
@@ -13,7 +13,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   pingTimer: number | null = null;
   pendingACKs: Map<string, { resolve: (value: boolean) => void; timerId: number }> = new Map();
 
-  status: WebSocketStatus = 'disconnected';
+  status: WebSocketStatus = 'init';
   wsURL: string;
   ws: WebSocket | null = null;
   onStatusChange?: (status: WebSocketStatus) => void;
@@ -44,14 +44,13 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.ws.addEventListener('open', this.handleWSOpen);
     this.ws.addEventListener('message', this.handleWSMessage);
     this.ws.addEventListener('close', this.handleWSClose);
-    this.ws.addEventListener('error', this.handleWSError);
     this.notifyStatusChange();
   };
 
   reconnect = () => {
     this.reconnectAttempts++;
 
-    if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
 
       console.log(`WebSocket error. Attempting to reconnect in ${delay} ms...`);
@@ -64,23 +63,29 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.reconnectAttempts = 0;
 
       this.notifyStatusChange();
+      this.resetWS();
     }
   };
 
-  disconnect = () => {
+  resetWS = () => {
     this.clearPingTimer();
     this.clearReconnectTimer();
+
+    this.pendingACKs.forEach((pending) => {
+      clearTimeout(pending.timerId);
+      pending.resolve(false);
+    });
+
+    this.pendingACKs.clear();
 
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-
-    this.notifyStatusChange();
   };
 
   destroy = () => {
-    this.disconnect();
+    this.resetWS();
 
     window.removeEventListener('offline', this.handleOffline);
     window.removeEventListener('online', this.handleOnline);
@@ -114,23 +119,26 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   handleWSClose = () => {
-    if (this.status === 'connected') {
-      this.status = 'disconnected';
-      console.log('WebSocket connection closed');
+    console.log('WebSocket connection closed');
 
+    this.resetWS();
+
+    if (window.navigator.onLine) {
+      if (this.status !== 'connecting') {
+        this.status = 'connecting';
+        this.notifyStatusChange();
+      }
+
+      this.reconnect();
+    } else {
+      this.status = 'offline';
       this.notifyStatusChange();
     }
   };
 
-  handleWSError = (error: Event) => {
-    console.error('WebSocket error:', error);
-
-    this.reconnect();
-  };
-
   handleOffline = () => {
     console.warn('Browser went offline. Disconnecting WebSocket.');
-    this.disconnect();
+    this.resetWS();
   };
 
   handleOnline = () => {
@@ -160,7 +168,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     const result = await this.sendMessage({ type: 'PING' });
 
     if (!result) {
-      this.disconnect();
+      this.resetWS();
       this.connect();
     }
   };
@@ -176,8 +184,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
         resolve,
         timerId: window.setTimeout(() => {
           console.warn('ACK not received for message:', message);
-          this.pendingACKs.delete(ackId);
-          resolve(false);
+          this.resetWS();
         }, ACK_TIMEOUT_MS)
       });
 
