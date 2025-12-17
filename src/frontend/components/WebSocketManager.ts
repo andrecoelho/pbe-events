@@ -164,14 +164,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
   };
 
-  sendPing = async () => {
-    const result = await this.sendMessage({ type: 'PING' });
-
-    if (!result) {
-      this.resetWS();
-      this.connect();
-    }
-  };
+  sendPing = () => this.sendMessage({ type: 'PING' });
 
   sendMessage = (message: WebSocketMessage) => {
     const { promise, resolve } = Promise.withResolvers<boolean>();
