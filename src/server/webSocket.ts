@@ -1,6 +1,4 @@
-import { sql, type ServerWebSocket } from 'bun';
 import type { Session } from '@/server/types';
-import type { ActiveItem } from '@/types';
 import {
   textBadRequest,
   textForbidden,
@@ -8,6 +6,8 @@ import {
   textServerError,
   textUnauthorized
 } from '@/server/utils/responses';
+import type { ActiveItem } from '@/types';
+import { sql, type ServerWebSocket } from 'bun';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -442,6 +442,12 @@ export class WebSocketServer {
           await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
           break;
       }
+    }
+
+    if (role === 'presenter') {
+      const msg = JSON.parse(message as string) as { type: string; __ACK__: string };
+
+      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
     }
 
     if (role === 'judge') {

@@ -1,6 +1,7 @@
 import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
+import { Icon } from '@/frontend/components/Icon';
 import { PresenterValt } from '@/frontend/presenter/presenterValt';
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot } from 'valtio';
 import '../base.css';
@@ -39,6 +40,10 @@ export const Presenter = () => {
     return () => window.removeEventListener('resize', calculateScale);
   }, []);
 
+  const handleReconnect = () => {
+    valt.connect();
+  };
+
   if (!valt) {
     return <div>Initialization error. Check console for details.</div>;
   }
@@ -56,11 +61,36 @@ export const Presenter = () => {
           marginTop: '-300px'
         }}
       >
-        <img
-          src={logo}
-          className='absolute w-200 opacity-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
-        />
+        <img src={logo} className='absolute w-200 opacity-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' />
         <ActiveItemScreen activeItem={snap.activeItem} languages={snap.languages} runStatus={snap.runStatus} />
+        {snap.connectionState !== 'connected' && (
+          <div className='absolute bottom-2 left-2'>
+            {snap.connectionState === 'connecting' && (
+              <span className='alert alert-info w-lg'>
+                <Icon name='information-circle' className='size-5' />
+                Connecting to event &hellip;
+              </span>
+            )}
+
+            {snap.connectionState === 'error' && (
+              <span className='alert alert-error w-lg'>
+                <Icon name='x-circle' className='size-5' />
+                Connection error.
+                <button className='btn btn-primary btn-sm' onClick={handleReconnect}>
+                  <Icon name='arrow-path' className='size-4' />
+                  Reconnect
+                </button>
+              </span>
+            )}
+
+            {snap.connectionState === 'offline' && (
+              <span className='alert alert-warning w-lg'>
+                <Icon name='exclamation-triangle' className='size-5' />
+                Your internet is down.
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

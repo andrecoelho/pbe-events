@@ -3,8 +3,6 @@ import type { ActiveItem } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
-const MAX_RECONNECT_ATTEMPTS = 5;
-
 export interface TeamStatus {
   id: string;
   number: number;

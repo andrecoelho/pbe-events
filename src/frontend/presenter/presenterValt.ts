@@ -1,5 +1,5 @@
+import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
-import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
 interface PresenterStore {
@@ -7,18 +7,26 @@ interface PresenterStore {
   activeItem: ActiveItem | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   languages: Record<string, { id: string; code: string; name: string }>;
+  connectionState: WebSocketStatus;
 }
+
+type WebSocketRunMessage =
+  | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
+  | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
+  | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> })
+  | (WebSocketMessage & { type: 'ANSWER_RECEIVED'; teamId: string });
 
 export class PresenterValt {
   store: PresenterStore;
-  private ws: WebSocket | null = null;
+  private ws: WebSocketManager<WebSocketRunMessage> | null = null;
 
   constructor() {
     this.store = proxy({
       eventId: '',
       activeItem: null,
       runStatus: 'not_started',
-      languages: {}
+      languages: {},
+      connectionState: 'init'
     });
   }
 
@@ -29,51 +37,47 @@ export class PresenterValt {
 
     this.store.eventId = eventId;
 
-    await this.connectWebSocket();
+    await this.connect();
   }
 
-  async connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
+  async connect() {
+    if (this.ws) {
+      this.ws.connect();
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
-    wsUrl.search = new URLSearchParams({
-      role: 'presenter',
-      eventId: this.store.eventId
-    }).toString();
+      wsUrl.search = new URLSearchParams({
+        role: 'presenter',
+        eventId: this.store.eventId
+      }).toString();
 
-    this.ws = new WebSocket(wsUrl.toString());
+      this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
-    this.ws.onclose = () => {
-      this.ws = null;
-    };
-
-    this.ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-
-      switch (message.type) {
-        case 'RUN_STATUS':
-          this.store.runStatus = message.status;
-
-          if (message.status === 'not_started') {
-            this.store.activeItem = null;
-          }
-
-          break;
-        case 'ACTIVE_ITEM':
-          this.store.activeItem = message.activeItem;
-          break;
-        case 'LANGUAGES':
-          this.store.languages = message.languages;
-          break;
-      }
-    };
+      this.ws.connect();
+    }
   }
 
-  submitAnswer(answer: string) {
-    this.ws?.send(JSON.stringify({ type: 'SUBMIT_ANSWER', answer }));
-  }
+  onStatusChange = (status: WebSocketStatus) => {
+    this.store.connectionState = status;
+  };
 
-  selectLanguage(languageId: string) {
-    this.ws?.send(JSON.stringify({ type: 'SELECT_LANGUAGE', languageId }));
-  }
+  onMessage = (message: WebSocketRunMessage) => {
+    switch (message.type) {
+      case 'RUN_STATUS':
+        this.store.runStatus = message.status;
+
+        if (message.status === 'not_started') {
+          this.store.activeItem = null;
+        }
+
+        break;
+      case 'ACTIVE_ITEM':
+        this.store.activeItem = message.activeItem;
+        break;
+      case 'LANGUAGES':
+        this.store.languages = message.languages;
+        break;
+    }
+  };
 }

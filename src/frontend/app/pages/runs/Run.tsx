@@ -149,13 +149,7 @@ export const Run = () => {
           {/* Current Slide */}
           <div className='card shadow-md w-200 h-150 bg-primary relative flex items-center justify-center'>
             <img src={logo} className='opacity-10' />
-            {snap.connectionState === 'connected' && (
-              <ActiveItemScreen
-                activeItem={snap.run.activeItem}
-                languages={snap.languages}
-                runStatus={snap.run.status}
-              />
-            )}
+            <ActiveItemScreen activeItem={snap.run.activeItem} languages={snap.languages} runStatus={snap.run.status} />
           </div>
 
           {/* Team connection status */}
@@ -277,6 +271,10 @@ export const Run = () => {
             <span className='alert alert-error w-lg'>
               <Icon name='x-circle' className='size-5' />
               Connection error.
+              <button className='btn btn-primary btn-sm' onClick={handleReconnect}>
+                <Icon name='arrow-path' className='size-4' />
+                Reconnect
+              </button>
             </span>
           )}
 
@@ -285,13 +283,6 @@ export const Run = () => {
               <Icon name='exclamation-triangle' className='size-5' />
               Your internet is down.
             </span>
-          )}
-
-          {snap.connectionState === 'error' && (
-            <button className='btn btn-primary' onClick={handleReconnect}>
-              <Icon name='arrow-path' className='size-4' />
-              Reconnect
-            </button>
           )}
 
           {snap.connectionState === 'connected' && (
