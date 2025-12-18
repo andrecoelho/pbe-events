@@ -43,7 +43,7 @@ export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWeb
 export interface EventConnection {
   eventId: string;
   eventName: string;
-  host: ServerWebSocket<HostWebsocketData> | null;
+  hosts: ServerWebSocket<HostWebsocketData>[];
   presenters: ServerWebSocket<PresenterWebsocketData>[];
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   judges: Map<string, ServerWebSocket<JudgeWebsocketData>>;
@@ -59,7 +59,7 @@ export interface Run {
 
 export class WebSocketServer {
   private eventConnections: Map<string, EventConnection>;
-  private server: any = null;
+  private server: Bun.Server<WebsocketData> | null = null;
 
   constructor() {
     this.eventConnections = new Map();
@@ -124,13 +124,6 @@ export class WebSocketServer {
         return;
       }
 
-      const eventConnection = this.eventConnections.get(eventId);
-
-      if (eventConnection && eventConnection.host) {
-        console.error('Host already connected for event', req.url);
-        return textBadRequest('Host already connected');
-      }
-
       const permissions: { role_id: string }[] = await sql`
           SELECT role_id
           FROM permissions
@@ -142,7 +135,7 @@ export class WebSocketServer {
         return textForbidden();
       }
 
-      if (this.server.upgrade(req, { data: { role: 'host', session, eventId } })) {
+      if (this.server?.upgrade(req, { data: { role: 'host', session, eventId } })) {
         return;
       }
     } else if (role === 'judge') {
@@ -162,7 +155,7 @@ export class WebSocketServer {
         return textForbidden();
       }
 
-      if (this.server.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
+      if (this.server?.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
         return;
       }
     } else if (role === 'presenter') {
@@ -183,7 +176,7 @@ export class WebSocketServer {
         return textForbidden();
       }
 
-      if (this.server.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
+      if (this.server?.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
         return;
       }
     } else {
@@ -207,7 +200,7 @@ export class WebSocketServer {
       }
 
       if (
-        this.server.upgrade(req, {
+        this.server?.upgrade(req, {
           data: {
             role: 'team',
             eventId,
@@ -244,12 +237,13 @@ export class WebSocketServer {
     const connection = this.eventConnections.get(eventId)!;
 
     if (this.isHostWebSocket(ws)) {
-      connection.host = ws;
-
+      connection.hosts.push(ws);
+      ws.subscribe(`${eventId}:hosts`);
       this.sendTeamStatuses(ws, connection);
       this.sendActiveItem(ws, connection);
     } else if (this.isJudgeWebSocket(ws)) {
       connection.judges.set(ws.data.wsId, ws);
+      ws.subscribe(`${eventId}:judges`);
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
@@ -258,6 +252,7 @@ export class WebSocketServer {
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
+      ws.subscribe(`${eventId}:presenters`);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
 
@@ -307,7 +302,8 @@ export class WebSocketServer {
           this.sendGracePeriod(ws, connection);
 
           // Send TEAM_CONNECTED to host
-          connection.host?.send(
+          this.server?.publish(
+            `${eventId}:hosts`,
             JSON.stringify({
               type: 'TEAM_STATUS',
               teams: [
@@ -322,7 +318,8 @@ export class WebSocketServer {
             })
           );
         } else {
-          connection.host?.send(
+          this.server?.publish(
+            `${eventId}:hosts`,
             JSON.stringify({
               type: 'TEAM_STATUS',
               teams: [
@@ -361,7 +358,7 @@ export class WebSocketServer {
     }
 
     if (role === 'host') {
-      connection.host = null;
+      connection.hosts = connection.hosts.filter((hostWs) => hostWs !== ws);
       console.log('Host disconnected for event', eventId);
     } else if (role === 'judge') {
       connection.judges.delete(ws.data.session.user_id);
@@ -380,7 +377,8 @@ export class WebSocketServer {
 
       if (team) {
         // Notify host
-        connection.host?.send(
+        this.server?.publish(
+          `${eventId}:hosts`,
           JSON.stringify({
             type: 'TEAM_STATUS',
             teams: [
@@ -399,10 +397,10 @@ export class WebSocketServer {
 
     // Clean up empty connections
     if (
-      !connection.host &&
-      connection.teams.size === 0 &&
+      connection.hosts.length === 0 &&
       connection.presenters.length === 0 &&
-      connection.judges.size === 0
+      connection.judges.size === 0 &&
+      connection.teams.size === 0
     ) {
       this.eventConnections.delete(eventId);
     }
@@ -511,7 +509,7 @@ export class WebSocketServer {
         this.eventConnections.set(eventId, {
           eventId,
           eventName: run.name,
-          host: null,
+          hosts: [],
           presenters: [],
           judges: new Map(),
           teams: new Map(),
@@ -604,7 +602,7 @@ export class WebSocketServer {
     const eventLanguages = this.eventConnections.get(eventId)?.languages;
 
     if (eventLanguages) {
-      Object.values(eventLanguages).forEach((lang) => this.server.publish(`${eventId}:${lang.code}`, message));
+      Object.values(eventLanguages).forEach((lang) => this.server?.publish(`${eventId}:${lang.code}`, message));
     }
   }
 
@@ -734,8 +732,8 @@ export class WebSocketServer {
       answerText: answer
     });
 
-    connection.host?.send(message);
-    connection.judges.forEach((judgeWs) => judgeWs.send(message));
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
   }
 
   private async handleUPDATE_RUN_STATUS(
@@ -756,9 +754,9 @@ export class WebSocketServer {
 
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
-    connection.host?.send(message);
-    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
-    connection.judges.forEach((judgeWs) => judgeWs.send(message));
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
     await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
@@ -773,8 +771,8 @@ export class WebSocketServer {
 
     const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
-    connection.host?.send(message);
-    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
     await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
@@ -789,9 +787,8 @@ export class WebSocketServer {
 
     const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
 
-    connection.host?.send(message);
-    connection.presenters.forEach((presenterWs) => presenterWs.send(message));
-    connection.judges.forEach((judgeWs) => judgeWs.send(message));
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
     await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
@@ -821,7 +818,7 @@ export class WebSocketServer {
       points
     });
 
-    connection.host?.send(message);
-    connection.judges.forEach((judgeWs) => judgeWs.send(message));
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
   }
 }
