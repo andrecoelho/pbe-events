@@ -67,6 +67,10 @@ const init = () => {
     }
   };
 
+  const handleReconnect = () => {
+    gradeValt.connect();
+  };
+
   return {
     gradeValt,
     handleSelectQuestion,
@@ -75,7 +79,8 @@ const init = () => {
     handlePointsChange,
     handleGiveMaxPoints,
     handleGiveZeroPoints,
-    handleClearPoints
+    handleClearPoints,
+    handleReconnect
   };
 };
 
@@ -88,7 +93,8 @@ export const Grade = () => {
     handlePointsChange,
     handleGiveMaxPoints,
     handleGiveZeroPoints,
-    handleClearPoints
+    handleClearPoints,
+    handleReconnect
   } = useMemo(init, []);
   const snap = useSnapshot(gradeValt.store);
 
@@ -191,7 +197,7 @@ export const Grade = () => {
                 </fieldset>
               ))}
 
-              <div className='mt-4'>
+              <div className={`mt-4 ${snap.connectionState !== 'connected' ? 'opacity-50 pointer-events-none' : ''}`}>
                 <h3 className='text-lg font-semibold mb-2'>Team Answers</h3>
                 <table className='table table-zebra w-full'>
                   <thead>
@@ -217,6 +223,7 @@ export const Grade = () => {
                           {answer.answerId && (
                             <input
                               type='number'
+                              disabled={snap.connectionState !== 'connected'}
                               className='input input-sm input-bordered w-20 font-mono text-base'
                               value={answer.points ?? ''}
                               data-team-id={answer.teamId}
@@ -234,6 +241,7 @@ export const Grade = () => {
                               data-tip='Mark Answer as Correct'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
+                              disabled={snap.connectionState !== 'connected'}
                               onClick={handleGiveMaxPoints}
                               aria-label='Mark Answer as Correct'
                             >
@@ -249,6 +257,7 @@ export const Grade = () => {
                               data-tip='Mark Answer as Incorrect'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
+                              disabled={snap.connectionState !== 'connected'}
                               onClick={handleGiveZeroPoints}
                               aria-label='Mark Answer as Incorrect'
                             >
@@ -264,6 +273,7 @@ export const Grade = () => {
                               data-tip='Clear Points'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
+                              disabled={snap.connectionState !== 'connected'}
                               onClick={handleClearPoints}
                               aria-label='Clear Points'
                             >
@@ -285,7 +295,7 @@ export const Grade = () => {
       </div>
 
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top z-1'>
-        <div className='flex gap-2'>
+        <div className='flex gap-2 items-center'>
           <button className='btn btn-neutral' onClick={handleSelectPreviousQuestion}>
             <Icon name='chevron-left' className='size-4' />
             Previous
@@ -294,8 +304,36 @@ export const Grade = () => {
             Next
             <Icon name='chevron-right' className='size-4' />
           </button>
+
+          {snap.connectionState === 'connecting' && (
+            <span className='alert alert-info w-lg'>
+              <Icon name='information-circle' className='size-5' />
+              Connecting to event &hellip;
+            </span>
+          )}
+
+          {snap.connectionState === 'error' && (
+            <span className='alert alert-error w-lg'>
+              <Icon name='x-circle' className='size-5' />
+              Connection error.
+              <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
+                <Icon name='arrow-path' className='size-3' />
+                Reconnect
+              </button>
+            </span>
+          )}
+
+          {snap.connectionState === 'offline' && (
+            <span className='alert alert-warning w-lg'>
+              <Icon name='exclamation-triangle' className='size-5' />
+              Your internet is down.
+            </span>
+          )}
         </div>
-        <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>
+
+        {snap.connectionState === 'connected' && (
+          <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>
+        )}
       </footer>
     </div>
   );
