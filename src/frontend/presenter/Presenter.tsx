@@ -76,8 +76,8 @@ export const Presenter = () => {
               <span className='alert alert-error w-lg'>
                 <Icon name='x-circle' className='size-5' />
                 Connection error.
-                <button className='btn btn-primary btn-sm' onClick={handleReconnect}>
-                  <Icon name='arrow-path' className='size-4' />
+                <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
+                  <Icon name='arrow-path' className='size-3' />
                   Reconnect
                 </button>
               </span>
