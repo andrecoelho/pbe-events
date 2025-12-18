@@ -789,6 +789,7 @@ export class WebSocketServer {
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
     await this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
