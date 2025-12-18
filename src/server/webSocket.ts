@@ -101,10 +101,12 @@ export class WebSocketServer {
     const teamId = url.searchParams.get('teamId');
 
     if (!eventId || !role) {
+      console.error('Missing eventId or role in WebSocket upgrade request', req.url);
       return textBadRequest('Missing eventId or role');
     }
 
     if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge') {
+      console.error('Invalid role in WebSocket upgrade request', req.url);
       return textBadRequest('Invalid role');
     }
 
@@ -112,15 +114,20 @@ export class WebSocketServer {
     const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
 
     if (events.length === 0) {
+      console.error('Event not found for WebSocket upgrade request', req.url);
       return textNotFound('Event not found');
     }
 
     if (role === 'host') {
       if (!session) {
-        return textUnauthorized();
+        console.error('No session found for host connection', req.url);
+        return;
       }
 
-      if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.host) {
+      const eventConnection = this.eventConnections.get(eventId);
+
+      if (eventConnection && eventConnection.host) {
+        console.error('Host already connected for event', req.url);
         return textBadRequest('Host already connected');
       }
 
@@ -131,14 +138,16 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
+        console.error('Host permission denied for event', req.url);
         return textForbidden();
       }
 
       if (this.server.upgrade(req, { data: { role: 'host', session, eventId } })) {
-        return textServerError('WebSocket upgrade failed');
+        return;
       }
     } else if (role === 'judge') {
       if (!session) {
+        console.error('No session found for judge connection', req.url);
         return textUnauthorized();
       }
 
@@ -149,14 +158,16 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
+        console.error('Judge permission denied for event', req.url);
         return textForbidden();
       }
 
       if (this.server.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
-        return textServerError('WebSocket upgrade failed');
+        return;
       }
     } else if (role === 'presenter') {
       if (!session) {
+        console.error('No session found for presenter connection', req.url);
         return textUnauthorized();
       }
 
@@ -168,6 +179,7 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
+        console.error('Presenter permission denied for event', req.url);
         return textForbidden();
       }
 
@@ -176,10 +188,12 @@ export class WebSocketServer {
       }
     } else {
       if (!teamId) {
+        console.error('Missing teamId for team connection', req.url);
         return textBadRequest('Missing teamId');
       }
 
       if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.teams.has(teamId)) {
+        console.error('Team already connected for event', req.url);
         return textBadRequest('Team already connected');
       }
 
@@ -188,6 +202,7 @@ export class WebSocketServer {
         await sql`SELECT id, name, number, language_id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
 
       if (teams.length === 0) {
+        console.error('Team not found for WebSocket upgrade request', req.url);
         return textNotFound('Team not found');
       }
 
@@ -204,10 +219,11 @@ export class WebSocketServer {
           }
         })
       ) {
-        return textServerError('WebSocket upgrade failed');
+        return;
       }
     }
 
+    console.error('WebSocket upgrade failed', req.url);
     return textServerError('WebSocket upgrade failed');
   }
 
@@ -346,6 +362,7 @@ export class WebSocketServer {
 
     if (role === 'host') {
       connection.host = null;
+      console.log('Host disconnected for event', eventId);
     } else if (role === 'judge') {
       connection.judges.delete(ws.data.session.user_id);
     } else if (role === 'presenter') {
