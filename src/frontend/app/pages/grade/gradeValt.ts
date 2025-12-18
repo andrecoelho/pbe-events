@@ -182,40 +182,46 @@ export class GradeValt {
     }
   };
 
-  updatePoints = (questionId: string, teamId: string, points: number | null) => {
+  updatePoints = async (questionId: string, teamId: string, points: number | null) => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
     if (answer && answer.answerId && (points === null || (points >= 0 && points <= question.maxPoints))) {
       answer.points = points;
 
-      this.notifyPointsUpdated(questionId, answer.answerId, points);
+      return await this.notifyPointsUpdated(questionId, answer.answerId, points);
     }
+
+    return false;
   };
 
-  giveMaxPoints = (questionId: string, teamId: string) => {
+  giveMaxPoints = async (questionId: string, teamId: string) => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
     if (answer && answer.answerId) {
       answer.points = question.maxPoints;
 
-      this.notifyPointsUpdated(question.id, answer.answerId, question.maxPoints);
+      return await this.notifyPointsUpdated(question.id, answer.answerId, question.maxPoints);
     }
+
+    return false;
   };
 
-  giveZeroPoints = (questionId: string, teamId: string) => {
+  giveZeroPoints = async (questionId: string, teamId: string) => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
     if (answer && answer.answerId) {
       answer.points = 0;
 
-      this.notifyPointsUpdated(question.id, answer.answerId, 0);
+      return await this.notifyPointsUpdated(question.id, answer.answerId, 0);
     }
+
+    return false;
   };
 
-  notifyPointsUpdated = (questionId: string, answerId: string, points: number | null) => {
-    this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points });
+  notifyPointsUpdated = async (questionId: string, answerId: string, points: number | null) => {
+    return await this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points });
   };
 }

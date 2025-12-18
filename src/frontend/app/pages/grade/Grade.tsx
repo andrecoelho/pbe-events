@@ -3,6 +3,7 @@ import { Icon } from '@/frontend/components/Icon';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Grade.css';
+import { toast } from '@/frontend/components/Toast';
 
 const init = () => {
   const url = new URL(window.location.href);
@@ -30,40 +31,56 @@ const init = () => {
     gradeValt.selectPreviousQuestion();
   };
 
-  const handlePointsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePointsChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const teamId = event.currentTarget.getAttribute('data-team-id');
     const questionId = event.currentTarget.getAttribute('data-question-id');
     const value = event.currentTarget.value;
 
     if (teamId && questionId) {
-      gradeValt.updatePoints(questionId, teamId, value === '' ? null : parseInt(value));
+      const result = await gradeValt.updatePoints(questionId, teamId, value === '' ? null : parseInt(value));
+
+      if (!result) {
+        toast.show({ type: 'error', message: 'Failed to update points.' });
+      }
     }
   };
 
-  const handleGiveMaxPoints = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleGiveMaxPoints = async (event: React.MouseEvent<HTMLButtonElement>) => {
     const teamId = event.currentTarget.getAttribute('data-team-id');
     const questionId = event.currentTarget.getAttribute('data-question-id');
 
     if (teamId && questionId) {
-      gradeValt.giveMaxPoints(questionId, teamId);
+      const result = await gradeValt.giveMaxPoints(questionId, teamId);
+
+      if (!result) {
+        toast.show({ type: 'error', message: 'Failed to update points.' });
+      }
     }
   };
 
-  const handleGiveZeroPoints = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleGiveZeroPoints = async (event: React.MouseEvent<HTMLButtonElement>) => {
     const teamId = event.currentTarget.getAttribute('data-team-id');
     const questionId = event.currentTarget.getAttribute('data-question-id');
 
     if (teamId && questionId) {
-      gradeValt.giveZeroPoints(questionId, teamId);
+      const result = await gradeValt.giveZeroPoints(questionId, teamId);
+
+      if (!result) {
+        toast.show({ type: 'error', message: 'Failed to update points.' });
+      }
     }
   };
 
-  const handleClearPoints = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClearPoints = async (event: React.MouseEvent<HTMLButtonElement>) => {
     const teamId = event.currentTarget.getAttribute('data-team-id');
     const questionId = event.currentTarget.getAttribute('data-question-id');
 
     if (teamId && questionId) {
-      gradeValt.updatePoints(questionId, teamId, null);
+      const result = await gradeValt.updatePoints(questionId, teamId, null);
+
+      if (!result) {
+        toast.show({ type: 'error', message: 'Failed to update points.' });
+      }
     }
   };
 
@@ -96,7 +113,7 @@ export const Grade = () => {
     handleClearPoints,
     handleReconnect
   } = useMemo(init, []);
-  const snap = useSnapshot(gradeValt.store);
+  const snap = useSnapshot(gradeValt.store, { sync: true });
 
   const selectedQuestion = snap.selectedQuestionId
     ? snap.questions.find((q) => q.id === snap.selectedQuestionId) || null
