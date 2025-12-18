@@ -61,20 +61,22 @@ interface RunStore {
   teams: Record<string, TeamStatus>;
 }
 
+type AnswerReceivedMessage = WebSocketMessage & {
+  type: 'ANSWER_RECEIVED';
+  teamId: string;
+  teamNumber: number;
+  questionId: string;
+  translationId: string;
+  languageCode: string;
+  answerId: string;
+  answerText: string;
+};
+
 type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
   | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
-  | {
-      type: 'ANSWER_RECEIVED';
-      teamId: string;
-      teamNumber: number;
-      questionId: string;
-      translationId: string;
-      languageCode: string;
-      answerId: string;
-      answerText: string;
-    };
+  | AnswerReceivedMessage;
 
 export class RunValt {
   store: RunStore;
@@ -247,28 +249,7 @@ export class RunValt {
         this.handleTEAM_STATUS(message.teams);
         break;
       case 'ANSWER_RECEIVED':
-        const item = this.store.items.find(
-          (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
-        );
-
-        if (item && item.type === 'question' && item.phase === 'answer') {
-          const answer = item.answers[message.teamId];
-
-          if (answer) {
-            answer.answerText = message.answerText;
-          } else {
-            item.answers[message.teamId] = {
-              answerId: message.answerId,
-              answerText: message.answerText,
-              languageCode: message.languageCode,
-              teamId: message.teamId,
-              teamNumber: message.teamNumber,
-              points: null,
-              autoPoints: null
-            };
-          }
-        }
-
+        this.handleANSWER_RECEIVED(message);
         break;
     }
   };
@@ -363,6 +344,30 @@ export class RunValt {
   private handleTEAM_STATUS = (teams: TeamStatus[]) => {
     for (const team of teams) {
       this.store.teams[team.id] = team;
+    }
+  };
+
+  private handleANSWER_RECEIVED = (message: AnswerReceivedMessage) => {
+    const item = this.store.items.find(
+      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
+    );
+
+    if (item && item.type === 'question' && item.phase === 'answer') {
+      const answer = item.answers[message.teamId];
+
+      if (answer) {
+        answer.answerText = message.answerText;
+      } else {
+        item.answers[message.teamId] = {
+          answerId: message.answerId,
+          answerText: message.answerText,
+          languageCode: message.languageCode,
+          teamId: message.teamId,
+          teamNumber: message.teamNumber,
+          points: null,
+          autoPoints: null
+        };
+      }
     }
   };
 }
