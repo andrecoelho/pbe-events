@@ -111,7 +111,7 @@ export const Grade = () => {
 
   const statusInfo = runStatusConfig[snap.runStatus] || { label: snap.runStatus, color: 'badge-neutral' };
 
-  useEffect(() => () => gradeValt.cleanup(), [gradeValt]);
+  useEffect(() => gradeValt.cleanup, [gradeValt]);
 
   return (
     <div className='Grade bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>

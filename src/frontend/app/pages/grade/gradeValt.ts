@@ -112,6 +112,7 @@ export class GradeValt {
 
   onStatusChange = (status: WebSocketStatus) => {
     this.store.connectionState = status;
+    this.store.activeItem = null;
   };
 
   onMessage = (message: WebSocketGradeMessage) => {
