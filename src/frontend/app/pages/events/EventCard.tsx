@@ -62,6 +62,10 @@ export const EventCard = memo((props: Props) => {
     }
   };
 
+  const handleOpenPresenter = () => {
+    window.open(`/event-run/presenter?eventId=${props.event.id}`, '_blank', 'width=800,height=600,popup=yes');
+  };
+
   const roleColorClass = roleGradients[roleId];
 
   return (
@@ -151,8 +155,18 @@ export const EventCard = memo((props: Props) => {
               href={`/run/${props.event.id}`}
               aria-label={`Run event ${props.event.name}`}
             >
-              <Icon name='presentation-chart-bar' className='text-lime-600 hover:brightness-75' />
+              <Icon name='play-circle' className='text-lime-600 hover:brightness-75' />
             </a>
+          )}
+          {canEdit && (
+            <button
+              className='tooltip tooltip-neutral'
+              data-tip='Presenter'
+              onClick={handleOpenPresenter}
+              aria-label={`Present event ${props.event.name}`}
+            >
+              <Icon name='presentation-chart-bar' className='text-indigo-600 hover:brightness-75' />
+            </button>
           )}
           {canGrade && (
             <a
