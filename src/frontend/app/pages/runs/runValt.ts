@@ -8,7 +8,6 @@ export interface TeamStatus {
   number: number;
   status: 'offline' | 'connected' | 'ready';
   languageCode: string | null;
-  hasAnswer: 'yes' | 'no' | null;
 }
 
 export interface Question {
@@ -17,7 +16,25 @@ export interface Question {
   type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
-  translations: Array<{ languageCode: string; prompt: string; answer: string; clarification: string }>;
+  translations: {
+    languageCode: string;
+    languageName: string;
+    prompt: string;
+    answer: string;
+    clarification: string;
+  }[];
+  answers: Record<
+    string,
+    {
+      answerId: string | null;
+      answerText: string | null;
+      languageCode: string | null;
+      teamId: string;
+      teamNumber: number;
+      points: number | null;
+      autoPoints: number | null;
+    }
+  >;
 }
 
 export interface Slide {
@@ -48,7 +65,16 @@ type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
   | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
-  | (WebSocketMessage & { type: 'ANSWER_RECEIVED'; teamId: string });
+  | {
+      type: 'ANSWER_RECEIVED';
+      teamId: string;
+      teamNumber: number;
+      questionId: string;
+      translationId: string;
+      languageCode: string;
+      answerId: string;
+      answerText: string;
+    };
 
 export class RunValt {
   store: RunStore;
@@ -146,7 +172,8 @@ export class RunValt {
           languageCode: t.languageCode,
           answer: t.answer,
           clarification: t.clarification
-        }))
+        })),
+        answers: question.answers
       });
     }
 
@@ -212,7 +239,6 @@ export class RunValt {
     switch (message.type) {
       case 'RUN_STATUS':
         this.store.run.status = message.status;
-        this.clearHasAnswers();
         break;
       case 'ACTIVE_ITEM':
         this.store.run.activeItem = message.activeItem;
@@ -221,8 +247,26 @@ export class RunValt {
         this.handleTEAM_STATUS(message.teams);
         break;
       case 'ANSWER_RECEIVED':
-        if (this.store.teams[message.teamId]) {
-          this.store.teams[message.teamId]!.hasAnswer = 'yes';
+        const item = this.store.items.find(
+          (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
+        );
+
+        if (item && item.type === 'question' && item.phase === 'answer') {
+          const answer = item.answers[message.teamId];
+
+          if (answer) {
+            answer.answerText = message.answerText;
+          } else {
+            item.answers[message.teamId] = {
+              answerId: message.answerId,
+              answerText: message.answerText,
+              languageCode: message.languageCode,
+              teamId: message.teamId,
+              teamNumber: message.teamNumber,
+              points: null,
+              autoPoints: null
+            };
+          }
         }
 
         break;
@@ -269,20 +313,6 @@ export class RunValt {
     return { ok: true } as const;
   };
 
-  clearHasAnswers = () => {
-    for (const teamId in this.store.teams) {
-      this.store.teams[teamId]!.hasAnswer = null;
-    }
-  };
-
-  fillHasAnswers = () => {
-    for (const teamId in this.store.teams) {
-      if (this.store.teams[teamId]!.hasAnswer === null) {
-        this.store.teams[teamId]!.hasAnswer = 'no';
-      }
-    }
-  };
-
   next = () => {
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
@@ -295,14 +325,6 @@ export class RunValt {
 
         if (updatedItem.phase === 'prompt') {
           updatedItem.startTime = new Date().toISOString();
-        }
-
-        if (nextItem.phase === 'reading') {
-          this.clearHasAnswers();
-        }
-
-        if (nextItem.phase === 'answer') {
-          this.fillHasAnswers();
         }
 
         this.ws?.sendMessage({
@@ -319,8 +341,6 @@ export class RunValt {
   };
 
   previous = () => {
-    this.clearHasAnswers();
-
     if (this.store.currentIndex > 0) {
       this.store.currentIndex--;
 

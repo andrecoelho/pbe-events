@@ -31,4 +31,16 @@ export type ActiveItem =
       number: number;
       phase: 'answer';
       translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
+      answers: Record<
+        string, // teamId
+        {
+          answerId: string | null;
+          answerText: string | null;
+          languageCode: string | null;
+          teamId: string;
+          teamNumber: number;
+          points: number | null;
+          autoPoints: number | null;
+        }
+      >;
     };

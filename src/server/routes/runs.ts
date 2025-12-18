@@ -1,6 +1,7 @@
 import { querySelectEvent } from '@/server/queries';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
+import { getQuestionsWithAnswers } from '@/server/utils/getQuestionsWithAnswers';
 import { apiData, apiForbidden, apiNotFound, apiServerError, apiUnauthorized } from '@/server/utils/responses';
 import type { WebSocketServer } from '@/server/webSocket';
 import type { ActiveItem } from '@/types';
@@ -41,60 +42,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
           }
 
           const run = runs[0]!;
-
-          // Get questions with translations
-          const questions: {
-            id: string;
-            number: number;
-            type: string;
-            max_points: number;
-            seconds: number;
-            language_code: string;
-            prompt: string;
-            answer: string;
-            clarification: string;
-          }[] = await sql`
-            SELECT
-              q.id,
-              q.number,
-              q.type,
-              q.max_points,
-              q.seconds,
-              l.code as language_code,
-              t.prompt,
-              t.answer,
-              t.clarification
-            FROM questions q
-            LEFT JOIN translations t ON q.id = t.question_id
-            LEFT JOIN languages l ON t.language_id = l.id
-            WHERE q.event_id = ${eventId}
-            ORDER BY q.number, l.code
-          `;
-
-          // Group translations by question
-          const questionsMap = new Map();
-
-          for (const q of questions) {
-            if (!questionsMap.has(q.id)) {
-              questionsMap.set(q.id, {
-                id: q.id,
-                number: q.number,
-                type: q.type,
-                maxPoints: q.max_points,
-                seconds: q.seconds,
-                translations: []
-              });
-            }
-
-            if (q.language_code && q.prompt) {
-              questionsMap.get(q.id).translations.push({
-                languageCode: q.language_code,
-                prompt: q.prompt,
-                answer: q.answer,
-                clarification: q.clarification
-              });
-            }
-          }
+          const questions = await getQuestionsWithAnswers(eventId);
 
           // Get slides
           const slides: {
@@ -127,7 +75,7 @@ export function createRunsRoutes(wsServer: WebSocketServer): Routes {
               gracePeriod: run.grace_period,
               activeItem: run.active_item
             },
-            questions: Array.from(questionsMap.values()),
+            questions,
             slides: slides.map((s) => ({
               id: s.id,
               number: s.number,

@@ -189,17 +189,20 @@ export const Run = () => {
               <div className='flex flex-wrap gap-3'>
                 {sortedTeams.map((teamId) => {
                   const team = snap.teams[teamId]!;
+                  const activeItem = snap.run.activeItem;
+                  const isAnswerPhase = activeItem?.type === 'question' && activeItem.phase === 'answer';
+                  const teamHasAnswer = isAnswerPhase ? activeItem.answers[teamId]?.answerText != null : false;
                   const stateClass = TEAM_STATE_CLASSES[team.status] ?? TEAM_STATE_CLASSES.offline;
 
                   return (
                     <span key={teamId} className='relative inline-flex'>
                       <span className={`team-badge ${stateClass}`}>{formatTeamNumber(team.number)}</span>
-                      {team.hasAnswer && team.hasAnswer === 'yes' && (
+                      {isAnswerPhase && teamHasAnswer && (
                         <span className='team-badge-check'>
                           <Icon name='check' className='size-3' />
                         </span>
                       )}
-                      {team.hasAnswer && team.hasAnswer === 'no' && (
+                      {isAnswerPhase && !teamHasAnswer && (
                         <span className='team-badge-no-answer'>
                           <Icon name='x-mark' className='size-3' />
                         </span>
