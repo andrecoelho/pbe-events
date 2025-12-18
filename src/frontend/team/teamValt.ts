@@ -131,9 +131,9 @@ export class TeamValt {
     }
   };
 
-  submitAnswer(answer: string | boolean) {
-    this.ws?.sendMessage({ type: 'SUBMIT_ANSWER', answer });
-  }
+  submitAnswer = async (answer: string | boolean) => {
+    return !this.ws ? false : await this.ws?.sendMessage({ type: 'SUBMIT_ANSWER', answer });
+  };
 
   timeUp() {
     this.store.isTimeUp = true;

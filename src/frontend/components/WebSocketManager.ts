@@ -177,6 +177,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
         timerId: window.setTimeout(() => {
           console.warn('ACK not received for message:', message);
           this.resetWS();
+          this.connect();
         }, ACK_TIMEOUT_MS)
       });
 

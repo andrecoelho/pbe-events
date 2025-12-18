@@ -1,8 +1,9 @@
 import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionTimer';
+import { toast } from '@/frontend/components/Toast';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import { debounce } from 'lodash';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import logo from 'src/assets/favicon.svg';
 import { useSnapshot, type Snapshot } from 'valtio';
 
@@ -37,8 +38,12 @@ export const GeneralAnswer = () => {
     textareaRef.current?.focus();
   }, []);
 
-  const handleAnswerChange = debounce((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    valt.submitAnswer(e.target.value);
+  const handleAnswerChange = debounce(async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const result = await valt.submitAnswer(e.target.value);
+
+    if (!result) {
+      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    }
   }, 1000);
 
   return (
@@ -74,14 +79,24 @@ export const TrueFalseAnswer = () => {
     trueButtonRef.current?.focus();
   }, []);
 
-  const handleAnswerTrue = () => {
+  const handleAnswerTrue = async () => {
     setAnswer(true);
-    valt.submitAnswer(true);
+
+    const result = await valt.submitAnswer(true);
+
+    if (!result) {
+      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    }
   };
 
-  const handleAnswerFalse = () => {
+  const handleAnswerFalse = async () => {
     setAnswer(false);
-    valt.submitAnswer(false);
+
+    const result = await valt.submitAnswer(false);
+
+    if (!result) {
+      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    }
   };
 
   return (
@@ -155,14 +170,18 @@ export const FillInTheBlankAnswer = ({
   const parts = parsePromptWithBlanks(translation.prompt);
   const totalBlanks = parts.filter((p) => p.type === 'blank').length;
 
-  const handleInputChange = debounce(() => {
+  const handleInputChange = debounce(async () => {
     // Read values directly from DOM
     const answerArray = Array.from({ length: totalBlanks }, (_, idx) => {
       const value = inputRefs.current[idx]?.value || '';
       return value || '__';
     });
 
-    valt.submitAnswer(answerArray.join(' | '));
+    const result = await valt.submitAnswer(answerArray.join(' | '));
+
+    if (!result) {
+      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    }
   }, 500);
 
   return (
