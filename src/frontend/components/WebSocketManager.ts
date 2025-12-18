@@ -79,12 +79,14 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.pendingACKs.clear();
 
     if (this.ws) {
+      this.ws.removeEventListener('close', this.handleWSClose);
       this.ws.close();
       this.ws = null;
     }
   };
 
   destroy = () => {
+    console.log('Destroying WebSocketManager...');
     this.resetWS();
 
     window.removeEventListener('offline', this.handleOffline);
@@ -118,8 +120,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onMessage?.(message);
   };
 
-  handleWSClose = () => {
-    console.log('WebSocket connection closed');
+  handleWSClose = (event: CloseEvent, ...args: any[]) => {
+    console.log('WebSocket connection closed', event, args);
 
     this.resetWS();
 
