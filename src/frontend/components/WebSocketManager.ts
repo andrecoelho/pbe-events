@@ -125,22 +125,19 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
     this.resetWS();
 
-    if (window.navigator.onLine) {
-      if (this.status !== 'connecting') {
-        this.status = 'connecting';
-        this.notifyStatusChange();
-      }
-
-      this.reconnect();
-    } else {
-      this.status = 'offline';
+    if (this.status !== 'connecting') {
+      this.status = 'connecting';
       this.notifyStatusChange();
     }
+
+    this.reconnect();
   };
 
   handleOffline = () => {
     console.warn('Browser went offline. Disconnecting WebSocket.');
     this.resetWS();
+    this.status = 'offline';
+    this.notifyStatusChange();
   };
 
   handleOnline = () => {
