@@ -34,6 +34,7 @@ export type ActiveItem =
           teamNumber: number;
           points: number | null;
           autoPoints: number | null;
+          challenged: boolean | null;
         }
       >;
     }
@@ -53,6 +54,7 @@ export type ActiveItem =
           teamNumber: number;
           points: number | null;
           autoPoints: number | null;
+          challenged: boolean | null;
         }
       >;
     };

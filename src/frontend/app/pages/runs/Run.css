@@ -2,7 +2,8 @@
 
 .Run {
   .team-badge {
-    @apply size-10 rounded-xl text-base-100 text-lg font-semibold flex items-center justify-center bg-gradient-to-br shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-transform;
+    @apply size-10 rounded-xl text-base-100 text-lg font-semibold flex items-center justify-center;
+    @apply bg-gradient-to-br shadow-inner ring-1 ring-accent/30 ring-offset-1 ring-offset-base-100 transition-transform;
   }
 
   .team-badge--offline {
@@ -18,11 +19,15 @@
   }
 
   .team-badge-check {
-    @apply absolute -top-1 -right-1 rounded-full bg-success text-base-100 flex items-center justify-center shadow-md border border-base-100;
+    @apply absolute -top-1 -right-1 rounded-full bg-success text-base-100 shadow-md border border-base-100;
   }
 
   .team-badge-no-answer {
-    @apply absolute -top-1 -right-1 rounded-full bg-error text-base-100 flex items-center justify-center shadow-md border border-base-100;
+    @apply absolute -top-1 -right-1 rounded-full bg-error text-base-100 shadow-md border border-base-100;
+  }
+
+  .team-badge-challenged {
+    @apply absolute -bottom-1 -right-1 rounded-full bg-base-100 text-error shadow-md border-base-100;
   }
 
   .team-badge--sm {

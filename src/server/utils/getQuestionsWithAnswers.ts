@@ -1,4 +1,4 @@
-import { sql } from "bun";
+import { sql } from 'bun';
 
 export const getQuestionsWithAnswers = async (eventId: string) => {
   // Query all questions with their translations
@@ -39,6 +39,7 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
     question_id: string;
     answer_id: string | null;
     answer: string | null;
+    challenged: boolean | null;
     translation_id: string | null;
     language_code: string | null;
     team_id: string;
@@ -50,6 +51,7 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
             q.id as question_id,
             a.id as answer_id,
             a.answer,
+            a.challenged,
             a.translation_id,
             l.code as language_code,
             t.id as team_id,
@@ -91,6 +93,7 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
           teamNumber: number;
           points: number | null;
           autoPoints: number | null;
+          challenged: boolean | null;
         }
       >;
     }
@@ -131,7 +134,8 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
         teamId: row.team_id,
         teamNumber: row.team_number,
         points: row.points_awarded,
-        autoPoints: row.auto_points_awarded
+        autoPoints: row.auto_points_awarded,
+        challenged: row.challenged
       };
     }
   }

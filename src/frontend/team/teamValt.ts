@@ -32,8 +32,8 @@ type WebSocketTeamMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null })
   | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> })
-  | (WebSocketMessage & { type: 'SAVED_ANSWER'; questionId: string; answer: string })
-  | (WebSocketMessage & { type: 'GRACE_PERIOD'; gracePeriod: number });
+  | (WebSocketMessage & { type: 'GRACE_PERIOD'; gracePeriod: number })
+  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; challenged: boolean });
 
 export class TeamValt {
   store: TeamStore;
@@ -98,7 +98,7 @@ export class TeamValt {
         this.store.activeItem = message.activeItem;
         this.store.answer = null;
 
-        if (message.activeItem?.type === 'question' && message.activeItem.phase !== 'reading') {
+        if (message.activeItem?.type === 'question' && message.activeItem.phase === 'prompt') {
           const savedAnswer = message.activeItem.answers[this.teamId];
 
           if (savedAnswer) {
@@ -122,6 +122,17 @@ export class TeamValt {
         }
 
         break;
+      case 'ANSWER_CHALLENGE':
+        const activeItem = this.store.activeItem;
+
+        if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
+          const answer = activeItem.answers[this.teamId];
+
+          if (answer) {
+            answer.challenged = message.challenged;
+          }
+        }
+        break;
       case 'LANGUAGES':
         this.store.languages = message.languages;
         break;
@@ -132,7 +143,21 @@ export class TeamValt {
   };
 
   submitAnswer = async (answer: string | boolean) => {
-    return !this.ws ? false : await this.ws?.sendMessage({ type: 'SUBMIT_ANSWER', answer });
+    return !this.ws ? false : await this.ws.sendMessage({ type: 'SUBMIT_ANSWER', answer });
+  };
+
+  submitChallenge = async (challenged: boolean) => {
+    const activeItem = this.store.activeItem;
+
+    if (!this.ws || activeItem?.type !== 'question') {
+      return false;
+    }
+
+    return await this.ws.sendMessage({
+      type: 'SUBMIT_CHALLENGE',
+      questionId: activeItem.id,
+      challenged
+    });
   };
 
   timeUp() {

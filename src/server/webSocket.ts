@@ -404,21 +404,17 @@ export class WebSocketServer {
 
   // Called when a WebSocket message is received
   private handleMessage = async (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
-    const { eventId, role } = ws.data;
-
-    if (!eventId) {
-      return;
-    }
-
-    const connection = this.eventConnections.get(eventId);
+    const connection = this.eventConnections.get(ws.data.eventId);
 
     if (!connection) {
       return;
     }
 
     // Handle team messages
-    if (role === 'team') {
-      const msg = JSON.parse(message as string) as { type: 'SUBMIT_ANSWER'; answer: string; __ACK__: string };
+    if (this.isTeamWebSocket(ws)) {
+      const msg = JSON.parse(message as string) as
+        | { type: 'SUBMIT_ANSWER'; answer: string; __ACK__: string }
+        | { type: 'SUBMIT_CHALLENGE'; questionId: string; challenged: boolean; __ACK__: string };
 
       ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
@@ -426,11 +422,14 @@ export class WebSocketServer {
         case 'SUBMIT_ANSWER':
           await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
           break;
+        case 'SUBMIT_CHALLENGE':
+          await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
+          break;
       }
     }
 
     // Handle host messages
-    if (role === 'host') {
+    if (this.isHostWebSocket(ws)) {
       const msg = JSON.parse(message as string) as
         | {
             type: 'UPDATE_RUN_STATUS';
@@ -455,13 +454,13 @@ export class WebSocketServer {
       }
     }
 
-    if (role === 'presenter') {
+    if (this.isPresenterWebSocket(ws)) {
       const msg = JSON.parse(message as string) as { type: string; __ACK__: string };
 
       ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
     }
 
-    if (role === 'judge') {
+    if (this.isJudgeWebSocket(ws)) {
       const msg = JSON.parse(message as string) as {
         type: 'UPDATE_POINTS';
         answerId: string;
@@ -578,28 +577,15 @@ export class WebSocketServer {
   }
 
   private async handleSUBMIT_ANSWER(
-    ws: ServerWebSocket<WebsocketData>,
+    ws: ServerWebSocket<TeamWebsocketData>,
     connection: EventConnection,
-    answer: string
+    answerText: string
   ): Promise<void> {
     if (ws.data.role !== 'team') {
       return;
     }
 
     const { id, languageId } = ws.data;
-
-    // Validate language selected
-    if (!languageId) {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'NO_LANGUAGE_SELECTED',
-          message: 'Please select a language first'
-        })
-      );
-
-      return;
-    }
 
     // Validate active question
     if (!connection.activeItem || connection.activeItem.type !== 'question') {
@@ -683,13 +669,31 @@ export class WebSocketServer {
     // Upsert answer
     const result: { id: string }[] = await sql`
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
-        VALUES (${answerId}, ${answer}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (${answerId}, ${answerText}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
         DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
         RETURNING id
       `;
 
     const finalAnswerId = result[0]!.id;
+
+    const activeItem = connection.activeItem;
+    const answer = activeItem.answers[id];
+
+    if (answer) {
+      answer.answerText = answerText;
+    } else {
+      activeItem.answers[id] = {
+        answerId: finalAnswerId,
+        teamId: id,
+        teamNumber,
+        languageCode,
+        answerText,
+        points: null,
+        autoPoints: null,
+        challenged: false
+      };
+    }
 
     // Notify
     const message = JSON.stringify({
@@ -700,11 +704,41 @@ export class WebSocketServer {
       translationId,
       languageCode,
       answerId: finalAnswerId,
-      answerText: answer
+      answerText: answerText
     });
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
+  }
+
+  private async handleSUBMIT_CHALLENGE(
+    ws: ServerWebSocket<TeamWebsocketData>,
+    connection: EventConnection,
+    questionId: string,
+    challenged: boolean
+  ): Promise<void> {
+    const activeItem = connection.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+      const answer = activeItem.answers[ws.data.id];
+
+      if (answer) {
+        await sql`UPDATE answers SET challenged = ${challenged} WHERE id = ${answer.answerId}`;
+
+        answer.challenged = challenged;
+
+        const message = JSON.stringify({
+          type: 'ANSWER_CHALLENGE',
+          questionId,
+          teamId: ws.data.id,
+          challenged
+        });
+
+        this.server?.publish(`${connection.eventId}:hosts`, message);
+        this.server?.publish(`${connection.eventId}:judges`, message);
+        ws.send(message);
+      }
+    }
   }
 
   private async handleUPDATE_RUN_STATUS(

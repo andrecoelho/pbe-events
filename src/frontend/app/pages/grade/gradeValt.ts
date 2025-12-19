@@ -25,6 +25,7 @@ export interface Question {
       teamNumber: number;
       points: number | null;
       autoPoints: number | null;
+      challenged: boolean;
     }
   >;
 }
@@ -53,6 +54,7 @@ type WebSocketGradeMessage =
       answerId: string;
       answerText: string;
     }
+  | { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean }
   | { type: 'POINTS_UPDATED'; answerId: string; questionId: string; teamId: string; points: number | null };
 
 export class GradeValt {
@@ -138,9 +140,23 @@ export class GradeValt {
               languageCode: message.languageCode,
               teamId: message.teamId,
               teamNumber: message.teamNumber,
+              challenged: false,
               points: null,
               autoPoints: null
             };
+          }
+        }
+
+        break;
+      }
+      case 'ANSWER_CHALLENGE': {
+        const question = this.store.questions.find((q) => q.id === message.questionId);
+
+        if (question) {
+          const answer = question.answers[message.teamId];
+
+          if (answer) {
+            answer.challenged = message.challenged;
           }
         }
 

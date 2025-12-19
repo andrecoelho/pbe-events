@@ -33,6 +33,7 @@ export interface Question {
       teamNumber: number;
       points: number | null;
       autoPoints: number | null;
+      challenged: boolean | null;
     }
   >;
 }
@@ -70,13 +71,15 @@ type AnswerReceivedMessage = WebSocketMessage & {
   languageCode: string;
   answerId: string;
   answerText: string;
+  challenged: boolean;
 };
 
 type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
   | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
-  | AnswerReceivedMessage;
+  | AnswerReceivedMessage
+  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean });
 
 export class RunValt {
   store: RunStore;
@@ -252,6 +255,9 @@ export class RunValt {
       case 'ANSWER_RECEIVED':
         this.handleANSWER_RECEIVED(message);
         break;
+      case 'ANSWER_CHALLENGE':
+        this.handleANSWER_CHALLENGE(message);
+        break;
     }
   };
 
@@ -351,8 +357,6 @@ export class RunValt {
   };
 
   private handleANSWER_RECEIVED = (message: AnswerReceivedMessage) => {
-    const activeItem = this.store.run.activeItem;
-
     const answerReceived = {
       answerId: message.answerId,
       answerText: message.answerText,
@@ -360,8 +364,11 @@ export class RunValt {
       teamId: message.teamId,
       teamNumber: message.teamNumber,
       points: null,
-      autoPoints: null
+      autoPoints: null,
+      challenged: message.challenged
     };
+
+    const activeItem = this.store.run.activeItem;
 
     if (
       activeItem &&
@@ -403,6 +410,47 @@ export class RunValt {
         answer.answerText = message.answerText;
       } else {
         answerItem.answers[message.teamId] = answerReceived;
+      }
+    }
+  };
+
+  private handleANSWER_CHALLENGE = (message: { questionId: string; teamId: string; challenged: boolean }) => {
+    const activeItem = this.store.run.activeItem;
+
+    if (
+      activeItem &&
+      activeItem.type === 'question' &&
+      activeItem.phase === 'answer' &&
+      activeItem.id === message.questionId
+    ) {
+      const answer = activeItem.answers[message.teamId];
+
+      if (answer) {
+        answer.challenged = message.challenged;
+      }
+    }
+
+    const promptItem = this.store.items.find(
+      (item) => item.type === 'question' && item.phase === 'prompt' && item.id === message.questionId
+    );
+
+    if (promptItem && promptItem.type === 'question' && promptItem.phase === 'prompt') {
+      const answer = promptItem.answers[message.teamId];
+
+      if (answer) {
+        answer.challenged = message.challenged;
+      }
+    }
+
+    const answerItem = this.store.items.find(
+      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
+    );
+
+    if (answerItem && answerItem.type === 'question' && answerItem.phase === 'answer') {
+      const answer = answerItem.answers[message.teamId];
+
+      if (answer) {
+        answer.challenged = message.challenged;
       }
     }
   };
