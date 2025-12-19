@@ -354,40 +354,49 @@ export const Grade = () => {
 
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top z-1'>
         <div className='flex gap-2 items-center'>
-          <button className='btn btn-neutral' onClick={handleSelectPreviousQuestion}>
+          <button
+            className='btn btn-neutral'
+            disabled={snap.connectionState !== 'connected'}
+            onClick={handleSelectPreviousQuestion}
+          >
             <Icon name='chevron-left' className='size-4' />
             Previous
           </button>
-          <button className='btn btn-neutral' onClick={handleSelectNextQuestion}>
+
+          <button
+            className='btn btn-neutral'
+            disabled={snap.connectionState !== 'connected'}
+            onClick={handleSelectNextQuestion}
+          >
             Next
             <Icon name='chevron-right' className='size-4' />
           </button>
-
-          {snap.connectionState === 'connecting' && (
-            <span className='alert alert-info w-lg'>
-              <Icon name='information-circle' className='size-5' />
-              Connecting to event &hellip;
-            </span>
-          )}
-
-          {snap.connectionState === 'error' && (
-            <span className='alert alert-error w-lg'>
-              <Icon name='x-circle' className='size-5' />
-              Connection error.
-              <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
-                <Icon name='arrow-path' className='size-3' />
-                Reconnect
-              </button>
-            </span>
-          )}
-
-          {snap.connectionState === 'offline' && (
-            <span className='alert alert-warning w-lg'>
-              <Icon name='exclamation-triangle' className='size-5' />
-              Your internet is down.
-            </span>
-          )}
         </div>
+
+        {snap.connectionState === 'connecting' && (
+          <span className='alert alert-info w-lg'>
+            <Icon name='information-circle' className='size-5' />
+            Connecting to event &hellip;
+          </span>
+        )}
+
+        {snap.connectionState === 'error' && (
+          <span className='alert alert-error w-lg'>
+            <Icon name='x-circle' className='size-5' />
+            Connection error.
+            <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
+              <Icon name='arrow-path' className='size-3' />
+              Reconnect
+            </button>
+          </span>
+        )}
+
+        {snap.connectionState === 'offline' && (
+          <span className='alert alert-warning w-lg'>
+            <Icon name='exclamation-triangle' className='size-5' />
+            Your internet is down.
+          </span>
+        )}
 
         {snap.connectionState === 'connected' && (
           <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>

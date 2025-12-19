@@ -163,6 +163,8 @@ export const Run = () => {
 
   useEffect(() => valt.cleanup, [valt]);
 
+  const isConnected = snap.connectionState === 'connected';
+
   return (
     <RunValtContext.Provider value={valt}>
       <div className='Run bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
@@ -315,6 +317,99 @@ export const Run = () => {
         </div>
 
         <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top'>
+          <div className='flex gap-2'>
+            {snap.run.status === 'not_started' && (
+              <button className='btn btn-success' disabled={!isConnected} onClick={handleStartEvent}>
+                <Icon name='play' className='size-4' />
+                Start
+              </button>
+            )}
+            {snap.run.status === 'paused' && (
+              <button className='btn btn-success' disabled={!isConnected} onClick={handleResumeEvent}>
+                <Icon name='play' className='size-4' />
+                Resume
+              </button>
+            )}
+            {snap.run.status === 'in_progress' && (
+              <button className='btn btn-info' disabled={!isConnected} onClick={handlePauseEvent}>
+                <Icon name='pause' className='size-4' />
+                Pause
+              </button>
+            )}
+            {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
+              <button className='btn btn-error' disabled={!isConnected} onClick={handleCompleteEvent}>
+                <Icon name='stop' className='size-4' />
+                Complete
+              </button>
+            )}
+            {snap.run.status === 'completed' && (
+              <button className='btn btn-warning' disabled={!isConnected} onClick={handleResetEvent}>
+                <Icon name='arrow-path' className='size-4' />
+                Reset
+              </button>
+            )}
+
+            {snap.run.status === 'in_progress' && (
+              <button className='btn btn-neutral' disabled={!isConnected} onClick={handlePreviousEvent}>
+                <Icon name='chevron-left' className='size-4' />
+                Previous
+              </button>
+            )}
+
+            {snap.run.status === 'in_progress' && (
+              <button className='btn btn-neutral' disabled={!isConnected} onClick={handleNextEvent}>
+                Next
+                <Icon name='chevron-right' className='size-4' />
+              </button>
+            )}
+
+            {snap.run.activeItem?.type === 'question' &&
+              snap.run.activeItem.phase !== 'reading' &&
+              !snap.run.activeItem.locked && (
+                <button
+                  className='btn btn-outline tooltip tooltip-neutral font-normal border-amber-600'
+                  data-tip='Lock Question'
+                  disabled={!isConnected}
+                  aria-label='Lock Question'
+                  onClick={handleLockQuestion}
+                >
+                  <svg
+                    xmlns='http://www.w3.org/2000/svg'
+                    viewBox='0 0 24 24'
+                    fill='currentColor'
+                    className='size-6 text-amber-600'
+                  >
+                    <path
+                      fill-rule='evenodd'
+                      d='M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z'
+                      clip-rule='evenodd'
+                    />
+                  </svg>
+                </button>
+              )}
+
+            {snap.run.activeItem?.type === 'question' &&
+              snap.run.activeItem.phase !== 'reading' &&
+              snap.run.activeItem.locked && (
+                <button
+                  className='btn btn-outline tooltip tooltip-neutral font-normal border-indigo-400'
+                  data-tip='Unlock Question'
+                  disabled={!isConnected}
+                  aria-label='Unlock Question'
+                  onClick={handleUnlockQuestion}
+                >
+                  <svg
+                    xmlns='http://www.w3.org/2000/svg'
+                    viewBox='0 0 24 24'
+                    fill='currentColor'
+                    className='size-6 text-indigo-400'
+                  >
+                    <path d='M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 0 1-1.5 0V6.75a3.75 3.75 0 1 0-7.5 0v3a3 3 0 0 1 3 3v6.75a3 3 0 0 1-3 3H3.75a3 3 0 0 1-3-3v-6.75a3 3 0 0 1 3-3h9v-3c0-2.9 2.35-5.25 5.25-5.25Z' />
+                  </svg>
+                </button>
+              )}
+          </div>
+
           {snap.connectionState === 'connecting' && (
             <span className='alert alert-info w-lg'>
               <Icon name='information-circle' className='size-5' />
@@ -340,157 +435,64 @@ export const Run = () => {
             </span>
           )}
 
-          {snap.connectionState === 'connected' && (
-            <div className='flex gap-2'>
-              {snap.run.status === 'not_started' && (
-                <button className='btn btn-success' onClick={handleStartEvent}>
-                  <Icon name='play' className='size-4' />
-                  Start
-                </button>
-              )}
-              {snap.run.status === 'paused' && (
-                <button className='btn btn-success' onClick={handleResumeEvent}>
-                  <Icon name='play' className='size-4' />
-                  Resume
-                </button>
-              )}
-              {snap.run.status === 'in_progress' && (
-                <button className='btn btn-info' onClick={handlePauseEvent}>
-                  <Icon name='pause' className='size-4' />
-                  Pause
-                </button>
-              )}
-              {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
-                <button className='btn btn-error' onClick={handleCompleteEvent}>
-                  <Icon name='stop' className='size-4' />
-                  Complete
-                </button>
-              )}
-              {snap.run.status === 'completed' && (
-                <button className='btn btn-warning' onClick={handleResetEvent}>
-                  <Icon name='arrow-path' className='size-4' />
-                  Reset
-                </button>
-              )}
-
-              {snap.run.status === 'in_progress' && (
-                <button className='btn btn-neutral' onClick={handlePreviousEvent}>
-                  <Icon name='chevron-left' className='size-4' />
-                  Previous
-                </button>
-              )}
-
-              {snap.run.status === 'in_progress' && (
-                <button className='btn btn-neutral' onClick={handleNextEvent}>
-                  Next
-                  <Icon name='chevron-right' className='size-4' />
-                </button>
-              )}
-
-              {snap.run.activeItem?.type === 'question' &&
-                snap.run.activeItem.phase !== 'reading' &&
-                !snap.run.activeItem.locked && (
-                  <button
-                    className='btn btn-outline tooltip tooltip-neutral font-normal border-amber-600'
-                    data-tip='Lock Question'
-                    aria-label='Lock Question'
-                    onClick={handleLockQuestion}
+          <div className='flex gap-2'>
+            {snap.run.activeItem &&
+              snap.run.activeItem.type === 'question' &&
+              snap.run.activeItem.phase === 'prompt' &&
+              typeof snap.run.activeItem.startTime === 'string' && (
+                <button
+                  className='btn btn-outline tooltip tooltip-neutral font-normal border-red-400'
+                  data-tip='Remove Timer'
+                  disabled={!isConnected}
+                  aria-label='Remove Timer'
+                  onClick={handleRemoveTimer}
+                >
+                  <svg
+                    xmlns='http://www.w3.org/2000/svg'
+                    viewBox='0 0 24 24'
+                    fill='currentColor'
+                    className='size-6 text-red-400'
                   >
-                    <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      viewBox='0 0 24 24'
-                      fill='currentColor'
-                      className='size-6 text-amber-600'
-                    >
-                      <path
-                        fill-rule='evenodd'
-                        d='M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z'
-                        clip-rule='evenodd'
-                      />
-                    </svg>
-                  </button>
-                )}
+                    <path d='M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-18-18ZM20.57 16.476c-.223.082-.448.161-.674.238L7.319 4.137A6.75 6.75 0 0 1 18.75 9v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206Z' />
+                    <path
+                      fillRule='evenodd'
+                      d='M5.25 9c0-.184.007-.366.022-.546l10.384 10.384a3.751 3.751 0 0 1-7.396-1.119 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </button>
+              )}
 
-              {snap.run.activeItem?.type === 'question' &&
-                snap.run.activeItem.phase !== 'reading' &&
-                snap.run.activeItem.locked && (
-                  <button
-                    className='btn btn-outline tooltip tooltip-neutral font-normal border-indigo-400'
-                    data-tip='Unlock Question'
-                    aria-label='Unlock Question'
-                    onClick={handleUnlockQuestion}
+            {snap.run.activeItem &&
+              snap.run.activeItem.type === 'question' &&
+              snap.run.activeItem.phase === 'prompt' && (
+                <button
+                  className='btn btn-outline tooltip tooltip-neutral font-normal border-sky-600'
+                  data-tip='Restart Timer'
+                  disabled={!isConnected}
+                  aria-label='Restart Timer'
+                  onClick={handleRestartTimer}
+                >
+                  <svg
+                    xmlns='http://www.w3.org/2000/svg'
+                    viewBox='0 0 24 24'
+                    fill='currentColor'
+                    className='size-6 text-sky-600'
                   >
-                    <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      viewBox='0 0 24 24'
-                      fill='currentColor'
-                      className='size-6 text-indigo-400'
-                    >
-                      <path d='M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 0 1-1.5 0V6.75a3.75 3.75 0 1 0-7.5 0v3a3 3 0 0 1 3 3v6.75a3 3 0 0 1-3 3H3.75a3 3 0 0 1-3-3v-6.75a3 3 0 0 1 3-3h9v-3c0-2.9 2.35-5.25 5.25-5.25Z' />
-                    </svg>
-                  </button>
-                )}
-            </div>
-          )}
+                    <path
+                      fillRule='evenodd'
+                      d='M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </button>
+              )}
 
-          {snap.connectionState === 'connected' && (
-            <div className='flex gap-2'>
-              {snap.run.activeItem &&
-                snap.run.activeItem.type === 'question' &&
-                snap.run.activeItem.phase === 'prompt' &&
-                typeof snap.run.activeItem.startTime === 'string' && (
-                  <button
-                    className='btn btn-outline tooltip tooltip-neutral font-normal border-red-400'
-                    data-tip='Remove Timer'
-                    aria-label='Remove Timer'
-                    onClick={handleRemoveTimer}
-                  >
-                    <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      viewBox='0 0 24 24'
-                      fill='currentColor'
-                      className='size-6 text-red-400'
-                    >
-                      <path d='M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-18-18ZM20.57 16.476c-.223.082-.448.161-.674.238L7.319 4.137A6.75 6.75 0 0 1 18.75 9v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206Z' />
-                      <path
-                        fillRule='evenodd'
-                        d='M5.25 9c0-.184.007-.366.022-.546l10.384 10.384a3.751 3.751 0 0 1-7.396-1.119 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z'
-                        clipRule='evenodd'
-                      />
-                    </svg>
-                  </button>
-                )}
-
-              {snap.run.activeItem &&
-                snap.run.activeItem.type === 'question' &&
-                snap.run.activeItem.phase === 'prompt' && (
-                  <button
-                    className='btn btn-outline tooltip tooltip-neutral font-normal border-sky-600'
-                    data-tip='Restart Timer'
-                    aria-label='Restart Timer'
-                    onClick={handleRestartTimer}
-                  >
-                    <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      viewBox='0 0 24 24'
-                      fill='currentColor'
-                      className='size-6 text-sky-600'
-                    >
-                      <path
-                        fillRule='evenodd'
-                        d='M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z'
-                        clipRule='evenodd'
-                      />
-                    </svg>
-                  </button>
-                )}
-
-              <button className='btn btn-accent' onClick={handleOpenPresenter}>
-                <Icon name='presentation-chart-bar' className='size-4' />
-                Presenter
-              </button>
-            </div>
-          )}
+            <button className='btn btn-accent' disabled={!isConnected} onClick={handleOpenPresenter}>
+              <Icon name='presentation-chart-bar' className='size-4' />
+              Presenter
+            </button>
+          </div>
         </footer>
       </div>
     </RunValtContext.Provider>

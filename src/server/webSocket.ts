@@ -119,6 +119,16 @@ export class WebSocketServer {
       return textNotFound('Event not found');
     }
 
+    // Initialize connection tracking if needed
+    if (!this.eventConnections.has(eventId)) {
+      await this.initializeEventConnection(eventId);
+    }
+
+    if (!this.eventConnections.has(eventId)) {
+      console.error('No event connection found for eventId', eventId);
+      return textBadRequest('No event connection found for eventId');
+    }
+
     if (role === 'host') {
       if (!session) {
         console.error('No session found for host connection', req.url);
@@ -157,6 +167,7 @@ export class WebSocketServer {
       }
 
       if (this.server?.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
+        console.log('Upgraded judge WebSocket connection', req.url);
         return;
       }
     } else if (role === 'presenter') {
@@ -225,17 +236,12 @@ export class WebSocketServer {
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
     const { eventId } = ws.data;
 
-    // Initialize connection tracking if needed
-    if (eventId && !this.eventConnections.has(eventId)) {
-      await this.initializeEventConnection(eventId);
-    }
+    const connection = this.eventConnections.get(eventId)!;
 
-    if (!this.eventConnections.has(eventId)) {
-      ws.close();
+    if (!connection) {
+      console.error('No event connection found for eventId', eventId, ws.data);
       return;
     }
-
-    const connection = this.eventConnections.get(eventId)!;
 
     if (this.isHostWebSocket(ws)) {
       connection.hosts.push(ws);
@@ -358,11 +364,14 @@ export class WebSocketServer {
       console.log('Host disconnected for event', eventId);
     } else if (role === 'judge') {
       connection.judges.delete(ws.data.session.user_id);
+      console.log('Judge disconnected for event', eventId);
     } else if (role === 'presenter') {
       connection.presenters = connection.presenters.filter((presenterWs) => presenterWs !== ws);
+      console.log('Presenter disconnected for event', eventId);
     } else {
       const { id, languageCode } = ws.data;
       const team = connection.teams.get(id)?.data;
+      console.log('Team disconnected for event', eventId, id);
 
       connection.teams.delete(id);
 
@@ -398,6 +407,7 @@ export class WebSocketServer {
       connection.judges.size === 0 &&
       connection.teams.size === 0
     ) {
+      console.log('Cleaning up event connection for eventId', eventId);
       this.eventConnections.delete(eventId);
     }
   };
@@ -510,6 +520,8 @@ export class WebSocketServer {
       `;
 
       if (languages.length > 0) {
+        console.log('Initializing event connection for eventId', eventId);
+
         this.eventConnections.set(eventId, {
           eventId,
           eventName: run.name,

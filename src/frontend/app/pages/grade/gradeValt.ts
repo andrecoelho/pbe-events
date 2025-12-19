@@ -86,7 +86,9 @@ export class GradeValt {
 
     this.store.initialized = true;
 
-    this.connect();
+    if (this.store.questions.length > 0) {
+      this.connect();
+    }
   };
 
   connect = () => {

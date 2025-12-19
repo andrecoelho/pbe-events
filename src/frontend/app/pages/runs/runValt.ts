@@ -226,7 +226,9 @@ export class RunValt {
 
     this.store.initialized = true;
 
-    this.connect();
+    if (response.questions.length > 0) {
+      this.connect();
+    }
 
     return { ok: true } as const;
   };
