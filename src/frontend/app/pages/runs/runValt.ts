@@ -372,12 +372,14 @@ export class RunValt {
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
     this.store.run.activeItem = activeItem;
 
-    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
-      for (const item of this.store.items) {
-        if (item.type === 'question' && item.id === activeItem.id && item.phase !== 'reading') {
-          item.locked = activeItem.locked;
-          item.graded = activeItem.graded;
-          item.answers = activeItem.answers;
+    if (activeItem) {
+      if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+        for (const item of this.store.items) {
+          if (item.type === 'question' && item.id === activeItem.id && item.phase !== 'reading') {
+            item.locked = activeItem.locked;
+            item.graded = activeItem.graded;
+            item.answers = activeItem.answers;
+          }
         }
       }
     }

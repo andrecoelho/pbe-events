@@ -199,12 +199,14 @@ export class GradeValt {
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
     this.store.activeItem = activeItem;
 
-    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
-      for (const item of this.store.questions) {
-        if (item.id === activeItem.id) {
-          item.locked = activeItem.locked;
-          item.graded = activeItem.graded;
-          item.answers = activeItem.answers;
+    if (activeItem) {
+      if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+        for (const item of this.store.questions) {
+          if (item.id === activeItem.id) {
+            item.locked = activeItem.locked;
+            item.graded = activeItem.graded;
+            item.answers = activeItem.answers;
+          }
         }
       }
     }
