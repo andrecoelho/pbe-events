@@ -27,8 +27,15 @@ export const TeamQuestionAnswer = () => {
         <h1 className='text-5xl uppercase text-center font-serif'>Question #{activeItem.number}</h1>
       </div>
       <h2 className='text-4xl font-serif font-semibold border-b border-accent pb-4'>Answer:</h2>
-      <div className='text-2xl font-serif'>
-        {translation.answer} {translation.clarification && <> ({translation.clarification})</>}
+      <div className='flex gap-2'>
+        <span className='text-2xl font-serif w-40 text-right'>Official:</span>
+        <span className='badge badge-lg bg-green-400'>
+          {translation.answer} {translation.clarification && <>({translation.clarification})</>}
+        </span>
+      </div>
+      <div className='flex gap-2'>
+        <span className='text-2xl font-serif w-40 text-right'>Your Answer:</span>
+        <span className='badge badge-lg badge-neutral'>{snap.answer}</span>
       </div>
     </div>
   );

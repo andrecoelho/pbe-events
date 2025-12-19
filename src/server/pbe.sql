@@ -76,6 +76,8 @@ CREATE TABLE questions (
   type TEXT NOT NULL CHECK (type IN ('PG', 'PS', 'TF', 'FB')),
   max_points INTEGER NOT NULL,
   seconds INTEGER NOT NULL,
+  locked BOOLEAN NOT NULL DEFAULT FALSE,
+  graded BOOLEAN NOT NULL DEFAULT FALSE,
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (event_id, number)
@@ -113,6 +115,7 @@ CREATE TABLE answers (
   answer TEXT NOT NULL,
   auto_points_awarded INTEGER,
   points_awarded INTEGER,
+  challenged BOOLEAN NOT NULL DEFAULT FALSE,
   question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   translation_id TEXT NOT NULL REFERENCES translations(id) ON DELETE CASCADE,

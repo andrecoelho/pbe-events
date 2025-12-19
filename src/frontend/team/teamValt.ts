@@ -98,7 +98,7 @@ export class TeamValt {
         this.store.activeItem = message.activeItem;
         this.store.answer = null;
 
-        if (message.activeItem?.type === 'question' && message.activeItem.phase === 'prompt') {
+        if (message.activeItem?.type === 'question' && message.activeItem.phase !== 'reading') {
           const savedAnswer = message.activeItem.answers[this.teamId];
 
           if (savedAnswer) {
