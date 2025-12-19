@@ -98,6 +98,14 @@ export class TeamValt {
         this.store.activeItem = message.activeItem;
         this.store.answer = null;
 
+        if (message.activeItem?.type === 'question' && message.activeItem.phase === 'prompt') {
+          const savedAnswer = message.activeItem.answers[this.teamId];
+
+          if (savedAnswer) {
+            this.store.answer = savedAnswer.answerText;
+          }
+        }
+
         // Check if grace period has expired
         if (
           message.activeItem?.type === 'question' &&
@@ -112,21 +120,13 @@ export class TeamValt {
         } else {
           this.store.isTimeUp = false;
         }
+
         break;
       case 'LANGUAGES':
         this.store.languages = message.languages;
         break;
       case 'GRACE_PERIOD':
         this.store.gracePeriod = message.gracePeriod;
-        break;
-      case 'SAVED_ANSWER':
-        if (
-          this.store.activeItem &&
-          this.store.activeItem.type === 'question' &&
-          this.store.activeItem.id === message.questionId
-        ) {
-          this.store.answer = message.answer;
-        }
         break;
     }
   };

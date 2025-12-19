@@ -24,7 +24,18 @@ export type ActiveItem =
       seconds: number;
       startTime: string | null;
       translations: Array<{ languageCode: string; prompt: string }>;
-      answers: Set<string> | null; // Set of teamIds that have answered
+      answers: Record<
+        string, // teamId
+        {
+          answerId: string | null;
+          answerText: string | null;
+          languageCode: string | null;
+          teamId: string;
+          teamNumber: number;
+          points: number | null;
+          autoPoints: number | null;
+        }
+      >;
     }
   | {
       type: 'question';

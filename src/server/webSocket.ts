@@ -8,6 +8,7 @@ import {
 } from '@/server/utils/responses';
 import type { ActiveItem } from '@/types';
 import { sql, type ServerWebSocket } from 'bun';
+import { pick } from 'lodash';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -334,11 +335,6 @@ export class WebSocketServer {
             })
           );
         }
-
-        // Send existing answer if active question and team has language
-        if (connection.activeItem && connection.activeItem.type === 'question' && ws.data.languageId) {
-          await this.sendExistingAnswerToTeam(ws, connection);
-        }
       }
     }
   };
@@ -525,7 +521,21 @@ export class WebSocketServer {
   }
 
   sendActiveItem(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
-    ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem }));
+    const activeItem = connection.activeItem;
+
+    if (ws.data.role === 'team' && activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+      const team = ws.data;
+      const answers = pick(activeItem.answers, team.id);
+
+      ws.send(
+        JSON.stringify({
+          type: 'ACTIVE_ITEM',
+          activeItem: { ...activeItem, answers }
+        })
+      );
+    } else {
+      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem }));
+    }
   }
 
   sendRunStatus(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
@@ -557,45 +567,6 @@ export class WebSocketServer {
 
   sendGracePeriod(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
     ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
-  }
-
-  private async sendExistingAnswerToTeam(
-    ws: ServerWebSocket<WebsocketData>,
-    connection: EventConnection
-  ): Promise<void> {
-    if (
-      !connection.activeItem ||
-      connection.activeItem.type !== 'question' ||
-      ws.data.role !== 'team' ||
-      !ws.data.languageId
-    ) {
-      return;
-    }
-
-    const { id, languageId } = ws.data;
-
-    try {
-      const answers: { question_id: string; answer: string }[] = await sql`
-        SELECT a.id, a.answer, a.question_id
-        FROM answers a
-        JOIN translations t ON t.id = a.translation_id
-        WHERE a.question_id = ${connection.activeItem.id}
-          AND a.team_id = ${id}
-          AND t.language_id = ${languageId}
-      `;
-
-      if (answers.length > 0) {
-        const answer = answers[0]!;
-
-        ws.send(
-          JSON.stringify({
-            type: 'SAVED_ANSWER',
-            questionId: answer.question_id,
-            answer: answer.answer
-          })
-        );
-      }
-    } catch {}
   }
 
   async broadcastToAllLanguageChannels(eventId: string, message: string): Promise<void> {
@@ -785,12 +756,17 @@ export class WebSocketServer {
       WHERE event_id = ${connection.eventId}
     `;
 
-    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
+    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
-    await this.broadcastToAllLanguageChannels(connection.eventId, message);
+
+    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+      connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
+    } else {
+      await this.broadcastToAllLanguageChannels(connection.eventId, message);
+    }
   }
 
   private async handleUPDATE_POINTS(

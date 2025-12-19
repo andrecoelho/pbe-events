@@ -163,7 +163,7 @@ export class RunValt {
         seconds: question.seconds,
         startTime: null,
         translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt })),
-        answers: null
+        answers: question.answers
       });
 
       items.push({
@@ -353,17 +353,43 @@ export class RunValt {
   private handleANSWER_RECEIVED = (message: AnswerReceivedMessage) => {
     const activeItem = this.store.run.activeItem;
 
+    const answerReceived = {
+      answerId: message.answerId,
+      answerText: message.answerText,
+      languageCode: message.languageCode,
+      teamId: message.teamId,
+      teamNumber: message.teamNumber,
+      points: null,
+      autoPoints: null
+    };
+
     if (
       activeItem &&
       activeItem.type === 'question' &&
       activeItem.phase === 'prompt' &&
       activeItem.id === message.questionId
     ) {
-      if (!activeItem.answers) {
-        activeItem.answers = new Set();
-      }
+      const answer = activeItem.answers[message.teamId];
 
-      activeItem.answers.add(message.teamId);
+      if (answer) {
+        answer.answerText = message.answerText;
+      } else {
+        activeItem.answers[message.teamId] = answerReceived;
+      }
+    }
+
+    const promptItem = this.store.items.find(
+      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
+    );
+
+    if (promptItem && promptItem.type === 'question' && promptItem.phase === 'answer') {
+      const answer = promptItem.answers[message.teamId];
+
+      if (answer) {
+        answer.answerText = message.answerText;
+      } else {
+        promptItem.answers[message.teamId] = answerReceived;
+      }
     }
 
     const answerItem = this.store.items.find(
@@ -376,15 +402,7 @@ export class RunValt {
       if (answer) {
         answer.answerText = message.answerText;
       } else {
-        answerItem.answers[message.teamId] = {
-          answerId: message.answerId,
-          answerText: message.answerText,
-          languageCode: message.languageCode,
-          teamId: message.teamId,
-          teamNumber: message.teamNumber,
-          points: null,
-          autoPoints: null
-        };
+        answerItem.answers[message.teamId] = answerReceived;
       }
     }
   };

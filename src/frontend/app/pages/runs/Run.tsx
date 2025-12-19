@@ -200,7 +200,7 @@ export const Run = () => {
 
                   const teamHasAnswer =
                     (isQuestion && activeItem.phase === 'answer' && activeItem.answers[teamId]?.answerText != null) ||
-                    (isQuestion && activeItem.phase === 'prompt' && activeItem.answers?.has(teamId));
+                    (isQuestion && activeItem.phase === 'prompt' && activeItem.answers[teamId]);
 
                   const isBadgeAllowed =
                     activeItem?.type === 'question' &&
