@@ -81,29 +81,6 @@ export const EventCard = memo((props: Props) => {
 
         {canEdit && (
           <div className='absolute top-2 left-6 flex gap-2'>
-            <button
-              className='tooltip tooltip-neutral'
-              data-tip='Duplicate'
-              onClick={handleDuplicateEvent}
-              aria-label={`Duplicate event ${props.event.name}`}
-            >
-              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75' />
-            </button>
-            {canDelete && (
-              <button
-                className='tooltip tooltip-neutral'
-                data-tip='Delete'
-                onClick={handleDeleteEvent}
-                aria-label={`Delete event ${props.event.name}`}
-              >
-                <Icon name='trash' className='text-error hover:brightness-75' />
-              </button>
-            )}
-          </div>
-        )}
-
-        {canEdit && (
-          <div className='absolute top-2 right-2 flex flex-col gap-2'>
             <a
               className='tooltip tooltip-neutral'
               data-tip='Permissions'
@@ -114,11 +91,11 @@ export const EventCard = memo((props: Props) => {
             </a>
             <a
               className='tooltip tooltip-neutral'
-              data-tip='Teams'
-              href={`/teams/${props.event.id}`}
-              aria-label={`Teams for event ${props.event.name}`}
+              data-tip='Intro Slides'
+              href={`/slides/${props.event.id}`}
+              aria-label={`Intro slides for event ${props.event.name}`}
             >
-              <Icon name='user-group' className='text-purple-500 hover:brightness-75' />
+              <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
             </a>
             <a
               className='tooltip tooltip-neutral'
@@ -138,12 +115,35 @@ export const EventCard = memo((props: Props) => {
             </a>
             <a
               className='tooltip tooltip-neutral'
-              data-tip='Intro Slides'
-              href={`/slides/${props.event.id}`}
-              aria-label={`Intro slides for event ${props.event.name}`}
+              data-tip='Teams'
+              href={`/teams/${props.event.id}`}
+              aria-label={`Teams for event ${props.event.name}`}
             >
-              <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
+              <Icon name='user-group' className='text-purple-500 hover:brightness-75' />
             </a>
+          </div>
+        )}
+
+        {canEdit && (
+          <div className='absolute top-2 right-2 flex flex-col gap-2'>
+            <button
+              className='tooltip tooltip-neutral'
+              data-tip='Duplicate'
+              onClick={handleDuplicateEvent}
+              aria-label={`Duplicate event ${props.event.name}`}
+            >
+              <Icon name='document-duplicate' className='text-sky-500 hover:brightness-75' />
+            </button>
+            {canDelete && (
+              <button
+                className='tooltip tooltip-neutral'
+                data-tip='Delete'
+                onClick={handleDeleteEvent}
+                aria-label={`Delete event ${props.event.name}`}
+              >
+                <Icon name='trash' className='text-error hover:brightness-75' />
+              </button>
+            )}
           </div>
         )}
 
