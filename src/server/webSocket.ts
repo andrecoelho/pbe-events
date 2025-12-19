@@ -437,7 +437,8 @@ export class WebSocketServer {
             __ACK__: string;
           }
         | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
-        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem; __ACK__: string };
+        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem; __ACK__: string }
+        | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string };
 
       ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
@@ -450,6 +451,9 @@ export class WebSocketServer {
           break;
         case 'SET_ACTIVE_ITEM':
           await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
+          break;
+        case 'SET_QUESTION_LOCK':
+          await this.handleSET_QUESTION_LOCK(connection, msg.questionId, msg.locked);
           break;
       }
     }
@@ -568,7 +572,7 @@ export class WebSocketServer {
     ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
   }
 
-  async broadcastToAllLanguageChannels(eventId: string, message: string): Promise<void> {
+  broadcastToAllLanguageChannels(eventId: string, message: string) {
     const eventLanguages = this.eventConnections.get(eventId)?.languages;
 
     if (eventLanguages) {
@@ -695,20 +699,7 @@ export class WebSocketServer {
       };
     }
 
-    // Notify
-    const message = JSON.stringify({
-      type: 'ANSWER_RECEIVED',
-      teamId: id,
-      teamNumber,
-      questionId: connection.activeItem.id,
-      translationId,
-      languageCode,
-      answerId: finalAnswerId,
-      answerText: answerText
-    });
-
-    this.server?.publish(`${connection.eventId}:hosts`, message);
-    this.server?.publish(`${connection.eventId}:judges`, message);
+    await this.handleSET_ACTIVE_ITEM(connection, activeItem);
   }
 
   private async handleSUBMIT_CHALLENGE(
@@ -719,7 +710,7 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       const answer = activeItem.answers[ws.data.id];
 
       if (answer) {
@@ -727,16 +718,7 @@ export class WebSocketServer {
 
         answer.challenged = challenged;
 
-        const message = JSON.stringify({
-          type: 'ANSWER_CHALLENGE',
-          questionId,
-          teamId: ws.data.id,
-          challenged
-        });
-
-        this.server?.publish(`${connection.eventId}:hosts`, message);
-        this.server?.publish(`${connection.eventId}:judges`, message);
-        ws.send(message);
+        await this.handleSET_ACTIVE_ITEM(connection, activeItem);
       }
     }
   }
@@ -762,7 +744,7 @@ export class WebSocketServer {
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
-    await this.broadcastToAllLanguageChannels(connection.eventId, message);
+    this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
@@ -778,17 +760,13 @@ export class WebSocketServer {
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
-    await this.broadcastToAllLanguageChannels(connection.eventId, message);
+    this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {
     connection.activeItem = activeItem;
 
-    await sql`
-      UPDATE runs
-      SET active_item = ${activeItem}::jsonb
-      WHERE event_id = ${connection.eventId}
-    `;
+    await sql`UPDATE runs SET active_item = ${connection.activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
 
     const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
 
@@ -799,7 +777,22 @@ export class WebSocketServer {
     if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
       connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
     } else {
-      await this.broadcastToAllLanguageChannels(connection.eventId, message);
+      this.broadcastToAllLanguageChannels(connection.eventId, message);
+    }
+  }
+
+  private async handleSET_QUESTION_LOCK(
+    connection: EventConnection,
+    questionId: string,
+    locked: boolean
+  ): Promise<void> {
+    const activeItem = connection.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
+      activeItem.locked = locked;
+
+      await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
+      await this.handleSET_ACTIVE_ITEM(connection, activeItem);
     }
   }
 
@@ -821,15 +814,16 @@ export class WebSocketServer {
       return;
     }
 
-    const message = JSON.stringify({
-      type: 'POINTS_UPDATED',
-      answerId,
-      questionId: answer.question_id,
-      teamId: answer.team_id,
-      points
-    });
+    const activeItem = connection.activeItem;
 
-    this.server?.publish(`${connection.eventId}:hosts`, message);
-    this.server?.publish(`${connection.eventId}:judges`, message);
+    if (activeItem) {
+      const activeAnswer =
+        activeItem.type === 'question' && activeItem.phase !== 'reading' ? activeItem.answers[answer.team_id] : null;
+
+      if (activeAnswer) {
+        activeAnswer.points = points;
+        await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+      }
+    }
   }
 }

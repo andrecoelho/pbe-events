@@ -10,6 +10,8 @@ export const QuestionAnswer = ({
     id: string;
     number: number;
     phase: 'answer';
+    locked: boolean;
+    graded: boolean;
     translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
   }>;
   languages: Snapshot<Record<string, { id: string; code: string; name: string }>>;

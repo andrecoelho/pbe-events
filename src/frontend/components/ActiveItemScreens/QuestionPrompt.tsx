@@ -13,13 +13,15 @@ export const QuestionPrompt = ({
     maxPoints: number;
     phase: 'prompt';
     seconds: number;
+    locked: boolean;
+    graded: boolean;
     startTime: string | null;
     translations: Array<{ languageCode: string; prompt: string }>;
   }>;
 }) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
-      <QuestionTimer active startTime={item.startTime} seconds={item.seconds} />
+      <QuestionTimer active locked={item.locked} startTime={item.startTime} seconds={item.seconds} />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />
         <h1 className='text-5xl uppercase text-center font-serif'>Question #{item.number}</h1>

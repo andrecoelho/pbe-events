@@ -113,11 +113,10 @@ export const Grade = () => {
     handleClearPoints,
     handleReconnect
   } = useMemo(init, []);
+
   const snap = useSnapshot(gradeValt.store, { sync: true });
 
-  const selectedQuestion = snap.selectedQuestionId
-    ? snap.questions.find((q) => q.id === snap.selectedQuestionId) || null
-    : null;
+  const selectedQuestion = snap.selectedQuestion;
 
   const runStatusConfig = {
     not_started: { label: 'Not Started', color: 'badge-neutral' },
@@ -127,6 +126,7 @@ export const Grade = () => {
   };
 
   const statusInfo = runStatusConfig[snap.runStatus] || { label: snap.runStatus, color: 'badge-neutral' };
+  const editDisabled = snap.connectionState !== 'connected' || !selectedQuestion?.locked;
 
   useEffect(() => gradeValt.cleanup, [gradeValt]);
 
@@ -142,21 +142,21 @@ export const Grade = () => {
           <div className='flex-none flex flex-col flex-wrap gap-1 p-2'>
             {snap.questions.map((question) => {
               const isActive = snap.activeItem?.type === 'question' && snap.activeItem.id === question.id;
-              const isSelected = snap.selectedQuestionId === question.id;
+              const isSelected = snap.selectedQuestion?.id === question.id;
 
               return (
                 <div
                   key={question.id}
                   tabIndex={0}
                   className={`question-badge ${
-                    isSelected && isActive
-                      ? 'question-badge--active-selected'
-                      : isSelected
-                      ? 'question-badge--selected'
+                    question.locked && isActive
+                      ? 'question-badge--active-locked'
                       : isActive
                       ? 'question-badge--active'
+                      : question.locked
+                      ? 'question-badge--locked'
                       : ''
-                  }`}
+                  } ${isSelected ? 'question-badge--selected' : ''}`}
                   data-question-id={question.id}
                   onClick={handleSelectQuestion}
                 >
@@ -214,7 +214,7 @@ export const Grade = () => {
                 </fieldset>
               ))}
 
-              <div className={`mt-4 ${snap.connectionState !== 'connected' ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className={`mt-4 ${editDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
                 <h3 className='text-lg font-semibold mb-2'>Team Answers</h3>
                 <table className='table table-zebra w-full'>
                   <thead>
@@ -241,7 +241,7 @@ export const Grade = () => {
                               xmlns='http://www.w3.org/2000/svg'
                               viewBox='0 0 24 24'
                               fill='currentColor'
-                              className='size-6 text-error'
+                              className='size-6 text-error inline'
                             >
                               <path
                                 fillRule='evenodd'
@@ -261,7 +261,7 @@ export const Grade = () => {
                           {answer.answerId && (
                             <input
                               type='number'
-                              disabled={snap.connectionState !== 'connected'}
+                              disabled={editDisabled}
                               className='input input-sm input-bordered w-20 font-mono text-base'
                               value={answer.points ?? ''}
                               data-team-id={answer.teamId}
@@ -279,7 +279,7 @@ export const Grade = () => {
                               data-tip='Mark Answer as Correct'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
-                              disabled={snap.connectionState !== 'connected'}
+                              disabled={editDisabled}
                               onClick={handleGiveMaxPoints}
                               aria-label='Mark Answer as Correct'
                             >
@@ -295,7 +295,7 @@ export const Grade = () => {
                               data-tip='Mark Answer as Incorrect'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
-                              disabled={snap.connectionState !== 'connected'}
+                              disabled={editDisabled}
                               onClick={handleGiveZeroPoints}
                               aria-label='Mark Answer as Incorrect'
                             >
@@ -311,7 +311,7 @@ export const Grade = () => {
                               data-tip='Clear Points'
                               data-team-id={answer.teamId}
                               data-question-id={selectedQuestion.id}
-                              disabled={snap.connectionState !== 'connected'}
+                              disabled={editDisabled}
                               onClick={handleClearPoints}
                               aria-label='Clear Points'
                             >

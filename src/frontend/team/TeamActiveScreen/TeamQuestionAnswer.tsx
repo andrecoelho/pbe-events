@@ -44,7 +44,7 @@ export const TeamQuestionAnswer = () => {
         <span className='badge badge-lg bg-green-400'>
           {translation.answer} {translation.clarification && <>({translation.clarification})</>}
         </span>
-        {!answer.challenged && <button className='btn btn-error ml-auto' onClick={handleChallengeClick}>
+        {!activeItem.locked && !answer.challenged && <button className='btn btn-error ml-auto' onClick={handleChallengeClick}>
           <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor' className='size-6 text-base-100'>
             <path
               fillRule='evenodd'
@@ -54,7 +54,7 @@ export const TeamQuestionAnswer = () => {
           </svg>
           Challenge Question
         </button>}
-        {answer.challenged && <button className='btn btn-success ml-auto' onClick={handleClearChallengeClick}>
+        {!activeItem.locked && answer.challenged && <button className='btn btn-success ml-auto' onClick={handleClearChallengeClick}>
           <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor' className='size-6 text-base-100'>
             <path
               fillRule='evenodd'

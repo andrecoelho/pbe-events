@@ -46,12 +46,17 @@ export const GeneralAnswer = () => {
     }
   }, 1000);
 
+  const activeItem = snap.activeItem;
+
+  const disabled =
+    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+
   return (
-    <div className={`card bg-base-100 text-base-content ${snap.isTimeUp ? 'opacity-50' : ''}`}>
+    <div className={`card bg-base-100 text-base-content ${disabled ? 'opacity-50' : ''}`}>
       <textarea
         ref={textareaRef}
         className='w-full h-16 p-2 border rounded'
-        disabled={snap.isTimeUp}
+        disabled={disabled}
         placeholder='Type your answer here...'
         onChange={handleAnswerChange}
         defaultValue={typeof snap.answer === 'string' ? snap.answer : ''}
@@ -99,14 +104,19 @@ export const TrueFalseAnswer = () => {
     }
   };
 
+  const activeItem = snap.activeItem;
+
+  const disabled =
+    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+
   return (
     <div className='text-center'>
       <div className='flex gap-8 justify-center'>
         <button
           ref={trueButtonRef}
-          disabled={snap.isTimeUp}
+          disabled={disabled}
           className={`h-30 w-60 rounded-2xl text-4xl shadow-md ${
-            snap.isTimeUp ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
+            disabled ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
           } ${answer === true ? 'bg-success' : 'bg-neutral'}`}
           onClick={handleAnswerTrue}
         >
@@ -114,9 +124,9 @@ export const TrueFalseAnswer = () => {
         </button>
         <button
           className={`h-30 w-60 rounded-2xl text-4xl shadow-md ${
-            snap.isTimeUp ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
+            disabled ? 'opacity-70' : 'cursor-pointer hover:brightness-90'
           } ${answer === false ? 'bg-error' : 'bg-neutral'}`}
-          disabled={snap.isTimeUp}
+          disabled={disabled}
           onClick={handleAnswerFalse}
         >
           False
@@ -184,6 +194,11 @@ export const FillInTheBlankAnswer = ({
     }
   }, 500);
 
+  const activeItem = snap.activeItem;
+
+  const disabled =
+    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+
   return (
     <div className='text-2xl font-serif leading-loose'>
       <span className='text-base-100'>({maxPoints} pts.) &nbsp;</span>
@@ -198,11 +213,9 @@ export const FillInTheBlankAnswer = ({
             ref={(el) => {
               inputRefs.current[part.index!] = el;
             }}
-            disabled={snap.isTimeUp}
+            disabled={disabled}
             type='text'
-            className={`input input-bordered input-sm mx-1 w-40 inline-block text-xl ${
-              snap.isTimeUp ? 'opacity-50' : ''
-            }`}
+            className={`input input-bordered input-sm mx-1 w-40 inline-block text-xl ${disabled ? 'opacity-50' : ''}`}
             defaultValue={savedAnswers[part.index!] || ''}
             onChange={handleInputChange}
           />
@@ -229,6 +242,7 @@ export const TeamQuestionPrompt = () => {
     <div className='absolute inset-0 flex flex-col gap-8 px-10'>
       <QuestionTimer
         active
+        locked={activeItem.locked}
         seconds={activeItem.seconds}
         startTime={activeItem.startTime}
         gracePeriod={snap.gracePeriod}

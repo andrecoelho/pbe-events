@@ -8,6 +8,8 @@ export interface Question {
   type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
+  locked: boolean;
+  graded: boolean;
   translations: {
     languageCode: string;
     languageName: string;
@@ -25,7 +27,7 @@ export interface Question {
       teamNumber: number;
       points: number | null;
       autoPoints: number | null;
-      challenged: boolean;
+      challenged: boolean | null;
     }
   >;
 }
@@ -38,24 +40,12 @@ interface GradeStore {
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
   activeItem: ActiveItem | null;
   questions: Question[];
-  selectedQuestionId?: string;
+  selectedQuestion?: Question;
 }
 
 type WebSocketGradeMessage =
   | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
-  | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
-  | {
-      type: 'ANSWER_RECEIVED';
-      teamId: string;
-      teamNumber: number;
-      questionId: string;
-      translationId: string;
-      languageCode: string;
-      answerId: string;
-      answerText: string;
-    }
-  | { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean }
-  | { type: 'POINTS_UPDATED'; answerId: string; questionId: string; teamId: string; points: number | null };
+  | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem };
 
 export class GradeValt {
   private ws: WebSocketManager<WebSocketGradeMessage> | null = null;
@@ -79,7 +69,11 @@ export class GradeValt {
 
     // Fetch questions and answers from the API
     const response = await fetch(`/api/events/${eventId}/answers`);
-    const data = await response.json();
+
+    const data = (await response.json()) as {
+      eventName?: string;
+      questions: Question[];
+    };
 
     if (data.eventName) {
       this.store.eventName = data.eventName;
@@ -87,7 +81,7 @@ export class GradeValt {
 
     if (data.questions) {
       this.store.questions = data.questions;
-      this.store.selectedQuestionId = data.questions.length > 0 ? data.questions[0].id : undefined;
+      this.store.selectedQuestion = data.questions.length > 0 ? data.questions[0] : undefined;
     }
 
     this.store.initialized = true;
@@ -123,78 +117,28 @@ export class GradeValt {
         this.store.runStatus = message.status;
         break;
       case 'ACTIVE_ITEM':
-        this.store.activeItem = message.activeItem;
+        this.handleSET_ACTIVE_ITEM(message.activeItem);
         break;
-      case 'ANSWER_RECEIVED': {
-        const question = this.store.questions.find((q) => q.id === message.questionId);
-
-        if (question) {
-          const answer = question.answers[message.answerId];
-
-          if (answer) {
-            answer.answerText = message.answerText;
-          } else {
-            question.answers[message.teamId] = {
-              answerId: message.answerId,
-              answerText: message.answerText,
-              languageCode: message.languageCode,
-              teamId: message.teamId,
-              teamNumber: message.teamNumber,
-              challenged: false,
-              points: null,
-              autoPoints: null
-            };
-          }
-        }
-
-        break;
-      }
-      case 'ANSWER_CHALLENGE': {
-        const question = this.store.questions.find((q) => q.id === message.questionId);
-
-        if (question) {
-          const answer = question.answers[message.teamId];
-
-          if (answer) {
-            answer.challenged = message.challenged;
-          }
-        }
-
-        break;
-      }
-      case 'POINTS_UPDATED': {
-        const question = this.store.questions.find((q) => q.id === message.questionId);
-
-        if (question) {
-          const answer = question.answers[message.teamId];
-
-          if (answer && answer.answerId === message.answerId && answer.points !== message.points) {
-            answer.points = message.points;
-          }
-        }
-
-        break;
-      }
     }
   };
 
   selectQuestion = (questionId: string) => {
-    this.store.selectedQuestionId = questionId;
+    this.store.selectedQuestion = this.store.questions.find((q) => q.id === questionId);
   };
 
   selectNextQuestion = () => {
-    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestionId);
+    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestion?.id);
 
     if (currentIndex >= 0 && currentIndex < this.store.questions.length - 1) {
-      this.store.selectedQuestionId = this.store.questions[currentIndex + 1]!.id;
+      this.store.selectedQuestion = this.store.questions[currentIndex + 1];
     }
   };
 
   selectPreviousQuestion = () => {
-    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestionId);
+    const currentIndex = this.store.questions.findIndex((q) => q.id === this.store.selectedQuestion?.id);
 
     if (currentIndex > 0) {
-      this.store.selectedQuestionId = this.store.questions[currentIndex - 1]!.id;
+      this.store.selectedQuestion = this.store.questions[currentIndex - 1];
     }
   };
 
@@ -239,5 +183,19 @@ export class GradeValt {
 
   notifyPointsUpdated = async (questionId: string, answerId: string, points: number | null) => {
     return await this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points });
+  };
+
+  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
+    this.store.activeItem = activeItem;
+
+    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+      for (const item of this.store.questions) {
+        if (item.id === activeItem.id) {
+          item.locked = activeItem.locked;
+          item.graded = activeItem.graded;
+          item.answers = activeItem.answers;
+        }
+      }
+    }
   };
 }

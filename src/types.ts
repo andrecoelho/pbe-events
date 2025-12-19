@@ -22,6 +22,8 @@ export type ActiveItem =
       maxPoints: number;
       phase: 'prompt';
       seconds: number;
+      locked: boolean;
+      graded: boolean;
       startTime: string | null;
       translations: Array<{ languageCode: string; prompt: string }>;
       answers: Record<
@@ -43,6 +45,8 @@ export type ActiveItem =
       id: string;
       number: number;
       phase: 'answer';
+      locked: boolean;
+      graded: boolean;
       translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
       answers: Record<
         string, // teamId

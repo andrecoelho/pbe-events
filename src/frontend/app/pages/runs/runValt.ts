@@ -1,5 +1,6 @@
 import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
+import { omit } from 'lodash';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -16,6 +17,8 @@ export interface Question {
   type: 'PG' | 'PS' | 'TF' | 'FB';
   maxPoints: number;
   seconds: number;
+  locked: boolean;
+  graded: boolean;
   translations: {
     languageCode: string;
     languageName: string;
@@ -79,7 +82,9 @@ type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
   | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
   | AnswerReceivedMessage
-  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean });
+  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean })
+  | (WebSocketMessage & { type: 'QUESTION_LOCK'; questionId: string; locked: boolean })
+  | (WebSocketMessage & { type: 'QUESTION_GRADE'; questionId: string; graded: boolean });
 
 export class RunValt {
   store: RunStore;
@@ -165,6 +170,8 @@ export class RunValt {
         phase: 'prompt',
         seconds: question.seconds,
         startTime: null,
+        locked: question.locked,
+        graded: question.graded,
         translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt })),
         answers: question.answers
       });
@@ -174,6 +181,8 @@ export class RunValt {
         id: question.id,
         number: question.number,
         phase: 'answer',
+        locked: question.locked,
+        graded: question.graded,
         translations: question.translations.map((t) => ({
           languageCode: t.languageCode,
           answer: t.answer,
@@ -247,16 +256,10 @@ export class RunValt {
         this.store.run.status = message.status;
         break;
       case 'ACTIVE_ITEM':
-        this.store.run.activeItem = message.activeItem;
+        this.handleSET_ACTIVE_ITEM(message.activeItem);
         break;
       case 'TEAM_STATUS':
         this.handleTEAM_STATUS(message.teams);
-        break;
-      case 'ANSWER_RECEIVED':
-        this.handleANSWER_RECEIVED(message);
-        break;
-      case 'ANSWER_CHALLENGE':
-        this.handleANSWER_CHALLENGE(message);
         break;
     }
   };
@@ -291,7 +294,7 @@ export class RunValt {
   };
 
   updateGracePeriod = async (gracePeriod: number) => {
-    this.ws?.sendMessage({
+    await this.ws?.sendMessage({
       type: 'UPDATE_GRACE_PERIOD',
       gracePeriod
     });
@@ -301,7 +304,13 @@ export class RunValt {
     return { ok: true } as const;
   };
 
-  next = () => {
+  next = async () => {
+    const currentItem = this.store.items[this.store.currentIndex];
+
+    if (currentItem?.type === 'question' && currentItem.phase === 'answer') {
+      await this.lockQuestion(currentItem.id, true);
+    }
+
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
 
@@ -312,7 +321,7 @@ export class RunValt {
         nextItem.startTime = new Date().toISOString();
       }
 
-      this.ws?.sendMessage({
+      await this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
         activeItem: nextItem
       });
@@ -333,10 +342,14 @@ export class RunValt {
   };
 
   removeTimer = () => {
-    this.ws?.sendMessage({
-      type: 'SET_ACTIVE_ITEM',
-      activeItem: this.store.items[this.store.currentIndex]
-    });
+    const activeItem = this.store.run.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
+      this.ws?.sendMessage({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: { ...activeItem, startTime: null }
+      });
+    }
   };
 
   restartTimer = () => {
@@ -350,108 +363,31 @@ export class RunValt {
     }
   };
 
+  lockQuestion = async (questionId: string, locked: boolean) => {
+    await this.ws?.sendMessage({
+      type: 'SET_QUESTION_LOCK',
+      questionId,
+      locked
+    });
+  };
+
+  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
+    this.store.run.activeItem = activeItem;
+
+    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+      for (const item of this.store.items) {
+        if (item.type === 'question' && item.id === activeItem.id && item.phase !== 'reading') {
+          item.locked = activeItem.locked;
+          item.graded = activeItem.graded;
+          item.answers = activeItem.answers;
+        }
+      }
+    }
+  };
+
   private handleTEAM_STATUS = (teams: TeamStatus[]) => {
     for (const team of teams) {
       this.store.teams[team.id] = team;
-    }
-  };
-
-  private handleANSWER_RECEIVED = (message: AnswerReceivedMessage) => {
-    const answerReceived = {
-      answerId: message.answerId,
-      answerText: message.answerText,
-      languageCode: message.languageCode,
-      teamId: message.teamId,
-      teamNumber: message.teamNumber,
-      points: null,
-      autoPoints: null,
-      challenged: message.challenged
-    };
-
-    const activeItem = this.store.run.activeItem;
-
-    if (
-      activeItem &&
-      activeItem.type === 'question' &&
-      activeItem.phase === 'prompt' &&
-      activeItem.id === message.questionId
-    ) {
-      const answer = activeItem.answers[message.teamId];
-
-      if (answer) {
-        answer.answerText = message.answerText;
-      } else {
-        activeItem.answers[message.teamId] = answerReceived;
-      }
-    }
-
-    const promptItem = this.store.items.find(
-      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
-    );
-
-    if (promptItem && promptItem.type === 'question' && promptItem.phase === 'answer') {
-      const answer = promptItem.answers[message.teamId];
-
-      if (answer) {
-        answer.answerText = message.answerText;
-      } else {
-        promptItem.answers[message.teamId] = answerReceived;
-      }
-    }
-
-    const answerItem = this.store.items.find(
-      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
-    );
-
-    if (answerItem && answerItem.type === 'question' && answerItem.phase === 'answer') {
-      const answer = answerItem.answers[message.teamId];
-
-      if (answer) {
-        answer.answerText = message.answerText;
-      } else {
-        answerItem.answers[message.teamId] = answerReceived;
-      }
-    }
-  };
-
-  private handleANSWER_CHALLENGE = (message: { questionId: string; teamId: string; challenged: boolean }) => {
-    const activeItem = this.store.run.activeItem;
-
-    if (
-      activeItem &&
-      activeItem.type === 'question' &&
-      activeItem.phase === 'answer' &&
-      activeItem.id === message.questionId
-    ) {
-      const answer = activeItem.answers[message.teamId];
-
-      if (answer) {
-        answer.challenged = message.challenged;
-      }
-    }
-
-    const promptItem = this.store.items.find(
-      (item) => item.type === 'question' && item.phase === 'prompt' && item.id === message.questionId
-    );
-
-    if (promptItem && promptItem.type === 'question' && promptItem.phase === 'prompt') {
-      const answer = promptItem.answers[message.teamId];
-
-      if (answer) {
-        answer.challenged = message.challenged;
-      }
-    }
-
-    const answerItem = this.store.items.find(
-      (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
-    );
-
-    if (answerItem && answerItem.type === 'question' && answerItem.phase === 'answer') {
-      const answer = answerItem.answers[message.teamId];
-
-      if (answer) {
-        answer.challenged = message.challenged;
-      }
     }
   };
 }

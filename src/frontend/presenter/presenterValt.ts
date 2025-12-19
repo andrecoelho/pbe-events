@@ -13,8 +13,7 @@ interface PresenterStore {
 type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
-  | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> })
-  | (WebSocketMessage & { type: 'ANSWER_RECEIVED'; teamId: string });
+  | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> });
 
 export class PresenterValt {
   store: PresenterStore;

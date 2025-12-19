@@ -122,17 +122,6 @@ export class TeamValt {
         }
 
         break;
-      case 'ANSWER_CHALLENGE':
-        const activeItem = this.store.activeItem;
-
-        if (activeItem?.type === 'question' && activeItem.phase === 'answer') {
-          const answer = activeItem.answers[this.teamId];
-
-          if (answer) {
-            answer.challenged = message.challenged;
-          }
-        }
-        break;
       case 'LANGUAGES':
         this.store.languages = message.languages;
         break;

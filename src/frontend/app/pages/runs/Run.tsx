@@ -65,6 +65,22 @@ const init = () => {
     valt.next();
   };
 
+  const handleLockQuestion = async () => {
+    const activeItem = valt.store.run.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+      valt.lockQuestion(activeItem.id, true);
+    }
+  };
+
+  const handleUnlockQuestion = async () => {
+    const activeItem = valt.store.run.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+      valt.lockQuestion(activeItem.id, false);
+    }
+  };
+
   const handleRemoveTimer = async () => {
     valt.removeTimer();
   };
@@ -98,6 +114,8 @@ const init = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
+    handleLockQuestion,
+    handleUnlockQuestion,
     handleRemoveTimer,
     handleRestartTimer,
     handleOpenPresenter,
@@ -116,6 +134,8 @@ export const Run = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
+    handleLockQuestion,
+    handleUnlockQuestion,
     handleRemoveTimer,
     handleRestartTimer,
     handleOpenPresenter,
@@ -366,6 +386,50 @@ export const Run = () => {
                   <Icon name='chevron-right' className='size-4' />
                 </button>
               )}
+
+              {snap.run.activeItem?.type === 'question' &&
+                snap.run.activeItem.phase !== 'reading' &&
+                !snap.run.activeItem.locked && (
+                  <button
+                    className='btn btn-outline tooltip tooltip-neutral font-normal border-amber-600'
+                    data-tip='Lock Question'
+                    aria-label='Lock Question'
+                    onClick={handleLockQuestion}
+                  >
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='currentColor'
+                      className='size-6 text-amber-600'
+                    >
+                      <path
+                        fill-rule='evenodd'
+                        d='M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z'
+                        clip-rule='evenodd'
+                      />
+                    </svg>
+                  </button>
+                )}
+
+              {snap.run.activeItem?.type === 'question' &&
+                snap.run.activeItem.phase !== 'reading' &&
+                snap.run.activeItem.locked && (
+                  <button
+                    className='btn btn-outline tooltip tooltip-neutral font-normal border-indigo-400'
+                    data-tip='Unlock Question'
+                    aria-label='Unlock Question'
+                    onClick={handleUnlockQuestion}
+                  >
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='currentColor'
+                      className='size-6 text-indigo-400'
+                    >
+                      <path d='M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 0 1-1.5 0V6.75a3.75 3.75 0 1 0-7.5 0v3a3 3 0 0 1 3 3v6.75a3 3 0 0 1-3 3H3.75a3 3 0 0 1-3-3v-6.75a3 3 0 0 1 3-3h9v-3c0-2.9 2.35-5.25 5.25-5.25Z' />
+                    </svg>
+                  </button>
+                )}
             </div>
           )}
 
@@ -385,7 +449,7 @@ export const Run = () => {
                       xmlns='http://www.w3.org/2000/svg'
                       viewBox='0 0 24 24'
                       fill='currentColor'
-                      className='size-5 text-red-400'
+                      className='size-6 text-red-400'
                     >
                       <path d='M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-18-18ZM20.57 16.476c-.223.082-.448.161-.674.238L7.319 4.137A6.75 6.75 0 0 1 18.75 9v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206Z' />
                       <path
@@ -410,7 +474,7 @@ export const Run = () => {
                       xmlns='http://www.w3.org/2000/svg'
                       viewBox='0 0 24 24'
                       fill='currentColor'
-                      className='size-5 text-sky-600'
+                      className='size-6 text-sky-600'
                     >
                       <path
                         fillRule='evenodd'

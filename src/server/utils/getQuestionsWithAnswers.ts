@@ -8,6 +8,8 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
     type: 'PG' | 'PS' | 'TF' | 'FB';
     max_points: number;
     seconds: number;
+    locked: boolean;
+    graded: boolean;
     translation_id: string;
     language_code: string;
     language_name: string;
@@ -21,6 +23,8 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
             q.type,
             q.max_points,
             q.seconds,
+            q.locked,
+            q.graded,
             tr.id as translation_id,
             l.code as language_code,
             l.name as language_name,
@@ -76,6 +80,8 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
       type: 'PG' | 'PS' | 'TF' | 'FB';
       maxPoints: number;
       seconds: number;
+      locked: boolean;
+      graded: boolean;
       translations: {
         languageCode: string;
         languageName: string;
@@ -108,6 +114,8 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
         type: row.type,
         maxPoints: row.max_points,
         seconds: row.seconds,
+        locked: row.locked,
+        graded: row.graded,
         translations: [],
         answers: {}
       });
