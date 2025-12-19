@@ -317,7 +317,7 @@ export class RunValt {
       const nextItem = { ...this.store.items[this.store.currentIndex]! };
 
       // For questions, update the startTime to current time
-      if (nextItem.type === 'question' && nextItem.phase === 'prompt') {
+      if (nextItem.type === 'question' && nextItem.phase === 'prompt' && !nextItem.locked) {
         nextItem.startTime = new Date().toISOString();
       }
 
