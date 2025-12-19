@@ -24,6 +24,7 @@ export type ActiveItem =
       seconds: number;
       startTime: string | null;
       translations: Array<{ languageCode: string; prompt: string }>;
+      answers: Set<string> | null; // Set of teamIds that have answered
     }
   | {
       type: 'question';

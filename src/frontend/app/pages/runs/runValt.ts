@@ -162,7 +162,8 @@ export class RunValt {
         phase: 'prompt',
         seconds: question.seconds,
         startTime: null,
-        translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt }))
+        translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt })),
+        answers: null
       });
 
       items.push({
@@ -298,26 +299,17 @@ export class RunValt {
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
 
-      const nextItem = this.store.items[this.store.currentIndex]!;
+      const nextItem = { ...this.store.items[this.store.currentIndex]! };
 
       // For questions, update the startTime to current time
-      if (nextItem.type === 'question') {
-        const updatedItem = { ...nextItem };
-
-        if (updatedItem.phase === 'prompt') {
-          updatedItem.startTime = new Date().toISOString();
-        }
-
-        this.ws?.sendMessage({
-          type: 'SET_ACTIVE_ITEM',
-          activeItem: updatedItem
-        });
-      } else {
-        this.ws?.sendMessage({
-          type: 'SET_ACTIVE_ITEM',
-          activeItem: nextItem
-        });
+      if (nextItem.type === 'question' && nextItem.phase === 'prompt') {
+        nextItem.startTime = new Date().toISOString();
       }
+
+      this.ws?.sendMessage({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: nextItem
+      });
     }
   };
 
@@ -325,7 +317,7 @@ export class RunValt {
     if (this.store.currentIndex > 0) {
       this.store.currentIndex--;
 
-      const prevItem = this.store.items[this.store.currentIndex]!;
+      const prevItem = { ...this.store.items[this.store.currentIndex]! };
 
       this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
@@ -342,10 +334,14 @@ export class RunValt {
   };
 
   restartTimer = () => {
-    this.ws?.sendMessage({
-      type: 'SET_ACTIVE_ITEM',
-      activeItem: { ...this.store.items[this.store.currentIndex], startTime: new Date().toISOString() }
-    });
+    const item = this.store.items[this.store.currentIndex];
+
+    if (item && item.type === 'question' && item.phase === 'prompt') {
+      this.ws?.sendMessage({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: { ...item, startTime: new Date().toISOString() }
+      });
+    }
   };
 
   private handleTEAM_STATUS = (teams: TeamStatus[]) => {
@@ -355,17 +351,32 @@ export class RunValt {
   };
 
   private handleANSWER_RECEIVED = (message: AnswerReceivedMessage) => {
-    const item = this.store.items.find(
+    const activeItem = this.store.run.activeItem;
+
+    if (
+      activeItem &&
+      activeItem.type === 'question' &&
+      activeItem.phase === 'prompt' &&
+      activeItem.id === message.questionId
+    ) {
+      if (!activeItem.answers) {
+        activeItem.answers = new Set();
+      }
+
+      activeItem.answers.add(message.teamId);
+    }
+
+    const answerItem = this.store.items.find(
       (item) => item.type === 'question' && item.phase === 'answer' && item.id === message.questionId
     );
 
-    if (item && item.type === 'question' && item.phase === 'answer') {
-      const answer = item.answers[message.teamId];
+    if (answerItem && answerItem.type === 'question' && answerItem.phase === 'answer') {
+      const answer = answerItem.answers[message.teamId];
 
       if (answer) {
         answer.answerText = message.answerText;
       } else {
-        item.answers[message.teamId] = {
+        answerItem.answers[message.teamId] = {
           answerId: message.answerId,
           answerText: message.answerText,
           languageCode: message.languageCode,
