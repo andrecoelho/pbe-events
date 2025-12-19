@@ -334,10 +334,17 @@ export class RunValt {
     }
   };
 
-  disableTimer = () => {
+  removeTimer = () => {
     this.ws?.sendMessage({
       type: 'SET_ACTIVE_ITEM',
       activeItem: this.store.items[this.store.currentIndex]
+    });
+  };
+
+  restartTimer = () => {
+    this.ws?.sendMessage({
+      type: 'SET_ACTIVE_ITEM',
+      activeItem: { ...this.store.items[this.store.currentIndex], startTime: new Date().toISOString() }
     });
   };
 

@@ -65,8 +65,12 @@ const init = () => {
     valt.next();
   };
 
-  const handleDisableTimer = async () => {
-    valt.disableTimer();
+  const handleRemoveTimer = async () => {
+    valt.removeTimer();
+  };
+
+  const handleRestartTimer = async () => {
+    valt.restartTimer();
   };
 
   const handleUpdateGracePeriod = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +98,8 @@ const init = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
-    handleDisableTimer,
+    handleRemoveTimer,
+    handleRestartTimer,
     handleOpenPresenter,
     handleUpdateGracePeriod,
     handleReconnect
@@ -111,7 +116,8 @@ export const Run = () => {
     handleResetEvent,
     handlePreviousEvent,
     handleNextEvent,
-    handleDisableTimer,
+    handleRemoveTimer,
+    handleRestartTimer,
     handleOpenPresenter,
     handleUpdateGracePeriod,
     handleReconnect
@@ -341,9 +347,21 @@ export const Run = () => {
             <div className='flex gap-2'>
               {snap.run.activeItem &&
                 snap.run.activeItem.type === 'question' &&
-                snap.run.activeItem.phase === 'prompt' && (
-                  <button className='btn btn-outline' onClick={handleDisableTimer}>
-                    ∞ Disable Timer
+                snap.run.activeItem.phase === 'prompt' &&
+                typeof snap.run.activeItem.startTime === 'string' && (
+                  <button className='btn btn-outline' onClick={handleRemoveTimer}>
+                    <Icon name='bell-slash' className='size-4' />
+                    Remove Timer
+                  </button>
+                )}
+
+              {snap.run.activeItem &&
+                snap.run.activeItem.type === 'question' &&
+                snap.run.activeItem.phase === 'prompt' &&
+                snap.run.activeItem.startTime === null && (
+                  <button className='btn btn-outline' onClick={handleRestartTimer}>
+                    <Icon name='clock' className='size-4' />
+                    Restart Timer
                   </button>
                 )}
 
