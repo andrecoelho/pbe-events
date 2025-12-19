@@ -199,8 +199,7 @@ export const Run = () => {
                   const isQuestion = activeItem?.type === 'question';
 
                   const teamHasAnswer =
-                    (isQuestion && activeItem.phase === 'answer' && activeItem.answers[teamId]?.answerText != null) ||
-                    (isQuestion && activeItem.phase === 'prompt' && activeItem.answers[teamId]);
+                    isQuestion && activeItem.phase !== 'reading' && activeItem.answers[teamId]?.answerId != null;
 
                   const isBadgeAllowed =
                     activeItem?.type === 'question' &&
@@ -363,7 +362,12 @@ export const Run = () => {
                     aria-label='Remove Timer'
                     onClick={handleRemoveTimer}
                   >
-                    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor' className='size-5 text-red-400'>
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='currentColor'
+                      className='size-5 text-red-400'
+                    >
                       <path d='M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-18-18ZM20.57 16.476c-.223.082-.448.161-.674.238L7.319 4.137A6.75 6.75 0 0 1 18.75 9v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206Z' />
                       <path
                         fill-rule='evenodd'
@@ -383,7 +387,12 @@ export const Run = () => {
                     aria-label='Restart Timer'
                     onClick={handleRestartTimer}
                   >
-                    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor' className='size-5 text-sky-600'>
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='currentColor'
+                      className='size-5 text-sky-600'
+                    >
                       <path
                         fill-rule='evenodd'
                         d='M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z'
