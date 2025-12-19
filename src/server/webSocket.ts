@@ -465,18 +465,23 @@ export class WebSocketServer {
     }
 
     if (this.isJudgeWebSocket(ws)) {
-      const msg = JSON.parse(message as string) as {
-        type: 'UPDATE_POINTS';
-        answerId: string;
-        points: number | null;
-        __ACK__: string;
-      };
+      const msg = JSON.parse(message as string) as
+        | {
+            type: 'UPDATE_POINTS';
+            answerId: string;
+            points: number | null;
+            __ACK__: string;
+          }
+        | { type: 'SET_QUESTION_GRADE'; questionId: string; graded: boolean; __ACK__: string };
 
       ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
       switch (msg.type) {
         case 'UPDATE_POINTS':
           await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
+          break;
+        case 'SET_QUESTION_GRADE':
+          await this.handleSET_QUESTION_GRADE(connection, msg.questionId, msg.graded);
           break;
       }
     }
@@ -792,6 +797,21 @@ export class WebSocketServer {
       activeItem.locked = locked;
 
       await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
+      await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+    }
+  }
+
+  private async handleSET_QUESTION_GRADE(
+    connection: EventConnection,
+    questionId: string,
+    graded: boolean
+  ): Promise<void> {
+    const activeItem = connection.activeItem;
+
+    await sql`UPDATE questions SET graded = ${graded} WHERE id = ${questionId}`;
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
+      activeItem.graded = graded;
       await this.handleSET_ACTIVE_ITEM(connection, activeItem);
     }
   }

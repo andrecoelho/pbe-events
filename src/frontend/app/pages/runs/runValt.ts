@@ -364,11 +364,7 @@ export class RunValt {
   };
 
   lockQuestion = async (questionId: string, locked: boolean) => {
-    await this.ws?.sendMessage({
-      type: 'SET_QUESTION_LOCK',
-      questionId,
-      locked
-    });
+    await this.ws?.sendMessage({ type: 'SET_QUESTION_LOCK', questionId, locked });
   };
 
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {

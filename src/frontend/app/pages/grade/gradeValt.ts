@@ -185,6 +185,15 @@ export class GradeValt {
     return await this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points });
   };
 
+  setQuestionGraded = async (questionId: string, graded: boolean) => {
+    const question = this.store.questions.find((q) => q.id === questionId);
+
+    if (question) {
+      await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADE', questionId, graded });
+      question.graded = graded;
+    }
+  };
+
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
     this.store.activeItem = activeItem;
 

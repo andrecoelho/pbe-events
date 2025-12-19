@@ -84,6 +84,18 @@ const init = () => {
     }
   };
 
+  const handleMarkQuestionAsGraded = async () => {
+    if (gradeValt.store.selectedQuestion) {
+      gradeValt.setQuestionGraded(gradeValt.store.selectedQuestion.id, true);
+    }
+  };
+
+  const handleMarkQuestionAsNotGraded = async () => {
+    if (gradeValt.store.selectedQuestion) {
+      gradeValt.setQuestionGraded(gradeValt.store.selectedQuestion.id, false);
+    }
+  };
+
   const handleReconnect = () => {
     gradeValt.connect();
   };
@@ -97,6 +109,8 @@ const init = () => {
     handleGiveMaxPoints,
     handleGiveZeroPoints,
     handleClearPoints,
+    handleMarkQuestionAsGraded,
+    handleMarkQuestionAsNotGraded,
     handleReconnect
   };
 };
@@ -111,6 +125,8 @@ export const Grade = () => {
     handleGiveMaxPoints,
     handleGiveZeroPoints,
     handleClearPoints,
+    handleMarkQuestionAsGraded,
+    handleMarkQuestionAsNotGraded,
     handleReconnect
   } = useMemo(init, []);
 
@@ -149,10 +165,14 @@ export const Grade = () => {
                   key={question.id}
                   tabIndex={0}
                   className={`question-badge ${
-                    question.locked && isActive
+                    question.graded && isActive
+                      ? 'question-badge--active-graded'
+                      : question.locked && isActive
                       ? 'question-badge--active-locked'
                       : isActive
                       ? 'question-badge--active'
+                      : question.graded
+                      ? 'question-badge--graded'
                       : question.locked
                       ? 'question-badge--locked'
                       : ''
@@ -372,6 +392,21 @@ export const Grade = () => {
         {snap.connectionState === 'connected' && (
           <span className={`badge ${statusInfo.color} ml-6`}>{statusInfo.label}</span>
         )}
+
+        <div>
+          {!selectedQuestion?.graded && (
+            <button className='btn btn-success' disabled={editDisabled} onClick={handleMarkQuestionAsGraded}>
+              <Icon name='academic-cap' className='size-4' />
+              Mark as Graded
+            </button>
+          )}
+          {selectedQuestion?.graded && (
+            <button className='btn btn-accent' disabled={editDisabled} onClick={handleMarkQuestionAsNotGraded}>
+              <Icon name='arrow-path' className='size-4' />
+              Reset Graded Status
+            </button>
+          )}
+        </div>
       </footer>
     </div>
   );
