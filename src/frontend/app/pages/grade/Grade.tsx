@@ -220,8 +220,12 @@ export const Grade = () => {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>CH</th>
-                      <th>Lang</th>
+                      <th className='text-center'>
+                        <Icon name='face-frown' className='size-5 inline' />
+                      </th>
+                      <th className='text-center'>
+                        <Icon name='language' className='size-5 inline' />
+                      </th>
                       <th>Answer</th>
                       <th>Points</th>
                       <th className='text-center'>Actions</th>
@@ -231,7 +235,7 @@ export const Grade = () => {
                     {Object.entries(selectedQuestion.answers).map(([key, answer]) => (
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
-                        <td>
+                        <td className='text-center'>
                           {answer.challenged && (
                             <svg
                               xmlns='http://www.w3.org/2000/svg'
@@ -247,7 +251,7 @@ export const Grade = () => {
                             </svg>
                           )}
                         </td>
-                        <td className='font-mono text-xs'>
+                        <td className='font-mono text-xs text-center'>
                           {answer.languageCode && (
                             <span className='badge badge-neutral'>{answer.languageCode.toUpperCase()}</span>
                           )}
