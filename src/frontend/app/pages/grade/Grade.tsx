@@ -272,7 +272,7 @@ export const Grade = () => {
                             />
                           )}
                         </td>
-                        <td className='flex gap-2'>
+                        <td className='flex gap-2 justify-center'>
                           {answer.answerId && (
                             <button
                               className='tooltip tooltip-neutral'
