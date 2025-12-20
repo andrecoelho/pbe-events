@@ -692,7 +692,7 @@ export class WebSocketServer {
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
         VALUES (${answerId}, ${answerText}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
-        DO UPDATE SET answer = EXCLUDED.answer, points_awarded = NULL, auto_points_awarded = NULL, challenged = NULL, updated_at = CURRENT_TIMESTAMP
+        DO UPDATE SET answer = EXCLUDED.answer, points_awarded = NULL, auto_points_awarded = NULL, challenged = false, updated_at = CURRENT_TIMESTAMP
         RETURNING id
       `;
 
