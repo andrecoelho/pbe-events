@@ -450,8 +450,6 @@ export class WebSocketServer {
         | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem; __ACK__: string }
         | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string };
 
-      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
-
       switch (msg.type) {
         case 'UPDATE_RUN_STATUS':
           await this.handleUPDATE_RUN_STATUS(connection, msg.status);
@@ -466,6 +464,8 @@ export class WebSocketServer {
           await this.handleSET_QUESTION_LOCK(connection, msg.questionId, msg.locked);
           break;
       }
+
+      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
     }
 
     if (this.isPresenterWebSocket(ws)) {
@@ -692,29 +692,23 @@ export class WebSocketServer {
         INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
         VALUES (${answerId}, ${answerText}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (question_id, team_id)
-        DO UPDATE SET answer = EXCLUDED.answer, updated_at = CURRENT_TIMESTAMP
+        DO UPDATE SET answer = EXCLUDED.answer, points_awarded = NULL, auto_points_awarded = NULL, challenged = NULL, updated_at = CURRENT_TIMESTAMP
         RETURNING id
       `;
 
     const finalAnswerId = result[0]!.id;
-
     const activeItem = connection.activeItem;
-    const answer = activeItem.answers[id];
 
-    if (answer) {
-      answer.answerText = answerText;
-    } else {
-      activeItem.answers[id] = {
-        answerId: finalAnswerId,
-        teamId: id,
-        teamNumber,
-        languageCode,
-        answerText,
-        points: null,
-        autoPoints: null,
-        challenged: false
-      };
-    }
+    activeItem.answers[id] = {
+      answerId: finalAnswerId,
+      teamId: id,
+      teamNumber,
+      languageCode,
+      answerText,
+      points: null,
+      autoPoints: null,
+      challenged: false
+    };
 
     await this.handleSET_ACTIVE_ITEM(connection, activeItem);
   }
@@ -748,6 +742,7 @@ export class WebSocketServer {
 
     if (status === 'not_started') {
       await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
+      await sql`UPDATE questions SET locked = false, graded = false WHERE event_id = ${connection.eventId}`;
     }
 
     await sql`
