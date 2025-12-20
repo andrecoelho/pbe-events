@@ -447,7 +447,7 @@ export class WebSocketServer {
             __ACK__: string;
           }
         | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
-        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem; __ACK__: string }
+        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem | null; __ACK__: string }
         | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string };
 
       switch (msg.type) {
@@ -775,7 +775,7 @@ export class WebSocketServer {
     this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
-  private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem): Promise<void> {
+  private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem | null): Promise<void> {
     connection.activeItem = activeItem;
 
     await sql`UPDATE runs SET active_item = ${connection.activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
@@ -786,7 +786,7 @@ export class WebSocketServer {
     this.server?.publish(`${connection.eventId}:presenters`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
 
-    if (activeItem.type === 'question' && activeItem.phase !== 'reading') {
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
       connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
     } else {
       this.broadcastToAllLanguageChannels(connection.eventId, message);
