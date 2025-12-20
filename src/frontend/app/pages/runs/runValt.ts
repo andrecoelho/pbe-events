@@ -109,6 +109,18 @@ export class RunValt {
   }
 
   init = async (eventId: string) => {
+    await this.loadEventData(eventId);
+
+    this.store.initialized = true;
+
+    if (this.store.items.some((item) => item.type === 'question')) {
+      this.connect();
+    }
+
+    return { ok: true } as const;
+  };
+
+  loadEventData = async (eventId: string) => {
     const result = await fetch(`/api/events/${eventId}/run`);
 
     if (result.status !== 200) {
@@ -223,14 +235,6 @@ export class RunValt {
     } else {
       this.store.currentIndex = 0;
     }
-
-    this.store.initialized = true;
-
-    if (response.questions.length > 0) {
-      this.connect();
-    }
-
-    return { ok: true } as const;
   };
 
   connect = () => {
@@ -271,22 +275,26 @@ export class RunValt {
   };
 
   updateRunStatus = async (status: 'not_started' | 'in_progress' | 'paused' | 'completed') => {
-    this.ws?.sendMessage({ type: 'UPDATE_RUN_STATUS', status });
+    await this.ws?.sendMessage({ type: 'UPDATE_RUN_STATUS', status });
 
-    if (this.store.run.status === 'not_started' && status === 'in_progress') {
+    if (status === 'not_started') {
+      await this.loadEventData(this.store.eventId);
+    }
+
+    if (status === 'in_progress') {
       // Start at the first item (title)
       this.store.currentIndex = 0;
 
       const activeItem = this.store.items[0];
 
       if (activeItem) {
-        this.ws?.sendMessage({
+        await this.ws?.sendMessage({
           type: 'SET_ACTIVE_ITEM',
           activeItem
         });
       }
     } else if (status === 'completed') {
-      this.ws?.sendMessage({
+      await this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
         activeItem: null
       });
