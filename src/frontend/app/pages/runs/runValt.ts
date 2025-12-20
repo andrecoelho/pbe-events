@@ -275,13 +275,15 @@ export class RunValt {
   };
 
   updateRunStatus = async (status: 'not_started' | 'in_progress' | 'paused' | 'completed') => {
+    const currentStatus = this.store.run.status;
+
     await this.ws?.sendMessage({ type: 'UPDATE_RUN_STATUS', status });
 
     if (status === 'not_started') {
       await this.loadEventData(this.store.eventId);
     }
 
-    if (status === 'in_progress') {
+    if (status === 'in_progress' && currentStatus === 'not_started') {
       // Start at the first item (title)
       this.store.currentIndex = 0;
 
