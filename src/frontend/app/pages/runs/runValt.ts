@@ -1,7 +1,5 @@
 import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
-import { omit } from 'lodash';
-import { clearTimeout } from 'node:timers';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -320,57 +318,16 @@ export class RunValt {
     return { ok: true } as const;
   };
 
-  tick = () => {
-    const activeItem = this.store.run.activeItem;
-
-    if (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.startTime) {
-      const now = Date.now();
-      const startTime = new Date(activeItem.startTime);
-      const elapsedSeconds = Math.floor((now - startTime.getTime()) / 1000);
-      const remainingSeconds = Math.max(activeItem.seconds - elapsedSeconds, 0);
-      const isTimeUp = elapsedSeconds >= activeItem.seconds + this.store.run.gracePeriod;
-
-      // Update remainingSeconds and isTimeUp
-      this.ws?.sendMessage({
-        type: 'SET_ACTIVE_ITEM',
-        activeItem: {
-          ...activeItem,
-          remainingSeconds,
-          isTimeUp
-        }
-      });
-
-      if (isTimeUp) {
-        return;
-      }
-
-      this.tickTimer = window.setTimeout(this.tick, 1000);
-    }
-  };
-
   next = async () => {
-    const currentItem = this.store.items[this.store.currentIndex];
-
-    if (currentItem?.type === 'question' && currentItem.phase === 'answer') {
-      await this.lockQuestion(currentItem.id, true);
-    }
-
     if (this.store.currentIndex < this.store.items.length - 1) {
       this.store.currentIndex++;
 
       const nextItem = { ...this.store.items[this.store.currentIndex]! };
 
-      // For questions, update the startTime to current time
-      if (nextItem.type === 'question' && nextItem.phase === 'prompt' && !nextItem.locked) {
-        nextItem.startTime = new Date().toISOString();
-      }
-
       await this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
         activeItem: nextItem
       });
-
-      this.tick();
     }
   };
 
@@ -387,33 +344,12 @@ export class RunValt {
     }
   };
 
-  removeTimer = () => {
-    if (this.tickTimer) {
-      window.clearTimeout(this.tickTimer!);
-    }
-
-    const activeItem = this.store.run.activeItem;
-    this.tickTimer = null;
-
-    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
-      this.ws?.sendMessage({
-        type: 'SET_ACTIVE_ITEM',
-        activeItem: { ...activeItem, startTime: null, remainingSeconds: null, isTimeUp: false }
-      });
-    }
+  removeTimer = async () => {
+    await this.ws?.sendMessage({ type: 'REMOVE_TIMER' });
   };
 
-  restartTimer = async () => {
-    const item = this.store.items[this.store.currentIndex];
-
-    if (item && item.type === 'question' && item.phase === 'prompt') {
-      await this.ws?.sendMessage({
-        type: 'SET_ACTIVE_ITEM',
-        activeItem: { ...item, startTime: new Date().toISOString() }
-      });
-
-      this.tick();
-    }
+  startTimer = async () => {
+    await this.ws?.sendMessage({ type: 'START_TIMER' });
   };
 
   lockQuestion = async (questionId: string, locked: boolean) => {

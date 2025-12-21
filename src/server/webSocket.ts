@@ -51,6 +51,7 @@ export interface EventConnection {
   run: Run;
   activeItem: ActiveItem | null;
   languages?: Record<string, { id: string; code: string; name: string }>;
+  tickTimer?: NodeJS.Timeout;
 }
 
 export interface Run {
@@ -448,7 +449,9 @@ export class WebSocketServer {
           }
         | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
         | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem | null; __ACK__: string }
-        | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string };
+        | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string }
+        | { type: 'START_TIMER'; __ACK__: string }
+        | { type: 'REMOVE_TIMER'; __ACK__: string };
 
       switch (msg.type) {
         case 'UPDATE_RUN_STATUS':
@@ -462,6 +465,12 @@ export class WebSocketServer {
           break;
         case 'SET_QUESTION_LOCK':
           await this.handleSET_QUESTION_LOCK(connection, msg.questionId, msg.locked);
+          break;
+        case 'START_TIMER':
+          this.handleSTART_TIMER(connection);
+          break;
+        case 'REMOVE_TIMER':
+          this.handleREMOVE_TIMER(connection);
           break;
       }
 
@@ -597,6 +606,64 @@ export class WebSocketServer {
     }
   }
 
+  broadcastActiveItem(connection: EventConnection) {
+    const activeItem = connection.activeItem;
+    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
+
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
+
+    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+      connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
+    } else {
+      this.broadcastToAllLanguageChannels(connection.eventId, message);
+    }
+  }
+
+  async saveActiveItem(connection: EventConnection, activeItem: ActiveItem | null): Promise<void> {
+    await sql`UPDATE runs SET active_item = ${activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
+  }
+
+  private scheduleTick(connection: EventConnection): void {
+    if (connection.tickTimer) {
+      clearTimeout(connection.tickTimer);
+    }
+
+    connection.tickTimer = setTimeout(() => this.tick(connection), 1000);
+  }
+
+  private async tick(connection: EventConnection): Promise<void> {
+    // In case we start a timer when there is already one running
+    // For example, if the host clicks "Start Timer" multiple times quickly or comes
+    // back from the answer phase to the prompt phase
+    if (connection.tickTimer) {
+      clearTimeout(connection.tickTimer);
+    }
+
+    const activeItem = connection.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.startTime !== null) {
+      const now = Date.now();
+      const startTime = new Date(activeItem.startTime).getTime();
+      const elapsedSeconds = Math.floor((now - startTime) / 1000);
+      const remainingSeconds = Math.max(activeItem.seconds - elapsedSeconds, 0);
+      const isTimeUp = elapsedSeconds >= activeItem.seconds + connection.run.gracePeriod;
+
+      activeItem.remainingSeconds = remainingSeconds;
+      activeItem.isTimeUp = isTimeUp;
+
+      await this.saveActiveItem(connection, activeItem);
+      this.broadcastActiveItem(connection);
+
+      if (activeItem.isTimeUp) {
+        return;
+      }
+
+      this.scheduleTick(connection);
+    }
+  }
+
   private async handleSUBMIT_ANSWER(
     ws: ServerWebSocket<TeamWebsocketData>,
     connection: EventConnection,
@@ -635,26 +702,24 @@ export class WebSocketServer {
     }
 
     // Validate deadline if timer enabled
-    let isValid = false;
-
-    if (connection.activeItem.startTime === null) {
-      isValid = true; // No timer set, so always valid
-    } else {
-      const now = Date.now();
-      const startTime = new Date(connection.activeItem.startTime).getTime();
-      const deadline = startTime + connection.activeItem.seconds * 1000 + connection.run.gracePeriod * 1000;
-
-      if (now <= deadline) {
-        isValid = true;
-      }
-    }
-
-    if (!isValid) {
+    if (connection.activeItem.isTimeUp) {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
           code: 'TIME_EXCEEDED',
           message: 'Answer submitted after time limit'
+        })
+      );
+
+      return;
+    }
+
+    if (connection.activeItem.locked) {
+      ws.send(
+        JSON.stringify({
+          type: 'ERROR',
+          code: 'QUESTION_LOCKED',
+          message: 'Question is locked for answers'
         })
       );
 
@@ -775,21 +840,31 @@ export class WebSocketServer {
     this.broadcastToAllLanguageChannels(connection.eventId, message);
   }
 
-  private async handleSET_ACTIVE_ITEM(connection: EventConnection, activeItem: ActiveItem | null): Promise<void> {
-    connection.activeItem = activeItem;
+  private async handleSET_ACTIVE_ITEM(connection: EventConnection, nextActiveItem: ActiveItem | null): Promise<void> {
+    const currentActiveItem = connection.activeItem;
 
-    await sql`UPDATE runs SET active_item = ${connection.activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
+    if (
+      nextActiveItem?.type === 'question' &&
+      nextActiveItem.phase === 'reading' &&
+      currentActiveItem?.type === 'question' &&
+      currentActiveItem.phase === 'answer'
+    ) {
+      await this.handleSET_QUESTION_LOCK(connection, currentActiveItem.id, true);
+    }
 
-    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
+    if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
+      nextActiveItem.startTime = Date.now();
+      nextActiveItem.remainingSeconds = nextActiveItem.seconds;
+      nextActiveItem.isTimeUp = false;
+    }
 
-    this.server?.publish(`${connection.eventId}:hosts`, message);
-    this.server?.publish(`${connection.eventId}:presenters`, message);
-    this.server?.publish(`${connection.eventId}:judges`, message);
+    await this.saveActiveItem(connection, nextActiveItem);
+    connection.activeItem = nextActiveItem;
 
-    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
-      connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
+    if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
+      this.tick(connection);
     } else {
-      this.broadcastToAllLanguageChannels(connection.eventId, message);
+      this.broadcastActiveItem(connection);
     }
   }
 
@@ -804,7 +879,36 @@ export class WebSocketServer {
       activeItem.locked = locked;
 
       await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
-      await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+      this.broadcastActiveItem(connection);
+    }
+  }
+
+  private async handleSTART_TIMER(connection: EventConnection): Promise<void> {
+    const activeItem = connection.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
+      activeItem.startTime = Date.now();
+      activeItem.remainingSeconds = activeItem.seconds;
+      activeItem.isTimeUp = false;
+      await this.saveActiveItem(connection, activeItem);
+      this.tick(connection);
+    }
+  }
+
+  private async handleREMOVE_TIMER(connection: EventConnection): Promise<void> {
+    if (connection.tickTimer) {
+      clearTimeout(connection.tickTimer);
+      connection.tickTimer = undefined;
+    }
+
+    const activeItem = connection.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
+      activeItem.startTime = null;
+      activeItem.remainingSeconds = activeItem.seconds;
+      activeItem.isTimeUp = false;
+      await this.saveActiveItem(connection, activeItem);
+      this.broadcastActiveItem(connection);
     }
   }
 

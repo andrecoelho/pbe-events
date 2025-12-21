@@ -24,7 +24,7 @@ export type ActiveItem =
       seconds: number;
       locked: boolean;
       graded: boolean;
-      startTime: string | null;
+      startTime: number | null;
       remainingSeconds: number;
       isTimeUp: boolean;
       translations: Array<{ languageCode: string; prompt: string }>;

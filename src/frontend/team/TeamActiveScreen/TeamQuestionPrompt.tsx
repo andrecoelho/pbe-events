@@ -241,7 +241,7 @@ export const TeamQuestionPrompt = () => {
         active
         locked={activeItem.locked}
         seconds={activeItem.seconds}
-        hasStartTime={!!activeItem.startTime}
+        hasStartTime={activeItem.startTime !== null}
         remainingSeconds={activeItem.remainingSeconds}
         gracePeriod={snap.gracePeriod}
       />
