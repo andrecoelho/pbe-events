@@ -25,6 +25,8 @@ export type ActiveItem =
       locked: boolean;
       graded: boolean;
       startTime: string | null;
+      remainingSeconds: number;
+      isTimeUp: boolean;
       translations: Array<{ languageCode: string; prompt: string }>;
       answers: Record<
         string, // teamId

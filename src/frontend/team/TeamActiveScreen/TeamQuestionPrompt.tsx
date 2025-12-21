@@ -49,7 +49,8 @@ export const GeneralAnswer = () => {
   const activeItem = snap.activeItem;
 
   const disabled =
-    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+    (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.isTimeUp) ||
+    (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
 
   return (
     <div className={`card bg-base-100 text-base-content ${disabled ? 'opacity-50' : ''}`}>
@@ -234,19 +235,15 @@ export const TeamQuestionPrompt = () => {
   const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
   const translation = activeItem?.translations.find((t) => t.languageCode === snap.team?.languageCode);
 
-  const handleTimeUp = useCallback(() => {
-    valt.timeUp();
-  }, [valt]);
-
   return (
     <div className='absolute inset-0 flex flex-col gap-8 px-10'>
       <QuestionTimer
         active
         locked={activeItem.locked}
         seconds={activeItem.seconds}
-        startTime={activeItem.startTime}
+        hasStartTime={!!activeItem.startTime}
+        remainingSeconds={activeItem.remainingSeconds}
         gracePeriod={snap.gracePeriod}
-        onTimeUp={handleTimeUp}
       />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />

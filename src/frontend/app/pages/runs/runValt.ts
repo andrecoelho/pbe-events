@@ -1,6 +1,7 @@
 import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
 import { omit } from 'lodash';
+import { clearTimeout } from 'node:timers';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -89,6 +90,7 @@ type WebSocketRunMessage =
 export class RunValt {
   store: RunStore;
   private ws: WebSocketManager<WebSocketRunMessage> | null = null;
+  tickTimer: number | null = null;
 
   constructor() {
     this.store = proxy({
@@ -182,6 +184,8 @@ export class RunValt {
         phase: 'prompt',
         seconds: question.seconds,
         startTime: null,
+        remainingSeconds: question.seconds,
+        isTimeUp: false,
         locked: question.locked,
         graded: question.graded,
         translations: question.translations.map((t) => ({ languageCode: t.languageCode, prompt: t.prompt })),
@@ -316,6 +320,29 @@ export class RunValt {
     return { ok: true } as const;
   };
 
+  tick = () => {
+    const activeItem = this.store.run.activeItem;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.startTime) {
+      const now = new Date();
+      const startTime = new Date(activeItem.startTime);
+      const elapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+      const remainingSeconds = Math.max(activeItem.seconds - elapsedSeconds, 0);
+
+      // Update remainingSeconds and isTimeUp
+      this.ws?.sendMessage({
+        type: 'SET_ACTIVE_ITEM',
+        activeItem: {
+          ...activeItem,
+          remainingSeconds,
+          isTimeUp: remainingSeconds === 0
+        }
+      });
+    }
+
+    this.tickTimer = window.setTimeout(this.tick, 1000);
+  };
+
   next = async () => {
     const currentItem = this.store.items[this.store.currentIndex];
 
@@ -337,6 +364,8 @@ export class RunValt {
         type: 'SET_ACTIVE_ITEM',
         activeItem: nextItem
       });
+
+      this.tick();
     }
   };
 
@@ -355,6 +384,8 @@ export class RunValt {
 
   removeTimer = () => {
     const activeItem = this.store.run.activeItem;
+    window.clearTimeout(this.tickTimer!);
+    this.tickTimer = null;
 
     if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
       this.ws?.sendMessage({
@@ -364,14 +395,16 @@ export class RunValt {
     }
   };
 
-  restartTimer = () => {
+  restartTimer = async () => {
     const item = this.store.items[this.store.currentIndex];
 
     if (item && item.type === 'question' && item.phase === 'prompt') {
-      this.ws?.sendMessage({
+      await this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
         activeItem: { ...item, startTime: new Date().toISOString() }
       });
+
+      this.tick();
     }
   };
 
