@@ -775,7 +775,7 @@ export class WebSocketServer {
       challenged: false
     };
 
-    await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+    this.broadcastActiveItem(connection);
   }
 
   private async handleSUBMIT_CHALLENGE(
@@ -794,7 +794,8 @@ export class WebSocketServer {
 
         answer.challenged = challenged;
 
-        await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+        this.saveActiveItem(connection, activeItem);
+        this.broadcastActiveItem(connection);
       }
     }
   }
@@ -923,7 +924,8 @@ export class WebSocketServer {
 
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       activeItem.graded = graded;
-      await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+      await this.saveActiveItem(connection, activeItem);
+      this.broadcastActiveItem(connection);
     }
   }
 
@@ -953,7 +955,8 @@ export class WebSocketServer {
 
       if (activeAnswer) {
         activeAnswer.points = points;
-        await this.handleSET_ACTIVE_ITEM(connection, activeItem);
+        await this.saveActiveItem(connection, activeItem);
+        this.broadcastActiveItem(connection);
       }
     }
   }
