@@ -324,10 +324,11 @@ export class RunValt {
     const activeItem = this.store.run.activeItem;
 
     if (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.startTime) {
-      const now = new Date();
+      const now = Date.now();
       const startTime = new Date(activeItem.startTime);
-      const elapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+      const elapsedSeconds = Math.floor((now - startTime.getTime()) / 1000);
       const remainingSeconds = Math.max(activeItem.seconds - elapsedSeconds, 0);
+      const isTimeUp = elapsedSeconds >= activeItem.seconds + this.store.run.gracePeriod;
 
       // Update remainingSeconds and isTimeUp
       this.ws?.sendMessage({
@@ -335,12 +336,16 @@ export class RunValt {
         activeItem: {
           ...activeItem,
           remainingSeconds,
-          isTimeUp: remainingSeconds === 0
+          isTimeUp
         }
       });
-    }
 
-    this.tickTimer = window.setTimeout(this.tick, 1000);
+      if (isTimeUp) {
+        return;
+      }
+
+      this.tickTimer = window.setTimeout(this.tick, 1000);
+    }
   };
 
   next = async () => {
@@ -383,14 +388,17 @@ export class RunValt {
   };
 
   removeTimer = () => {
+    if (this.tickTimer) {
+      window.clearTimeout(this.tickTimer!);
+    }
+
     const activeItem = this.store.run.activeItem;
-    window.clearTimeout(this.tickTimer!);
     this.tickTimer = null;
 
     if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
       this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
-        activeItem: { ...activeItem, startTime: null }
+        activeItem: { ...activeItem, startTime: null, remainingSeconds: null, isTimeUp: false }
       });
     }
   };
