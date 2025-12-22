@@ -758,7 +758,7 @@ export class WebSocketServer {
       teamId: id,
       teamNumber,
       languageCode,
-      answerText,
+      answerText: String(answerText),
       points: null,
       autoPoints: null,
       challenged: false
