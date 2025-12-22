@@ -300,48 +300,28 @@ export class WebSocketServer {
           })
         );
 
+        ws.subscribe(`${eventId}:teams`);
         this.sendLanguages(ws, connection);
+        this.sendRunStatus(ws, connection);
+        this.sendActiveItem(ws, connection);
+        this.sendGracePeriod(ws, connection);
 
-        // Subscribe to language channel if language selected
-        if (team.code) {
-          ws.subscribe(`${eventId}:${team.code}`);
-          this.sendRunStatus(ws, connection);
-          this.sendActiveItem(ws, connection);
-          this.sendGracePeriod(ws, connection);
-
-          // Send TEAM_CONNECTED to host
-          this.server?.publish(
-            `${eventId}:hosts`,
-            JSON.stringify({
-              type: 'TEAM_STATUS',
-              teams: [
-                {
-                  id,
-                  status: 'ready',
-                  name: team.name,
-                  number: team.number,
-                  languageCode: team.code
-                }
-              ]
-            })
-          );
-        } else {
-          this.server?.publish(
-            `${eventId}:hosts`,
-            JSON.stringify({
-              type: 'TEAM_STATUS',
-              teams: [
-                {
-                  id,
-                  status: 'connected',
-                  name: team.name,
-                  number: team.number,
-                  languageCode: null
-                }
-              ]
-            })
-          );
-        }
+        // Send TEAM_CONNECTED to host
+        this.server?.publish(
+          `${eventId}:hosts`,
+          JSON.stringify({
+            type: 'TEAM_STATUS',
+            teams: [
+              {
+                id,
+                status: 'connected',
+                name: team.name,
+                number: team.number,
+                languageCode: team.code
+              }
+            ]
+          })
+        );
       }
     }
   };
@@ -599,14 +579,6 @@ export class WebSocketServer {
     ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
   }
 
-  broadcastToAllLanguageChannels(eventId: string, message: string) {
-    const eventLanguages = this.eventConnections.get(eventId)?.languages;
-
-    if (eventLanguages) {
-      Object.values(eventLanguages).forEach((lang) => this.server?.publish(`${eventId}:${lang.code}`, message));
-    }
-  }
-
   broadcastActiveItem(connection: EventConnection) {
     const activeItem = connection.activeItem;
     const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
@@ -618,7 +590,7 @@ export class WebSocketServer {
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
       connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
     } else {
-      this.broadcastToAllLanguageChannels(connection.eventId, message);
+      this.server?.publish(`${connection.eventId}:teams`, message);
     }
   }
 
@@ -826,7 +798,7 @@ export class WebSocketServer {
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
-    this.broadcastToAllLanguageChannels(connection.eventId, message);
+    this.server?.publish(`${connection.eventId}:teams`, message);
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
@@ -842,7 +814,7 @@ export class WebSocketServer {
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
-    this.broadcastToAllLanguageChannels(connection.eventId, message);
+    this.server?.publish(`${connection.eventId}:teams`, message);
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, nextActiveItem: ActiveItem | null): Promise<void> {
