@@ -409,6 +409,7 @@ export class WebSocketServer {
       connection.teams.size === 0
     ) {
       console.log('Cleaning up event connection for eventId', eventId);
+      this.clearTickTimer(connection);
       this.eventConnections.delete(eventId);
     }
   };
@@ -625,10 +626,15 @@ export class WebSocketServer {
     await sql`UPDATE runs SET active_item = ${activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
   }
 
-  private scheduleTick(connection: EventConnection): void {
+  private clearTickTimer(connection: EventConnection): void {
     if (connection.tickTimer) {
       clearTimeout(connection.tickTimer);
+      connection.tickTimer = undefined;
     }
+  }
+
+  private scheduleTick(connection: EventConnection): void {
+    this.clearTickTimer(connection);
 
     connection.tickTimer = setTimeout(() => this.tick(connection), 1000);
   }
@@ -637,9 +643,7 @@ export class WebSocketServer {
     // In case we start a timer when there is already one running
     // For example, if the host clicks "Start Timer" multiple times quickly or comes
     // back from the answer phase to the prompt phase
-    if (connection.tickTimer) {
-      clearTimeout(connection.tickTimer);
-    }
+    this.clearTickTimer(connection);
 
     const activeItem = connection.activeItem;
 
@@ -897,10 +901,7 @@ export class WebSocketServer {
   }
 
   private async handleREMOVE_TIMER(connection: EventConnection): Promise<void> {
-    if (connection.tickTimer) {
-      clearTimeout(connection.tickTimer);
-      connection.tickTimer = undefined;
-    }
+    this.clearTickTimer(connection);
 
     const activeItem = connection.activeItem;
 
