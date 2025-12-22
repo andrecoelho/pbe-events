@@ -1,6 +1,6 @@
 import '../base.css';
 
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 import { alertModal } from '../components/AlertModal';
 import { modal } from '../components/Modal';
 import { CreateAccountModal } from './CreateAccountModal';

@@ -52,7 +52,7 @@
   body #root::before {
     content: '';
     @apply absolute inset-0 -z-10;
-    @apply bg-[url(@/assets/bible.jpg)] bg-cover bg-center bg-fixed;
+    @apply bg-[url(@/assets/bible_reduced.jpg)] bg-cover bg-center bg-fixed;
     @apply blur-[2px];
   }
 

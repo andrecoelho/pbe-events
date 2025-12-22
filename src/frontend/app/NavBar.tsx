@@ -1,9 +1,9 @@
-import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
-
-import logo from '@/assets/favicon.svg';
+import logo from '@/assets/PBE-logo_600px.png';
 import { useAppValt } from '@/frontend/app/appValt';
 import { alertModal } from '@/frontend/components/AlertModal';
 import { Avatar } from '@/frontend/components/Avatar';
+import { Icon } from '@/frontend/components/Icon';
+import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { useSnapshot } from 'valtio';
 
 export const NavBar = memo(() => {
@@ -50,10 +50,18 @@ export const NavBar = memo(() => {
           style={{ positionAnchor: '--profile-menu-anchor' } as CSSProperties}
         >
           <li>
-            <a href='/settings' onClick={closeMenu}>Settings</a>
+            <a href='/settings' onClick={closeMenu}>
+              Settings
+            </a>
           </li>
           <li>
-            <button onClick={(e) => { closeMenu(); handleLogout(e); }} onKeyDown={handleLogout}>
+            <button
+              onClick={(e) => {
+                closeMenu();
+                handleLogout(e);
+              }}
+              onKeyDown={handleLogout}
+            >
               Logout
             </button>
           </li>

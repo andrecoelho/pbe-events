@@ -1,4 +1,4 @@
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 
 export const Completed = () => {
   return (

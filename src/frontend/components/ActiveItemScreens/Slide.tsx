@@ -1,4 +1,4 @@
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 import type { Snapshot } from 'valtio';
 
 export const Slide = ({

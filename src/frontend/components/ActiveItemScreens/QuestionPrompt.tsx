@@ -1,25 +1,12 @@
 import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionTimer';
-import logo from 'src/assets/favicon.svg';
+import type { ActiveItem } from '@/types';
+import logo from 'src/assets/PBE-logo_600px.png';
 import type { Snapshot } from 'valtio';
 
 export const QuestionPrompt = ({
   item
 }: {
-  item: Snapshot<{
-    type: 'question';
-    id: string;
-    number: number;
-    questionType: 'PG' | 'PS' | 'TF' | 'FB';
-    maxPoints: number;
-    phase: 'prompt';
-    seconds: number;
-    locked: boolean;
-    graded: boolean;
-    startTime: string | null;
-    remainingSeconds: number;
-    isTimeUp: boolean;
-    translations: Array<{ languageCode: string; prompt: string }>;
-  }>;
+  item: Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
 }) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>

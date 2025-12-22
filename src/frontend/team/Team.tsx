@@ -2,7 +2,7 @@ import { Icon } from '@/frontend/components/Icon';
 import { TeamActiveItemScreen } from '@/frontend/team/TeamActiveScreen/TeamActiveItemScreen';
 import { TeamValt, TeamValtContext } from '@/frontend/team/teamValt';
 import { useEffect, useMemo, useState } from 'react';
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 import { useSnapshot } from 'valtio';
 import '../base.css';
 

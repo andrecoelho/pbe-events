@@ -1,5 +1,5 @@
 import { useTeamValt } from '@/frontend/team/teamValt';
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 import { useSnapshot } from 'valtio';
 
 export const TeamQuestionAnswer = () => {

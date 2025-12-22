@@ -5,7 +5,7 @@ import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useEffect, useMemo } from 'react';
-import logo from 'src/assets/favicon.svg';
+import logo from 'src/assets/PBE-logo_600px.png';
 import { useSnapshot } from 'valtio';
 import './Run.css';
 
