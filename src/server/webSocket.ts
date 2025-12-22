@@ -765,6 +765,7 @@ export class WebSocketServer {
     };
 
     this.broadcastActiveItemToManagers(connection);
+    this.sendActiveItem(ws, connection);
   }
 
   private async handleSUBMIT_CHALLENGE(
@@ -785,6 +786,7 @@ export class WebSocketServer {
 
         this.saveActiveItem(connection, activeItem);
         this.broadcastActiveItemToManagers(connection);
+        this.sendActiveItem(ws, connection);
       }
     }
   }
