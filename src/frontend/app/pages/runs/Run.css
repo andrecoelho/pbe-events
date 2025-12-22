@@ -11,10 +11,6 @@
   }
 
   .team-badge--connected {
-    @apply from-info via-sky-500 to-indigo-500;
-  }
-
-  .team-badge--ready {
     @apply from-green-500 via-emerald-500 to-teal-600;
   }
 

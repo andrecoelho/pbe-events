@@ -6,7 +6,7 @@ import { proxy } from 'valtio';
 export interface TeamStatus {
   id: string;
   number: number;
-  status: 'offline' | 'connected' | 'ready';
+  status: 'offline' | 'connected';
   languageCode: string | null;
 }
 

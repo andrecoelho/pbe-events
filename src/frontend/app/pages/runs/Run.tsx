@@ -12,7 +12,6 @@ import './Run.css';
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',
   connected: 'team-badge--connected',
-  ready: 'team-badge--ready'
 };
 
 const formatTeamNumber = (value: number) => value.toString().padStart(2, '0');
