@@ -168,7 +168,6 @@ export class WebSocketServer {
       }
 
       if (this.server?.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
-        console.log('Upgraded judge WebSocket connection', req.url);
         return;
       }
     } else if (role === 'presenter') {
