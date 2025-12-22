@@ -1,21 +1,13 @@
+import type { ActiveItem } from '@/types';
 import logo from 'src/assets/PBE-logo_600px.png';
 import type { Snapshot } from 'valtio';
 
-export const QuestionAnswer = ({
-  item,
-  languages
-}: {
-  item: Snapshot<{
-    type: 'question';
-    id: string;
-    number: number;
-    phase: 'answer';
-    locked: boolean;
-    graded: boolean;
-    translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
-  }>;
+interface Props {
+  item: Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'answer' }>>;
   languages: Snapshot<Record<string, { id: string; code: string; name: string }>>;
-}) => {
+}
+
+export const QuestionAnswer = ({ item, languages }: Props) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
       <div className='flex items-center gap-10 mt-10'>

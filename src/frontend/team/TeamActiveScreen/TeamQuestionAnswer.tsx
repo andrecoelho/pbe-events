@@ -1,28 +1,15 @@
 import { useTeamValt } from '@/frontend/team/teamValt';
+import type { ActiveItem } from '@/types';
 import logo from 'src/assets/PBE-logo_600px.png';
-import { useSnapshot } from 'valtio';
+import { useSnapshot, type Snapshot } from 'valtio';
 
 export const TeamQuestionAnswer = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store);
 
-  const activeItem = snap.activeItem;
-
-  if (!activeItem || activeItem.type !== 'question' || activeItem.phase !== 'answer') {
-    return null;
-  }
-
+  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'answer' }>>;
   const translation = activeItem.translations.find((t) => t.languageCode === snap.team?.languageCode);
-
-  if (!translation) {
-    return null;
-  }
-
   const answer = activeItem.answers[snap.team!.id];
-
-  if (!answer) {
-    return null;
-  }
 
   const handleChallengeClick = () => {
     valt.submitChallenge(true);
@@ -40,7 +27,7 @@ export const TeamQuestionAnswer = () => {
       </div>
       <h2 className='border-b border-accent pb-4 flex justify-between'>
         <span className='text-4xl font-serif font-semibold '>Answer:</span>
-        {!activeItem.locked && !answer.challenged && (
+        {answer && !activeItem.locked && !answer.challenged && (
           <button className='btn btn-error ml-auto' onClick={handleChallengeClick}>
             <svg
               xmlns='http://www.w3.org/2000/svg'
@@ -57,7 +44,7 @@ export const TeamQuestionAnswer = () => {
             Challenge Question
           </button>
         )}
-        {!activeItem.locked && answer.challenged && (
+        {answer && !activeItem.locked && answer.challenged && (
           <button className='btn btn-success ml-auto' onClick={handleClearChallengeClick}>
             <svg
               xmlns='http://www.w3.org/2000/svg'
@@ -78,13 +65,13 @@ export const TeamQuestionAnswer = () => {
       <div className='flex gap-2 items-center'>
         <span className='text-2xl font-serif w-40 text-right flex-none'>Correct:</span>
         <span className='bg-green-400 text-base-content rounded-md px-2 py-1 border-base-100 border'>
-          {translation.answer} {translation.clarification && <>({translation.clarification})</>}
+          {translation?.answer} {translation?.clarification && <>({translation.clarification})</>}
         </span>
       </div>
       <div className='flex gap-2'>
         <span className='text-2xl font-serif w-40 text-right flex-none'>Your Answer:</span>
         <span className='bg-neutral text-base-content rounded-md px-2 py-1 border-base-100 border'>
-          {answer.answerText}
+          {answer?.answerText}
         </span>
       </div>
     </div>

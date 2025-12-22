@@ -11,10 +11,6 @@ export const TeamQuestionReading = () => {
   const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
   const translation = activeItem.translations.find((t) => t.languageCode === snap.team?.languageCode);
 
-  if (!translation) {
-    return null;
-  }
-
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10 leading-loose'>
       <QuestionTimer
@@ -29,7 +25,7 @@ export const TeamQuestionReading = () => {
       </div>
       <div className='text-2xl font-serif leading-loose'>
         ({activeItem.maxPoints} pts.) &nbsp;
-        {translation.prompt}
+        {translation?.prompt}
       </div>
     </div>
   );

@@ -3,11 +3,11 @@ import type { ActiveItem } from '@/types';
 import logo from 'src/assets/PBE-logo_600px.png';
 import type { Snapshot } from 'valtio';
 
-export const QuestionPrompt = ({
-  item
-}: {
+interface Props {
   item: Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
-}) => {
+}
+
+export const QuestionPrompt = ({ item }: Props) => {
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>
       <QuestionTimer
