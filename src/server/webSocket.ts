@@ -351,8 +351,8 @@ export class WebSocketServer {
     } else {
       const { id, languageCode } = ws.data;
       const team = connection.teams.get(id)?.data;
-      console.log('Team disconnected for event', eventId, id);
 
+      console.log('Team disconnected for event', eventId, id);
       connection.teams.delete(id);
 
       // Unsubscribe from language channel
@@ -578,13 +578,27 @@ export class WebSocketServer {
     ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
   }
 
-  broadcastActiveItem(connection: EventConnection) {
+  broadcastToAll(connection: EventConnection, message: string): void {
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
+    this.server?.publish(`${connection.eventId}:teams`, message);
+  }
+
+  broadcastActiveItemToManagers(connection: EventConnection) {
     const activeItem = connection.activeItem;
     const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
+  }
+
+  broadcastActiveItemToAll(connection: EventConnection) {
+    const activeItem = connection.activeItem;
+    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
+
+    this.broadcastActiveItemToManagers(connection);
 
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
       connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
@@ -629,7 +643,7 @@ export class WebSocketServer {
       activeItem.isTimeUp = isTimeUp;
 
       await this.saveActiveItem(connection, activeItem);
-      this.broadcastActiveItem(connection);
+      this.broadcastActiveItemToAll(connection);
 
       if (activeItem.isTimeUp) {
         return;
@@ -750,7 +764,7 @@ export class WebSocketServer {
       challenged: false
     };
 
-    this.broadcastActiveItem(connection);
+    this.broadcastActiveItemToManagers(connection);
   }
 
   private async handleSUBMIT_CHALLENGE(
@@ -770,7 +784,7 @@ export class WebSocketServer {
         answer.challenged = challenged;
 
         this.saveActiveItem(connection, activeItem);
-        this.broadcastActiveItem(connection);
+        this.broadcastActiveItemToManagers(connection);
       }
     }
   }
@@ -794,10 +808,7 @@ export class WebSocketServer {
 
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
-    this.server?.publish(`${connection.eventId}:hosts`, message);
-    this.server?.publish(`${connection.eventId}:judges`, message);
-    this.server?.publish(`${connection.eventId}:presenters`, message);
-    this.server?.publish(`${connection.eventId}:teams`, message);
+    this.broadcastToAll(connection, message);
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
@@ -811,9 +822,7 @@ export class WebSocketServer {
 
     const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
-    this.server?.publish(`${connection.eventId}:hosts`, message);
-    this.server?.publish(`${connection.eventId}:presenters`, message);
-    this.server?.publish(`${connection.eventId}:teams`, message);
+    this.broadcastToAll(connection, message);
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, nextActiveItem: ActiveItem | null): Promise<void> {
@@ -840,7 +849,7 @@ export class WebSocketServer {
     if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
       this.tick(connection);
     } else {
-      this.broadcastActiveItem(connection);
+      this.broadcastActiveItemToAll(connection);
     }
   }
 
@@ -855,7 +864,7 @@ export class WebSocketServer {
       activeItem.locked = locked;
 
       await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
-      this.broadcastActiveItem(connection);
+      this.broadcastActiveItemToAll(connection);
     }
   }
 
@@ -881,7 +890,7 @@ export class WebSocketServer {
       activeItem.remainingSeconds = activeItem.seconds;
       activeItem.isTimeUp = false;
       await this.saveActiveItem(connection, activeItem);
-      this.broadcastActiveItem(connection);
+      this.broadcastActiveItemToAll(connection);
     }
   }
 
@@ -897,7 +906,7 @@ export class WebSocketServer {
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       activeItem.graded = graded;
       await this.saveActiveItem(connection, activeItem);
-      this.broadcastActiveItem(connection);
+      this.broadcastActiveItemToAll(connection);
     }
   }
 
@@ -928,7 +937,7 @@ export class WebSocketServer {
       if (activeAnswer) {
         activeAnswer.points = points;
         await this.saveActiveItem(connection, activeItem);
-        this.broadcastActiveItem(connection);
+        this.broadcastActiveItemToAll(connection);
       }
     }
   }
