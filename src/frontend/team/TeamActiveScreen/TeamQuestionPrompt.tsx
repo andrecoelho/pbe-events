@@ -34,9 +34,11 @@ export const GeneralAnswer = () => {
   const snap = useSnapshot(valt.store, { sync: true });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const activeItem = snap.activeItem;
+
   useEffect(() => {
     textareaRef.current?.focus();
-  }, []);
+  }, [activeItem]);
 
   const handleAnswerChange = debounce(async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const result = await valt.submitAnswer(e.target.value);
@@ -45,8 +47,6 @@ export const GeneralAnswer = () => {
       toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
     }
   }, 1000);
-
-  const activeItem = snap.activeItem;
 
   const disabled =
     (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.isTimeUp) ||
