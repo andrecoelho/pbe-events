@@ -29,14 +29,18 @@ export const authRoutes: Routes = {
 
       const sessionId = await createSession(user.id);
 
-      return apiData({}, { 'Set-Cookie': `sessionId=${sessionId}; HttpOnly; Secure; Path=/;` });
+      const isProduction = Bun.env.NODE_ENV === 'production';
+      const secureCookie = isProduction ? 'Secure; ' : '';
+      return apiData({}, { 'Set-Cookie': `sessionId=${sessionId}; HttpOnly; ${secureCookie}SameSite=Lax; Path=/;` });
     }
   },
   '/api/logout': {
     POST: async (req) => {
       await deleteSession(req);
 
-      return apiData({}, { 'Set-Cookie': `sessionId=; HttpOnly; Secure; Path=/; Max-Age=0` });
+      const isProduction = Bun.env.NODE_ENV === 'production';
+      const secureCookie = isProduction ? 'Secure; ' : '';
+      return apiData({}, { 'Set-Cookie': `sessionId=; HttpOnly; ${secureCookie}SameSite=Lax; Path=/; Max-Age=0` });
     }
   },
   '/api/signup': {
