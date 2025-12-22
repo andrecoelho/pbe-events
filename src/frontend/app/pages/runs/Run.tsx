@@ -163,6 +163,8 @@ export const Run = () => {
   useEffect(() => valt.cleanup, [valt]);
 
   const isConnected = snap.connectionState === 'connected';
+  const isFirstItem = snap.currentIndex === 0;
+  const isLastItem = snap.currentIndex === snap.items.length - 1;
 
   return (
     <RunValtContext.Provider value={valt}>
@@ -349,14 +351,14 @@ export const Run = () => {
             )}
 
             {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' disabled={!isConnected} onClick={handlePreviousEvent}>
+              <button className='btn btn-neutral' disabled={!isConnected || isFirstItem} onClick={handlePreviousEvent}>
                 <Icon name='chevron-left' className='size-4' />
                 Previous
               </button>
             )}
 
             {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' disabled={!isConnected} onClick={handleNextEvent}>
+              <button className='btn btn-neutral' disabled={!isConnected || isLastItem} onClick={handleNextEvent}>
                 Next
                 <Icon name='chevron-right' className='size-4' />
               </button>
