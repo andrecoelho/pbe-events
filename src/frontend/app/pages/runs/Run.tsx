@@ -292,13 +292,13 @@ export const Run = () => {
             </div>
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
-                <span className='team-badge team-badge--sm team-badge--ready'>23</span>
+                <span className='team-badge team-badge--sm team-badge--connected'>23</span>
               </span>
               <span>Connected</span>
             </div>
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
-                <span className='team-badge team-badge--sm team-badge--ready'>23</span>
+                <span className='team-badge team-badge--sm team-badge--connected'>23</span>
                 <span className='team-badge-check'>
                   <Icon name='check' />
                 </span>
@@ -307,7 +307,7 @@ export const Run = () => {
             </div>
             <div className='flex items-center gap-2'>
               <span className='relative inline-flex'>
-                <span className='team-badge team-badge--sm team-badge--ready'>23</span>
+                <span className='team-badge team-badge--sm team-badge--connected'>23</span>
                 <span className='team-badge-no-answer'>
                   <Icon name='x-mark' />
                 </span>
