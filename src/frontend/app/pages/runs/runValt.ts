@@ -298,6 +298,12 @@ export class RunValt {
         });
       }
     } else if (status === 'completed') {
+      const activeItem = this.store.run.activeItem;
+
+      if (activeItem && activeItem.type === 'question') {
+        await this.lockQuestion(activeItem.id, true);
+      }
+
       await this.ws?.sendMessage({
         type: 'SET_ACTIVE_ITEM',
         activeItem: null
