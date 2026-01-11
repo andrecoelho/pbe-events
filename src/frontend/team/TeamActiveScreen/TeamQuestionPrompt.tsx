@@ -34,7 +34,7 @@ export const GeneralAnswer = () => {
   const snap = useSnapshot(valt.store, { sync: true });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const activeItem = snap.activeItem;
+  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -48,9 +48,7 @@ export const GeneralAnswer = () => {
     }
   }, 1000);
 
-  const disabled =
-    (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.isTimeUp) ||
-    (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+  const disabled = activeItem.isTimeUp || activeItem.locked;
 
   return (
     <div className={`card bg-base-100 text-base-content ${disabled ? 'opacity-50' : ''}`}>
@@ -105,10 +103,8 @@ export const TrueFalseAnswer = () => {
     }
   };
 
-  const activeItem = snap.activeItem;
-
-  const disabled =
-    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
+  const disabled = activeItem.isTimeUp || activeItem.locked;
 
   return (
     <div className='text-center'>
@@ -195,10 +191,8 @@ export const FillInTheBlankAnswer = ({
     }
   }, 500);
 
-  const activeItem = snap.activeItem;
-
-  const disabled =
-    snap.isTimeUp || (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.locked);
+  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
+  const disabled = activeItem.isTimeUp || activeItem.locked;
 
   return (
     <div className='text-2xl font-serif leading-loose'>

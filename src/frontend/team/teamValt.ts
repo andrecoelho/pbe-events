@@ -15,7 +15,6 @@ interface TeamStore {
     languageCode: string;
   };
   activeItem: ActiveItem | null;
-  isTimeUp: boolean;
   gracePeriod: number;
   answer: string | null;
   runStatus: 'not_started' | 'in_progress' | 'paused' | 'completed';
@@ -45,7 +44,6 @@ export class TeamValt {
     this.store = proxy({
       activeItem: null,
       answer: null,
-      isTimeUp: false,
       gracePeriod: 0,
       runStatus: 'not_started',
       connectionState: 'init'
@@ -106,21 +104,6 @@ export class TeamValt {
           }
         }
 
-        // Check if grace period has expired
-        if (
-          message.activeItem?.type === 'question' &&
-          message.activeItem.phase === 'prompt' &&
-          message.activeItem.startTime
-        ) {
-          const startTimeMs = new Date(message.activeItem.startTime).getTime();
-          const nowMs = Date.now();
-          const elapsedSeconds = Math.floor((nowMs - startTimeMs) / 1000);
-          const remainingSeconds = message.activeItem.seconds - elapsedSeconds;
-          this.store.isTimeUp = remainingSeconds <= -this.store.gracePeriod;
-        } else {
-          this.store.isTimeUp = false;
-        }
-
         break;
       case 'LANGUAGES':
         this.store.languages = message.languages;
@@ -148,10 +131,6 @@ export class TeamValt {
       challenged
     });
   };
-
-  timeUp() {
-    this.store.isTimeUp = true;
-  }
 }
 
 export const TeamValtContext = createContext<TeamValt | null>(null);
