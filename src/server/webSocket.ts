@@ -248,18 +248,29 @@ export class WebSocketServer {
       ws.subscribe(`${eventId}:hosts`);
       this.sendTeamStatuses(ws, connection);
       this.sendActiveItem(ws, connection);
+
+      console.log(
+        'Host connected for event',
+        eventId,
+        '\n',
+        Array.from(connection.teams)
+          .map(([id, teamWs]) => `\t${id}: ${teamWs.data.name}`)
+          .join('\n')
+      );
     } else if (this.isJudgeWebSocket(ws)) {
       connection.judges.set(ws.data.wsId, ws);
       ws.subscribe(`${eventId}:judges`);
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
+      console.log('Judge connected for event', eventId);
     } else if (this.isPresenterWebSocket(ws)) {
       connection.presenters.push(ws);
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
       ws.subscribe(`${eventId}:presenters`);
+      console.log('Presenter connected for event', eventId);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
 
@@ -300,6 +311,7 @@ export class WebSocketServer {
         );
 
         ws.subscribe(`${eventId}:teams`);
+
         this.sendLanguages(ws, connection);
         this.sendRunStatus(ws, connection);
         this.sendActiveItem(ws, connection);
@@ -322,6 +334,8 @@ export class WebSocketServer {
           })
         );
       }
+
+      console.log('Team connected for event', eventId, id);
     }
   };
 
@@ -561,7 +575,7 @@ export class WebSocketServer {
 
     const teamStatuses = teams.map((team) => {
       const teamWs = connection.teams.get(team.id);
-      const teamStatus = !teamWs ? 'offline' : teamWs.data.languageCode ? 'ready' : 'connected';
+      const teamStatus = teamWs ? 'connected' : 'offline';
 
       return {
         id: team.id,
