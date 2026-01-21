@@ -29,6 +29,7 @@ const presenterNounce = Bun.randomUUIDv7();
 const teamNounce = Bun.randomUUIDv7();
 
 const wsServer = new WebSocketServer();
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const server = Bun.serve({
   routes: {
@@ -90,13 +91,14 @@ const server = Bun.serve({
     return await fetch(`${server.url}${appNounce}`);
   },
   websocket: wsServer.createHandlers(),
-  development: process.env.NODE_ENV !== 'production'
+  development: isDevelopment
 });
 
 // Set WebSocket server reference
 wsServer.setServer(server);
 
 console.log(`🚀 Server running at ${styleText('green', server.url.toString())}`);
+console.log(`${isDevelopment ? '🚧 Development' : '🛣️ Production'} mode`);
 
 // Handle graceful shutdown
 const shutdown = () => {
