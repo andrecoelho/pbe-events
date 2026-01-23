@@ -142,7 +142,8 @@ export const Grade = () => {
   };
 
   const statusInfo = runStatusConfig[snap.runStatus] || { label: snap.runStatus, color: 'badge-neutral' };
-  const editDisabled = snap.connectionState !== 'connected' || !selectedQuestion?.locked;
+  const readyToGrade = snap.connectionState === 'connected' && selectedQuestion?.locked;
+  const editDisabled = !readyToGrade || selectedQuestion?.graded;
 
   useEffect(() => gradeValt.cleanup, [gradeValt]);
 
@@ -404,13 +405,13 @@ export const Grade = () => {
 
         <div>
           {!selectedQuestion?.graded && (
-            <button className='btn btn-success' disabled={editDisabled} onClick={handleMarkQuestionAsGraded}>
+            <button className='btn btn-success' disabled={!readyToGrade} onClick={handleMarkQuestionAsGraded}>
               <Icon name='academic-cap' className='size-4' />
               Mark as Graded
             </button>
           )}
           {selectedQuestion?.graded && (
-            <button className='btn btn-accent' disabled={editDisabled} onClick={handleMarkQuestionAsNotGraded}>
+            <button className='btn btn-accent' disabled={!readyToGrade} onClick={handleMarkQuestionAsNotGraded}>
               <Icon name='arrow-path' className='size-4' />
               Reset Graded Status
             </button>

@@ -391,7 +391,8 @@ export const Run = () => {
 
             {snap.run.activeItem?.type === 'question' &&
               snap.run.activeItem.phase !== 'reading' &&
-              snap.run.activeItem.locked && (
+              snap.run.activeItem.locked &&
+              !snap.run.activeItem.graded && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-indigo-400'
                   data-tip='Unlock Question'

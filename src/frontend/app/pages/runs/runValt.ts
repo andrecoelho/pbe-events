@@ -82,8 +82,9 @@ type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
   | AnswerReceivedMessage
   | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean })
-  | (WebSocketMessage & { type: 'QUESTION_LOCK'; questionId: string; locked: boolean })
-  | (WebSocketMessage & { type: 'QUESTION_GRADE'; questionId: string; graded: boolean });
+  | (WebSocketMessage & { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null })
+  | (WebSocketMessage & { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean })
+  | (WebSocketMessage & { type: 'QUESTION_GRADED'; questionId: string; graded: boolean });
 
 export class RunValt {
   store: RunStore;
@@ -269,6 +270,15 @@ export class RunValt {
       case 'TEAM_STATUS':
         this.handleTEAM_STATUS(message.teams);
         break;
+      case 'POINTS_UPDATED':
+        this.handlePOINTS_UPDATED(message.questionId, message.answerId, message.points);
+        break;
+      case 'QUESTION_GRADED':
+        this.handleQUESTION_GRADED(message.questionId, message.graded);
+        break;
+      case 'QUESTION_LOCKED':
+        this.handleQUESTION_LOCKED(message.questionId, message.locked);
+        break;
     }
   };
 
@@ -359,7 +369,7 @@ export class RunValt {
   };
 
   lockQuestion = async (questionId: string, locked: boolean) => {
-    await this.ws?.sendMessage({ type: 'SET_QUESTION_LOCK', questionId, locked });
+    await this.ws?.sendMessage({ type: 'SET_QUESTION_LOCKED', questionId, locked });
   };
 
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
@@ -381,6 +391,60 @@ export class RunValt {
   private handleTEAM_STATUS = (teams: TeamStatus[]) => {
     for (const team of teams) {
       this.store.teams[team.id] = team;
+    }
+  };
+
+  private handlePOINTS_UPDATED = (questionId: string, answerId: string, points: number | null) => {
+    for (const item of this.store.items) {
+      if (item.type !== 'question' || item.phase === 'reading' || item.id !== questionId) {
+        continue;
+      }
+
+      for (const teamId in item.answers) {
+        if (!Object.hasOwn(item.answers, teamId)) {
+          continue;
+        }
+
+        const answer = item.answers[teamId];
+
+        if (answer?.answerId === answerId) {
+          answer.points = points;
+
+          if (item.phase === 'answer') {
+            return;
+          }
+
+          break;
+        }
+      }
+    }
+  };
+
+  private handleQUESTION_GRADED = (questionId: string, graded: boolean) => {
+    for (const item of this.store.items) {
+      if (item.type !== 'question' || item.phase === 'reading' || item.id !== questionId) {
+        continue;
+      }
+
+      item.graded = graded;
+
+      if (item.phase === 'answer') {
+        break;
+      }
+    }
+  };
+
+  private handleQUESTION_LOCKED = (questionId: string, locked: boolean) => {
+    for (const item of this.store.items) {
+      if (item.type !== 'question' || item.phase === 'reading' || item.id !== questionId) {
+        continue;
+      }
+
+      item.locked = locked;
+
+      if (item.phase === 'answer') {
+        break;
+      }
     }
   };
 }

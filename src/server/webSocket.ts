@@ -248,15 +248,16 @@ export class WebSocketServer {
       ws.subscribe(`${eventId}:hosts`);
       this.sendTeamStatuses(ws, connection);
       this.sendActiveItem(ws, connection);
+      console.log('Host connected for event', eventId);
 
-      console.log(
-        'Host connected for event',
-        eventId,
-        '\n',
-        Array.from(connection.teams)
-          .map(([id, teamWs]) => `\t${id}: ${teamWs.data.name}`)
-          .join('\n')
-      );
+      if (connection.teams.size > 0) {
+        console.log(
+          '    Teams:\n',
+          Array.from(connection.teams)
+            .map(([id, teamWs]) => `\t${id}: ${teamWs.data.name}`)
+            .join('\n')
+        );
+      }
     } else if (this.isJudgeWebSocket(ws)) {
       connection.judges.set(ws.data.wsId, ws);
       ws.subscribe(`${eventId}:judges`);
@@ -443,7 +444,7 @@ export class WebSocketServer {
           }
         | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
         | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem | null; __ACK__: string }
-        | { type: 'SET_QUESTION_LOCK'; questionId: string; locked: boolean; __ACK__: string }
+        | { type: 'SET_QUESTION_LOCKED'; questionId: string; locked: boolean; __ACK__: string }
         | { type: 'START_TIMER'; __ACK__: string }
         | { type: 'REMOVE_TIMER'; __ACK__: string };
 
@@ -457,8 +458,8 @@ export class WebSocketServer {
         case 'SET_ACTIVE_ITEM':
           await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
           break;
-        case 'SET_QUESTION_LOCK':
-          await this.handleSET_QUESTION_LOCK(connection, msg.questionId, msg.locked);
+        case 'SET_QUESTION_LOCKED':
+          await this.handleSET_QUESTION_LOCKED(connection, msg.questionId, msg.locked);
           break;
         case 'START_TIMER':
           this.handleSTART_TIMER(connection);
@@ -485,7 +486,7 @@ export class WebSocketServer {
             points: number | null;
             __ACK__: string;
           }
-        | { type: 'SET_QUESTION_GRADE'; questionId: string; graded: boolean; __ACK__: string };
+        | { type: 'SET_QUESTION_GRADED'; questionId: string; graded: boolean; __ACK__: string };
 
       ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
 
@@ -493,8 +494,8 @@ export class WebSocketServer {
         case 'UPDATE_POINTS':
           await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
           break;
-        case 'SET_QUESTION_GRADE':
-          await this.handleSET_QUESTION_GRADE(connection, msg.questionId, msg.graded);
+        case 'SET_QUESTION_GRADED':
+          await this.handleSET_QUESTION_GRADED(connection, msg.questionId, msg.graded);
           break;
       }
     }
@@ -597,6 +598,11 @@ export class WebSocketServer {
     this.server?.publish(`${connection.eventId}:presenters`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
     this.server?.publish(`${connection.eventId}:teams`, message);
+  }
+
+  broadcastToManagers(connection: EventConnection, message: string): void {
+    this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:judges`, message);
   }
 
   broadcastActiveItemToManagers(connection: EventConnection) {
@@ -850,7 +856,7 @@ export class WebSocketServer {
       currentActiveItem?.type === 'question' &&
       currentActiveItem.phase === 'answer'
     ) {
-      await this.handleSET_QUESTION_LOCK(connection, currentActiveItem.id, true);
+      await this.handleSET_QUESTION_LOCKED(connection, currentActiveItem.id, true);
     }
 
     if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
@@ -869,17 +875,26 @@ export class WebSocketServer {
     }
   }
 
-  private async handleSET_QUESTION_LOCK(
+  private async handleSET_QUESTION_LOCKED(
     connection: EventConnection,
     questionId: string,
     locked: boolean
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
+    await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
+
+    const message = JSON.stringify({
+      type: 'QUESTION_LOCKED',
+      questionId,
+      locked
+    });
+
+    this.broadcastToManagers(connection, message);
+
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       activeItem.locked = locked;
 
-      await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
       this.broadcastActiveItemToAll(connection);
     }
   }
@@ -910,7 +925,7 @@ export class WebSocketServer {
     }
   }
 
-  private async handleSET_QUESTION_GRADE(
+  private async handleSET_QUESTION_GRADED(
     connection: EventConnection,
     questionId: string,
     graded: boolean
@@ -918,6 +933,14 @@ export class WebSocketServer {
     const activeItem = connection.activeItem;
 
     await sql`UPDATE questions SET graded = ${graded} WHERE id = ${questionId}`;
+
+    const message = JSON.stringify({
+      type: 'QUESTION_GRADED',
+      questionId,
+      graded
+    });
+
+    this.broadcastToManagers(connection, message);
 
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       activeItem.graded = graded;
@@ -944,14 +967,24 @@ export class WebSocketServer {
       return;
     }
 
+    const message = JSON.stringify({
+      type: 'POINTS_UPDATED',
+      questionId: answer.question_id,
+      answerId,
+      points
+    });
+
+    this.broadcastToManagers(connection, message);
+
     const activeItem = connection.activeItem;
 
-    if (activeItem) {
+    if (activeItem && activeItem.type === 'question' && activeItem.id === answer.question_id) {
       const activeAnswer =
         activeItem.type === 'question' && activeItem.phase !== 'reading' ? activeItem.answers[answer.team_id] : null;
 
       if (activeAnswer) {
         activeAnswer.points = points;
+
         await this.saveActiveItem(connection, activeItem);
         this.broadcastActiveItemToAll(connection);
       }

@@ -45,7 +45,10 @@ interface GradeStore {
 
 type WebSocketGradeMessage =
   | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
-  | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem };
+  | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
+  | { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null }
+  | { type: 'QUESTION_GRADED'; questionId: string; graded: boolean }
+  | { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean };
 
 export class GradeValt {
   private ws: WebSocketManager<WebSocketGradeMessage> | null = null;
@@ -121,6 +124,15 @@ export class GradeValt {
       case 'ACTIVE_ITEM':
         this.handleSET_ACTIVE_ITEM(message.activeItem);
         break;
+      case 'POINTS_UPDATED':
+        this.handlePOINTS_UPDATED(message.questionId, message.answerId, message.points);
+        break;
+      case 'QUESTION_GRADED':
+        this.handleQUESTION_GRADED(message.questionId, message.graded);
+        break;
+      case 'QUESTION_LOCKED':
+        this.handleQUESTION_LOCKED(message.questionId, message.locked);
+        break;
     }
   };
 
@@ -191,8 +203,7 @@ export class GradeValt {
     const question = this.store.questions.find((q) => q.id === questionId);
 
     if (question) {
-      await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADE', questionId, graded });
-      question.graded = graded;
+      await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADED', questionId, graded });
     }
   };
 
@@ -209,6 +220,51 @@ export class GradeValt {
           }
         }
       }
+    }
+  };
+
+  private handlePOINTS_UPDATED = (questionId: string, answerId: string, points: number | null) => {
+    for (const question of this.store.questions) {
+      if (question.id !== questionId) {
+        continue;
+      }
+
+      for (const teamId in question.answers) {
+        if (!Object.hasOwn(question.answers, teamId)) {
+          continue;
+        }
+
+        const answer = question.answers[teamId];
+
+        if (answer?.answerId === answerId) {
+          answer.points = points;
+          return;
+        }
+      }
+
+      break;
+    }
+  };
+
+  private handleQUESTION_GRADED = (questionId: string, graded: boolean) => {
+    for (const question of this.store.questions) {
+      if (question.id !== questionId) {
+        continue;
+      }
+
+      question.graded = graded;
+      break;
+    }
+  };
+
+  private handleQUESTION_LOCKED = (questionId: string, locked: boolean) => {
+    for (const question of this.store.questions) {
+      if (question.id !== questionId) {
+        continue;
+      }
+
+      question.locked = locked;
+      break;
     }
   };
 }
