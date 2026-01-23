@@ -16,8 +16,8 @@ export type TeamWebsocketData = {
   id: string;
   name: string;
   number: number;
-  languageId: string | null;
-  languageCode: string | null;
+  languageId: string;
+  languageCode: string;
 };
 
 export type HostWebsocketData = {
@@ -203,10 +203,22 @@ export class WebSocketServer {
       }
 
       // Validate team exists for team role
-      const teams: { id: string; name: string; number: number; languageId: string | null }[] =
-        await sql`SELECT id, name, number, language_id FROM teams WHERE id = ${teamId} AND event_id = ${eventId}`;
+      const teams: {
+        id: string;
+        name: string;
+        number: number;
+        languageId: string;
+        languageCode: string;
+      }[] = await sql`
+          SELECT t.id, t.name, t.number, t.language_id, l.code as language_code
+          FROM teams t
+          LEFT JOIN languages l ON l.id = t.language_id
+          WHERE t.id = ${teamId} AND t.event_id = ${eventId}
+        `;
 
-      if (teams.length === 0) {
+      const team = teams[0];
+
+      if (!team) {
         console.error('Team not found for WebSocket upgrade request', req.url);
         return textNotFound('Team not found');
       }
@@ -216,11 +228,11 @@ export class WebSocketServer {
           data: {
             role: 'team',
             eventId,
-            id: teams[0]!.id,
-            name: teams[0]!.name,
-            number: teams[0]!.number,
-            languageId: teams[0]!.languageId,
-            languageCode: null
+            id: team.id,
+            name: team.name,
+            number: team.number,
+            languageId: team.languageId,
+            languageCode: team.languageCode
           }
         })
       ) {
@@ -274,19 +286,19 @@ export class WebSocketServer {
       console.log('Presenter connected for event', eventId);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
+      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${id}`);
 
       // Close existing connection if team reconnecting
-      if (connection.teams.has(id)) {
+      if (connection.teams.has(id) || (subscriberCount && subscriberCount > 0)) {
+        console.log('Team reconnecting, closing existing connection for event', eventId, id, subscriberCount);
         connection.teams.get(id)?.close();
         connection.teams.delete(id);
       }
 
-      connection.teams.set(id, ws);
-
       // Get team details including language
       const teams: {
-        language_id: string | null;
-        code: string | null;
+        language_id: string;
+        code: string;
         name: string;
         number: number;
       }[] = await sql`
@@ -297,6 +309,8 @@ export class WebSocketServer {
         `;
 
       if (teams.length > 0) {
+        connection.teams.set(id, ws);
+
         const team = teams[0]!;
 
         ws.data.languageId = team.language_id;
@@ -312,6 +326,7 @@ export class WebSocketServer {
         );
 
         ws.subscribe(`${eventId}:teams`);
+        ws.subscribe(`${eventId}:team:${id}`);
 
         this.sendLanguages(ws, connection);
         this.sendRunStatus(ws, connection);
@@ -334,9 +349,12 @@ export class WebSocketServer {
             ]
           })
         );
-      }
 
-      console.log('Team connected for event', eventId, id);
+        console.log(`Team ${team.number} connected for event`, eventId, id);
+      } else {
+        ws.close();
+        console.error('Team not found during WebSocket open for event', eventId, id);
+      }
     }
   };
 
@@ -364,34 +382,30 @@ export class WebSocketServer {
       connection.presenters = connection.presenters.filter((presenterWs) => presenterWs !== ws);
       console.log('Presenter disconnected for event', eventId);
     } else {
-      const { id, languageCode } = ws.data;
-      const team = connection.teams.get(id)?.data;
+      console.log(`Disconnecting team ${ws.data.number} for event`, eventId);
+      const { id, number, languageCode } = ws.data;
+      const team = connection.teams.get(id);
 
-      console.log('Team disconnected for event', eventId, id);
-      connection.teams.delete(id);
-
-      // Unsubscribe from language channel
-      if (languageCode) {
-        ws.unsubscribe(`${eventId}:${languageCode}`);
+      if (!team || team !== ws) {
+        console.log(`Team ${number} WebSocket mismatch on close`, eventId, id);
       }
 
-      if (team) {
-        // Notify host
+      connection.teams.delete(id);
+
+      ws.unsubscribe(`${eventId}:${languageCode}`);
+      ws.unsubscribe(`${eventId}:team:${id}`);
+
+      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${id}`);
+
+      console.log(`Subscriber count for team ${number}`, `${eventId}:team:${id}`, ':', subscriberCount);
+
+      if (!subscriberCount || subscriberCount === 0) {
         this.server?.publish(
           `${eventId}:hosts`,
-          JSON.stringify({
-            type: 'TEAM_STATUS',
-            teams: [
-              {
-                id,
-                status: 'offline',
-                name: team.name,
-                number: team.number,
-                languageCode
-              }
-            ]
-          })
+          JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id, number, status: 'offline' }] })
         );
+
+        console.log(`Team ${number} disconnected for event`, eventId, id);
       }
     }
 
@@ -576,13 +590,15 @@ export class WebSocketServer {
 
     const teamStatuses = teams.map((team) => {
       const teamWs = connection.teams.get(team.id);
-      const teamStatus = teamWs ? 'connected' : 'offline';
+      const subscriberCount = this.server?.subscriberCount(`${connection.eventId}:team:${team.id}`);
+      const teamStatus = teamWs || (subscriberCount && subscriberCount > 0) ? 'connected' : 'offline';
+
+      console.log('    Team status for', team.id, ':', teamStatus, subscriberCount);
 
       return {
         id: team.id,
         number: team.number,
-        status: teamStatus,
-        languageCode: teamWs?.data.languageCode || null
+        status: teamStatus
       };
     });
 
