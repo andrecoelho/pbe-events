@@ -441,6 +441,7 @@ export const Run = () => {
             {snap.run.activeItem &&
               snap.run.activeItem.type === 'question' &&
               snap.run.activeItem.phase === 'prompt' &&
+              !snap.run.activeItem.graded &&
               snap.run.activeItem.startTime !== null && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-red-400'
@@ -467,7 +468,8 @@ export const Run = () => {
 
             {snap.run.activeItem &&
               snap.run.activeItem.type === 'question' &&
-              snap.run.activeItem.phase === 'prompt' && (
+              snap.run.activeItem.phase === 'prompt' &&
+              !snap.run.activeItem.graded && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-sky-600'
                   data-tip='Restart Timer'
