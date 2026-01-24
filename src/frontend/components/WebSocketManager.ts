@@ -1,7 +1,7 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
-const MAX_RECONNECT_DELAY_MS = 30000;
-const PING_INTERVAL_MS = 10000;
-const ACK_TIMEOUT_MS = 5000;
+const MAX_RECONNECT_DELAY_MS = 16000;
+const PING_INTERVAL_MS = 5000;
+const ACK_TIMEOUT_MS = 2000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
 export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
