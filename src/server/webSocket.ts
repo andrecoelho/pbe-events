@@ -76,7 +76,8 @@ export class WebSocketServer {
       data: {} as WebsocketData,
       open: this.handleOpen,
       close: this.handleClose,
-      message: this.handleMessage
+      message: this.handleMessage,
+      idleTimeout: 35
     };
   }
 
