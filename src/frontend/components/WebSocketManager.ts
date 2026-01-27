@@ -1,5 +1,5 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
-const MAX_RECONNECT_DELAY_MS = 16000;
+const MAX_RECONNECT_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 5000;
 const ACK_TIMEOUT_MS = 2000;
 
@@ -39,11 +39,15 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
 
     this.status = 'connecting';
-    this.ws = new WebSocket(this.wsURL);
 
-    this.ws.addEventListener('open', this.handleWSOpen);
-    this.ws.addEventListener('message', this.handleWSMessage);
-    this.ws.addEventListener('close', this.handleWSClose);
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      this.ws = new WebSocket(this.wsURL);
+
+      this.ws.addEventListener('open', this.handleWSOpen);
+      this.ws.addEventListener('message', this.handleWSMessage);
+      this.ws.addEventListener('close', this.handleWSClose);
+    }
+
     this.notifyStatusChange();
   };
 
@@ -99,7 +103,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
     console.log('WebSocket connection established');
     this.notifyStatusChange();
-    this.schedulePing();
+    // this.schedulePing();
   };
 
   handleWSMessage = (event: MessageEvent<string>) => {
@@ -123,7 +127,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   handleWSClose = (event: CloseEvent, ...args: any[]) => {
     console.log('WebSocket connection closed', event, args);
 
-    this.resetWS();
+    // this.resetWS();
 
     if (this.status !== 'connecting') {
       this.status = 'connecting';
@@ -135,13 +139,13 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleOffline = () => {
     console.warn('Browser went offline. Disconnecting WebSocket.');
-    this.resetWS();
+    // this.resetWS();
     this.status = 'offline';
     this.notifyStatusChange();
   };
 
   handleOnline = () => {
-    console.log('Browser went online. Reconnecting WebSocket.');
+    console.log('Browser went online. Reconnecting WebSocket.', this.ws?.readyState);
     this.connect();
   };
 
@@ -160,7 +164,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   schedulePing = () => {
-    this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
+    // this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
   };
 
   sendPing = () => this.sendMessage({ type: 'PING' });
