@@ -131,11 +131,6 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
     // this.resetWS();
 
-    if (this.status !== 'connecting') {
-      this.status = 'connecting';
-      this.notifyStatusChange();
-    }
-
     this.reconnect();
   };
 
