@@ -103,16 +103,16 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   handleWSClose = () => {
+    const needsReset = !!this.ws;
+    
+    this.resetWS();
+
     if (window.navigator.onLine) {
-      if (this.ws) {
-        this.resetWS();
+      if (needsReset) {
         this.reconnect();
       } else {
-        this.resetWS();
         this.connect();
       }
-    } else {
-      this.resetWS();
     }
   };
 
@@ -136,6 +136,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleOffline = () => {
     this.changeStatus('offline');
+    // Forces browsers to close websocket if connection is not restored within about 8 seconds.
+    this.sendPing();
   };
 
   handleOnline = async () => {
