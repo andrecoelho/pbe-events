@@ -1,6 +1,7 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const ACK_TIMEOUT_MS = 2000;
+const SERVER_TIMEOUT_MS = 10000 - 3000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
 export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
@@ -8,6 +9,7 @@ export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
   reconnectTimer: number | null = null;
   reconnectAttempts: number = 0;
+  offlineTimer: number | null = null;
   pendingACKs: Map<string, { resolve: (value: boolean) => void; timerId: number }> = new Map();
   status: WebSocketStatus = 'init';
   wsURL: string;
@@ -76,6 +78,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   resetWS = () => {
     this.clearReconnectTimer();
+    this.clearOfflineTimer();
 
     this.pendingACKs.forEach((pending) => {
       clearTimeout(pending.timerId);
@@ -136,11 +139,12 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleOffline = () => {
     this.changeStatus('offline');
-    // Forces browsers to close websocket if connection is not restored within about 8 seconds.
-    this.sendPing();
+    this.offlineTimer = window.setTimeout(this.resetWS, SERVER_TIMEOUT_MS);
   };
 
   handleOnline = async () => {
+    this.clearOfflineTimer();
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       await this.sendPing();
       this.changeStatus('connected');
@@ -160,6 +164,13 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  };
+
+  clearOfflineTimer = () => {
+    if (this.offlineTimer) {
+      clearTimeout(this.offlineTimer);
+      this.offlineTimer = null;
     }
   };
 
