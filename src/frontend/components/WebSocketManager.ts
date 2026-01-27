@@ -1,6 +1,5 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
 const MAX_RECONNECT_DELAY_MS = 10000;
-// const PING_INTERVAL_MS = 5000;
 const ACK_TIMEOUT_MS = 2000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
@@ -9,10 +8,7 @@ export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
   reconnectTimer: number | null = null;
   reconnectAttempts: number = 0;
-
-  pingTimer: number | null = null;
   pendingACKs: Map<string, { resolve: (value: boolean) => void; timerId: number }> = new Map();
-
   status: WebSocketStatus = 'init';
   wsURL: string;
   ws: WebSocket | null = null;
@@ -79,7 +75,6 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   resetWS = () => {
-    this.clearPingTimer();
     this.clearReconnectTimer();
 
     this.pendingACKs.forEach((pending) => {
@@ -105,7 +100,20 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.reconnectAttempts = 0;
 
     this.changeStatus('connected');
-    // this.schedulePing();
+  };
+
+  handleWSClose = () => {
+    if (window.navigator.onLine) {
+      if (this.ws) {
+        this.resetWS();
+        this.reconnect();
+      } else {
+        this.resetWS();
+        this.connect();
+      }
+    } else {
+      this.resetWS();
+    }
   };
 
   handleWSMessage = (event: MessageEvent<string>) => {
@@ -124,13 +132,6 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
 
     this.onMessage?.(message);
-  };
-
-  handleWSClose = () => {
-    if (window.navigator.onLine) {
-      this.resetWS();
-      this.connect();
-    }
   };
 
   handleOffline = () => {
@@ -160,17 +161,6 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
   };
 
-  clearPingTimer = () => {
-    if (this.pingTimer) {
-      clearTimeout(this.pingTimer);
-      this.pingTimer = null;
-    }
-  };
-
-  // schedulePing = () => {
-  //   this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
-  // };
-
   sendPing = async () => await this.sendMessage({ type: 'PING' });
 
   sendMessage = (message: WebSocketMessage) => {
@@ -189,9 +179,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
         }, ACK_TIMEOUT_MS)
       });
 
-      this.clearPingTimer();
       this.ws.send(JSON.stringify(message));
-      // this.schedulePing();
     } else {
       console.warn('WebSocket is not open. Unable to send message:', message);
       resolve(false);
