@@ -60,7 +60,19 @@ export class TeamValt {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
-      wsUrl.search = new URLSearchParams({ role: 'team', eventId: this.eventId, teamId: this.teamId }).toString();
+      let hash = sessionStorage.getItem('teamHash') || '';
+
+      if (!hash) {
+        hash = crypto.randomUUID();
+        sessionStorage.setItem('teamHash', hash);
+      }
+
+      wsUrl.search = new URLSearchParams({
+        role: 'team',
+        eventId: this.eventId,
+        teamId: this.teamId,
+        hash
+      }).toString();
 
       this.ws = new WebSocketManager<WebSocketTeamMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 

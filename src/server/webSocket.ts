@@ -18,6 +18,7 @@ export type TeamWebsocketData = {
   number: number;
   languageId: string;
   languageCode: string;
+  hash: string;
 };
 
 export type HostWebsocketData = {
@@ -77,7 +78,7 @@ export class WebSocketServer {
       open: this.handleOpen,
       close: this.handleClose,
       message: this.handleMessage,
-      idleTimeout: 16
+      idleTimeout: 60
     };
   }
 
@@ -101,7 +102,6 @@ export class WebSocketServer {
     const url = new URL(req.url);
     const role = url.searchParams.get('role');
     const eventId = url.searchParams.get('eventId');
-    const teamId = url.searchParams.get('teamId');
 
     if (!eventId || !role) {
       console.error('Missing eventId or role in WebSocket upgrade request', req.url);
@@ -124,16 +124,17 @@ export class WebSocketServer {
     // Initialize connection tracking if needed
     if (!this.eventConnections.has(eventId)) {
       await this.initializeEventConnection(eventId);
-    }
 
-    if (!this.eventConnections.has(eventId)) {
-      console.error('No event connection found for eventId', eventId);
-      return textBadRequest('No event connection found for eventId');
+      if (!this.eventConnections.has(eventId)) {
+        console.error('Could not initialize event connection for eventId', eventId);
+        return textBadRequest('Could not initialize event connection');
+      }
     }
 
     if (role === 'host') {
       if (!session) {
         console.error('No session found for host connection', req.url);
+        this.cleanUpEventConnection(eventId);
         return;
       }
 
@@ -145,6 +146,7 @@ export class WebSocketServer {
 
       if (permissions.length === 0) {
         console.error('Host permission denied for event', req.url);
+        this.cleanUpEventConnection(eventId);
         return textForbidden();
       }
 
@@ -154,6 +156,7 @@ export class WebSocketServer {
     } else if (role === 'judge') {
       if (!session) {
         console.error('No session found for judge connection', req.url);
+        this.cleanUpEventConnection(eventId);
         return textUnauthorized();
       }
 
@@ -165,6 +168,7 @@ export class WebSocketServer {
 
       if (permissions.length === 0) {
         console.error('Judge permission denied for event', req.url);
+        this.cleanUpEventConnection(eventId);
         return textForbidden();
       }
 
@@ -174,6 +178,7 @@ export class WebSocketServer {
     } else if (role === 'presenter') {
       if (!session) {
         console.error('No session found for presenter connection', req.url);
+        this.cleanUpEventConnection(eventId);
         return textUnauthorized();
       }
 
@@ -186,6 +191,7 @@ export class WebSocketServer {
 
       if (permissions.length === 0) {
         console.error('Presenter permission denied for event', req.url);
+        this.cleanUpEventConnection(eventId);
         return textForbidden();
       }
 
@@ -193,14 +199,39 @@ export class WebSocketServer {
         return;
       }
     } else {
+      const hash = url.searchParams.get('hash');
+
+      if (!hash) {
+        console.error('Missing hash for team connection', req.url);
+        this.cleanUpEventConnection(eventId);
+        return textBadRequest('Missing hash');
+      }
+
+      const teamId = url.searchParams.get('teamId');
+
       if (!teamId) {
         console.error('Missing teamId for team connection', req.url);
+        this.cleanUpEventConnection(eventId);
         return textBadRequest('Missing teamId');
       }
 
-      if (this.eventConnections.has(eventId) && this.eventConnections.get(eventId)!.teams.has(teamId)) {
-        console.error('Team already connected for event', req.url);
-        return textBadRequest('Team already connected');
+      const connection = this.eventConnections.get(eventId);
+      const existingTeam = connection?.teams.get(teamId);
+      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${teamId}`);
+
+      if (existingTeam || (subscriberCount && subscriberCount > 0)) {
+        if (existingTeam?.data.hash !== hash) {
+          console.error('Team already connected for event', req.url);
+          this.cleanUpEventConnection(eventId);
+          return textBadRequest('Team already connected');
+        } else {
+          existingTeam?.close();
+          connection?.teams.delete(teamId);
+
+          if (!this.eventConnections.has(eventId)) {
+            await this.initializeEventConnection(eventId);
+          }
+        }
       }
 
       // Validate team exists for team role
@@ -221,6 +252,7 @@ export class WebSocketServer {
 
       if (!team) {
         console.error('Team not found for WebSocket upgrade request', req.url);
+        this.cleanUpEventConnection(eventId);
         return textNotFound('Team not found');
       }
 
@@ -233,7 +265,8 @@ export class WebSocketServer {
             name: team.name,
             number: team.number,
             languageId: team.languageId,
-            languageCode: team.languageCode
+            languageCode: team.languageCode,
+            hash
           }
         })
       ) {
@@ -242,6 +275,7 @@ export class WebSocketServer {
     }
 
     console.error('WebSocket upgrade failed', req.url);
+    this.cleanUpEventConnection(eventId);
     return textServerError('WebSocket upgrade failed');
   }
 
@@ -287,14 +321,6 @@ export class WebSocketServer {
       console.log('Presenter connected for event', eventId);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
-      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${id}`);
-
-      // Close existing connection if team reconnecting
-      if (connection.teams.has(id) || (subscriberCount && subscriberCount > 0)) {
-        console.log('Team reconnecting, closing existing connection for event', eventId, id, subscriberCount);
-        connection.teams.get(id)?.close();
-        connection.teams.delete(id);
-      }
 
       // Get team details including language
       const teams: {
@@ -410,17 +436,7 @@ export class WebSocketServer {
       }
     }
 
-    // Clean up empty connections
-    if (
-      connection.hosts.length === 0 &&
-      connection.presenters.length === 0 &&
-      connection.judges.size === 0 &&
-      connection.teams.size === 0
-    ) {
-      console.log('Cleaning up event connection for eventId', eventId);
-      this.clearTickTimer(connection);
-      this.eventConnections.delete(eventId);
-    }
+    this.cleanUpEventConnection(eventId);
   };
 
   // Called when a WebSocket message is received
@@ -515,6 +531,22 @@ export class WebSocketServer {
       }
     }
   };
+
+  private async cleanUpEventConnection(eventId: string): Promise<void> {
+    const connection = this.eventConnections.get(eventId);
+
+    if (
+      connection &&
+      connection.hosts.length === 0 &&
+      connection.presenters.length === 0 &&
+      connection.judges.size === 0 &&
+      connection.teams.size === 0
+    ) {
+      console.log('Cleaning up event connection for eventId', eventId);
+      this.clearTickTimer(connection);
+      this.eventConnections.delete(eventId);
+    }
+  }
 
   private async initializeEventConnection(eventId: string): Promise<void> {
     const [run]: {
