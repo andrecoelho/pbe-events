@@ -147,6 +147,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log('Testing connection.');
       await this.sendPing();
+      this.status = 'connected';
     } else {
       this.connect();
     }
