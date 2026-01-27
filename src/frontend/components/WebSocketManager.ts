@@ -46,6 +46,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.ws.addEventListener('open', this.handleWSOpen);
       this.ws.addEventListener('message', this.handleWSMessage);
       this.ws.addEventListener('close', this.handleWSClose);
+    } else if (this.ws.readyState === WebSocket.OPEN) {
+      this.status = 'connected';
     }
 
     this.notifyStatusChange();
