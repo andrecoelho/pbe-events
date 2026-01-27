@@ -146,9 +146,10 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
   };
 
-  handleVisibilityChange = () => {
+  handleVisibilityChange = async () => {
     if (document.visibilityState === 'visible') {
       navigator.wakeLock.request('screen');
+      await this.sendPing();
     }
   };
 
