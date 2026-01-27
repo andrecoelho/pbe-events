@@ -39,7 +39,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
 
     console.log('Connecting to WebSocket at', this.wsURL);
-    this.changeStatus('connecting')
+    this.changeStatus('connecting');
 
     if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
       this.ws = new WebSocket(this.wsURL);
