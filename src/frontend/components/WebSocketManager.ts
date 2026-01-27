@@ -1,6 +1,5 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
-const MAX_RECONNECT_DELAY_MS = 16000;
-const PING_INTERVAL_MS = 5000;
+const MAX_RECONNECT_DELAY_MS = 10000;
 const ACK_TIMEOUT_MS = 2000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
@@ -9,10 +8,7 @@ export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
   reconnectTimer: number | null = null;
   reconnectAttempts: number = 0;
-
-  pingTimer: number | null = null;
   pendingACKs: Map<string, { resolve: (value: boolean) => void; timerId: number }> = new Map();
-
   status: WebSocketStatus = 'init';
   wsURL: string;
   ws: WebSocket | null = null;
@@ -28,47 +24,57 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onStatusChange = onStatusChange;
     this.onMessage = onMessage;
 
-    window.addEventListener('offline', this.handleOffline);
-    window.addEventListener('online', this.handleOnline);
+    navigator.wakeLock.request('screen');
+    this.addEventListeners();
   }
 
+  addEventListeners = () => {
+    window.addEventListener('offline', this.handleOffline);
+    window.addEventListener('online', this.handleOnline);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+  };
+
+  removeEventListeners = () => {
+    window.removeEventListener('offline', this.handleOffline);
+    window.removeEventListener('online', this.handleOnline);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+  };
+
   connect = () => {
-    if (window.navigator.onLine === false) {
-      console.warn('Offline: WebSocket connection aborted.');
+    if (!window.navigator.onLine) {
       return;
     }
 
-    this.status = 'connecting';
-    this.ws = new WebSocket(this.wsURL);
+    this.changeStatus('connecting');
 
-    this.ws.addEventListener('open', this.handleWSOpen);
-    this.ws.addEventListener('message', this.handleWSMessage);
-    this.ws.addEventListener('close', this.handleWSClose);
-    this.notifyStatusChange();
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      this.ws = new WebSocket(this.wsURL);
+
+      this.ws.addEventListener('open', this.handleWSOpen);
+      this.ws.addEventListener('message', this.handleWSMessage);
+      this.ws.addEventListener('close', this.handleWSClose);
+    } else if (this.ws.readyState === WebSocket.OPEN) {
+      this.changeStatus('connected');
+    }
   };
 
   reconnect = () => {
+    this.changeStatus('connecting');
     this.reconnectAttempts++;
 
     if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
 
-      console.log(`WebSocket error. Attempting to reconnect in ${delay} ms...`);
-
       this.reconnectTimer = window.setTimeout(this.connect, delay);
     } else {
-      console.error('Max WebSocket reconnection attempts reached.');
-
-      this.status = 'error';
       this.reconnectAttempts = 0;
 
-      this.notifyStatusChange();
+      this.changeStatus('error');
       this.resetWS();
     }
   };
 
   resetWS = () => {
-    this.clearPingTimer();
     this.clearReconnectTimer();
 
     this.pendingACKs.forEach((pending) => {
@@ -86,20 +92,28 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   destroy = () => {
-    console.log('Destroying WebSocketManager...');
     this.resetWS();
-
-    window.removeEventListener('offline', this.handleOffline);
-    window.removeEventListener('online', this.handleOnline);
+    this.removeEventListeners();
   };
 
   handleWSOpen = () => {
     this.reconnectAttempts = 0;
-    this.status = 'connected';
 
-    console.log('WebSocket connection established');
-    this.notifyStatusChange();
-    this.schedulePing();
+    this.changeStatus('connected');
+  };
+
+  handleWSClose = () => {
+    if (window.navigator.onLine) {
+      if (this.ws) {
+        this.resetWS();
+        this.reconnect();
+      } else {
+        this.resetWS();
+        this.connect();
+      }
+    } else {
+      this.resetWS();
+    }
   };
 
   handleWSMessage = (event: MessageEvent<string>) => {
@@ -120,29 +134,24 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onMessage?.(message);
   };
 
-  handleWSClose = (event: CloseEvent, ...args: any[]) => {
-    console.log('WebSocket connection closed', event, args);
-
-    this.resetWS();
-
-    if (this.status !== 'connecting') {
-      this.status = 'connecting';
-      this.notifyStatusChange();
-    }
-
-    this.reconnect();
-  };
-
   handleOffline = () => {
-    console.warn('Browser went offline. Disconnecting WebSocket.');
-    this.resetWS();
-    this.status = 'offline';
-    this.notifyStatusChange();
+    this.changeStatus('offline');
   };
 
-  handleOnline = () => {
-    console.log('Browser went online. Reconnecting WebSocket.');
-    this.connect();
+  handleOnline = async () => {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      await this.sendPing();
+      this.changeStatus('connected');
+    } else {
+      this.connect();
+    }
+  };
+
+  handleVisibilityChange = async () => {
+    if (document.visibilityState === 'visible') {
+      navigator.wakeLock.request('screen');
+      await this.sendPing();
+    }
   };
 
   clearReconnectTimer = () => {
@@ -152,18 +161,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
   };
 
-  clearPingTimer = () => {
-    if (this.pingTimer) {
-      clearTimeout(this.pingTimer);
-      this.pingTimer = null;
-    }
-  };
-
-  schedulePing = () => {
-    this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
-  };
-
-  sendPing = () => this.sendMessage({ type: 'PING' });
+  sendPing = async () => await this.sendMessage({ type: 'PING' });
 
   sendMessage = (message: WebSocketMessage) => {
     const { promise, resolve } = Promise.withResolvers<boolean>();
@@ -181,9 +179,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
         }, ACK_TIMEOUT_MS)
       });
 
-      this.clearPingTimer();
       this.ws.send(JSON.stringify(message));
-      this.schedulePing();
     } else {
       console.warn('WebSocket is not open. Unable to send message:', message);
       resolve(false);
@@ -192,9 +188,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     return promise;
   };
 
-  notifyStatusChange = () => {
+  changeStatus = (status: WebSocketStatus) => {
+    this.status = status;
+
     if (this.onStatusChange) {
-      this.onStatusChange(this.status);
+      this.onStatusChange(status);
     }
   };
 }

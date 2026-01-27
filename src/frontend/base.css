@@ -1,5 +1,12 @@
 @import 'tailwindcss';
-@plugin "daisyui";
+
+@plugin "daisyui" {
+  /*
+    Disable DaisyUI default themes; we only use our custom "pbe" theme below
+    for consistent PBE branding, and we don't have a dark mode theme so the default dark mode looks bad.
+  */
+  themes: false;
+};
 
 @plugin "daisyui/theme" {
   name: 'pbe';
