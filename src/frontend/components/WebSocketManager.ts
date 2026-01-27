@@ -39,7 +39,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     }
 
     console.log('Connecting to WebSocket at', this.wsURL);
-    this.status = 'connecting';
+    this.changeStatus('connecting')
 
     if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
       this.ws = new WebSocket(this.wsURL);
@@ -48,10 +48,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.ws.addEventListener('message', this.handleWSMessage);
       this.ws.addEventListener('close', this.handleWSClose);
     } else if (this.ws.readyState === WebSocket.OPEN) {
-      this.status = 'connected';
+      this.changeStatus('connected');
     }
-
-    this.notifyStatusChange();
   };
 
   reconnect = () => {
@@ -66,10 +64,9 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     } else {
       console.error('Max WebSocket reconnection attempts reached.');
 
-      this.status = 'error';
       this.reconnectAttempts = 0;
 
-      this.notifyStatusChange();
+      this.changeStatus('error');
       this.resetWS();
     }
   };
@@ -102,10 +99,9 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleWSOpen = () => {
     this.reconnectAttempts = 0;
-    this.status = 'connected';
 
     console.log('WebSocket connection established');
-    this.notifyStatusChange();
+    this.changeStatus('connected');
     // this.schedulePing();
   };
 
@@ -137,8 +133,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleOffline = () => {
     console.warn('Browser offline.');
-    this.status = 'offline';
-    this.notifyStatusChange();
+    this.changeStatus('offline');
   };
 
   handleOnline = async () => {
@@ -147,7 +142,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log('Testing connection.');
       await this.sendPing();
-      this.status = 'connected';
+      this.changeStatus('connected');
     } else {
       this.connect();
     }
@@ -200,9 +195,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     return promise;
   };
 
-  notifyStatusChange = () => {
+  changeStatus = (status: WebSocketStatus) => {
+    this.status = status;
+
     if (this.onStatusChange) {
-      this.onStatusChange(this.status);
+      this.onStatusChange(status);
     }
   };
 }
