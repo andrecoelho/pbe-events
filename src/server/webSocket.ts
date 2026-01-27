@@ -78,7 +78,7 @@ export class WebSocketServer {
       open: this.handleOpen,
       close: this.handleClose,
       message: this.handleMessage,
-      idleTimeout: 60
+      idleTimeout: 10
     };
   }
 
