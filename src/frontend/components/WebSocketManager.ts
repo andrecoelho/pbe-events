@@ -141,9 +141,14 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.notifyStatusChange();
   };
 
-  handleOnline = () => {
-    console.log('Browser went online. Reconnecting WebSocket.', this.ws?.readyState);
-    this.connect();
+  handleOnline = async () => {
+    console.log('Browser went online. Testing connection.', this.ws?.readyState);
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      await this.sendPing();
+    } else {
+      this.connect();
+    }
   };
 
   clearReconnectTimer = () => {
@@ -164,7 +169,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     // this.pingTimer = window.setTimeout(this.sendPing, PING_INTERVAL_MS);
   };
 
-  sendPing = () => this.sendMessage({ type: 'PING' });
+  sendPing = async () => await this.sendMessage({ type: 'PING' });
 
   sendMessage = (message: WebSocketMessage) => {
     const { promise, resolve } = Promise.withResolvers<boolean>();
