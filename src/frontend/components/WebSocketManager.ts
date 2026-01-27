@@ -130,7 +130,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   handleWSClose = (event: CloseEvent, ...args: any[]) => {
     console.log('WebSocket connection closed', event, args);
 
-    if (!window.navigator.onLine) {
+    if (window.navigator.onLine) {
       this.reconnect();
     }
   };
