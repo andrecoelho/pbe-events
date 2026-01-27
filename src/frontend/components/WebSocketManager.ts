@@ -1,7 +1,7 @@
 const MAX_RECONNECT_ATTEMPTS = 3;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const ACK_TIMEOUT_MS = 2000;
-const SERVER_TIMEOUT_MS = 10000 - 3000;
+const SERVER_TIMEOUT_MS = 10000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
 export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
