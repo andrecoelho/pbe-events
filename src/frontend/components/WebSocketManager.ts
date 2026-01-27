@@ -53,8 +53,9 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   reconnect = () => {
-    this.reconnectAttempts++;
+    console.log('Reconnecting to WebSocket...');
     this.changeStatus('connecting');
+    this.reconnectAttempts++;
 
     if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
