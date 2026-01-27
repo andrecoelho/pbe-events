@@ -54,6 +54,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   reconnect = () => {
     this.reconnectAttempts++;
+    this.changeStatus('connecting');
 
     if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
@@ -62,10 +63,9 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
       this.reconnectTimer = window.setTimeout(this.connect, delay);
     } else {
-      console.error('Max WebSocket reconnection attempts reached.');
-
       this.reconnectAttempts = 0;
 
+      console.error('Max WebSocket reconnection attempts reached.');
       this.changeStatus('error');
       this.resetWS();
     }
