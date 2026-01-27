@@ -28,6 +28,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onStatusChange = onStatusChange;
     this.onMessage = onMessage;
 
+    console.log(navigator.wakeLock.request('screen'));
+
     window.addEventListener('offline', this.handleOffline);
     window.addEventListener('online', this.handleOnline);
   }
@@ -128,6 +130,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     console.log('WebSocket connection closed', event, args);
 
     if (window.navigator.onLine) {
+      this.resetWS();
       this.reconnect();
     }
   };
