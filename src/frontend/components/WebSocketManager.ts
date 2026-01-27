@@ -129,7 +129,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   handleWSClose = () => {
     if (window.navigator.onLine) {
       this.resetWS();
-      this.reconnect();
+      this.connect();
     }
   };
 
