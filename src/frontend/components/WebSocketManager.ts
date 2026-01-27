@@ -55,6 +55,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.ws.addEventListener('open', this.handleWSOpen);
       this.ws.addEventListener('message', this.handleWSMessage);
       this.ws.addEventListener('close', this.handleWSClose);
+      this.ws.addEventListener('error', this.handleWSError);
     } else if (this.ws.readyState === WebSocket.OPEN) {
       this.changeStatus('connected');
     }
@@ -118,6 +119,10 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       }
     }
   };
+
+  handleWSError = (event: Event) => {
+    console.log('WS error:', event);
+  }
 
   handleWSMessage = (event: MessageEvent<string>) => {
     const message = JSON.parse(event.data) as TMessage;
