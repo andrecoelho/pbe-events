@@ -98,7 +98,7 @@ const ResultsContent = () => {
                   style={{ height: `${Math.max(height, 2)}%` }}
                   title={`${team.name}: ${team.totalPoints}/${snap.maxPoints} (${height.toFixed(1)}%)`}
                 >
-                  {team.percentage.toFixed(2)}%
+                  {team.percentage > 0 ? `${team.percentage.toFixed(2)}%` : null}
                 </div>
               );
             })}
@@ -144,13 +144,13 @@ const ResultsContent = () => {
                 <th>Language</th>
                 <th>Points</th>
                 <th>Max Points</th>
-                <th>ABS Percentage</th>
+                <th>Max Percentage</th>
                 <th>Highest Points</th>
-                <th>Percentage</th>
+                <th>Highest Percentage</th>
               </tr>
             </thead>
             <tbody>
-              {snap.teams.map((team, index) => (
+              {snap.teams.map((team) => (
                 <tr key={team.id}>
                   <td className='font-semibold'>{team.number}</td>
                   <td>{team.name}</td>
