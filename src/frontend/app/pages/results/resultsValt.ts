@@ -48,13 +48,14 @@ export class ResultsValt {
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
-    this.store.maxPoints = response.maxPoints;
-    this.store.highestPoints = response.teams.reduce((highestPoints: number, team: any) => Math.max(highestPoints, team.totalPoints), 0);
+    this.store.maxPoints = Number(response.maxPoints);
+    this.store.highestPoints = response.teams.reduce((highestPoints: number, team: any) => Math.max(highestPoints, Number(team.totalPoints)), 0);
 
     this.store.teams = response.teams.map((team: any) => ({
       ...team,
-      absPercentage: response.maxPoints > 0 ? (team.totalPoints / response.maxPoints) * 100 : 0,
-      percentage: response.maxPoints > 0 ? (team.totalPoints / this.store.highestPoints) * 100 : 0
+      totalPoints: Number(team.totalPoints),
+      absPercentage: response.maxPoints > 0 ? (Number(team.totalPoints) / Number(response.maxPoints)) * 100 : 0,
+      percentage: response.maxPoints > 0 ? (Number(team.totalPoints) / this.store.highestPoints) * 100 : 0
     }));
 
     this.store.initialized = true;
