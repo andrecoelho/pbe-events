@@ -27,7 +27,7 @@ export const TeamQuestionAnswer = () => {
       </div>
       <h2 className='border-b border-accent pb-4 flex justify-between'>
         <span className='text-4xl font-serif font-semibold '>Answer:</span>
-        {answer && !activeItem.locked && !answer.challenged && (
+        {answer && answer.answerId && !activeItem.locked && !answer.challenged && (
           <button className='btn btn-error ml-auto' onClick={handleChallengeClick}>
             <svg
               xmlns='http://www.w3.org/2000/svg'
@@ -44,7 +44,7 @@ export const TeamQuestionAnswer = () => {
             Challenge Question
           </button>
         )}
-        {answer && !activeItem.locked && answer.challenged && (
+        {answer && answer.answerId && !activeItem.locked && answer.challenged && (
           <button className='btn btn-success ml-auto' onClick={handleClearChallengeClick}>
             <svg
               xmlns='http://www.w3.org/2000/svg'

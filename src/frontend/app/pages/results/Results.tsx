@@ -98,7 +98,7 @@ const ResultsContent = () => {
                   style={{ height: `${Math.max(height, 2)}%` }}
                   title={`${team.name}: ${team.totalPoints}/${snap.maxPoints} (${height.toFixed(1)}%)`}
                 >
-                  {team.percentage.toFixed(2)}%
+                  {team.percentage > 0 ? `${team.percentage.toFixed(2)}%` : null}
                 </div>
               );
             })}
@@ -143,17 +143,29 @@ const ResultsContent = () => {
                 <th>Team Name</th>
                 <th>Language</th>
                 <th>Points</th>
-                <th>Percentage</th>
+                <th>Max Points</th>
+                <th>Max Percentage</th>
+                <th>Highest Points</th>
+                <th>Highest Percentage</th>
               </tr>
             </thead>
             <tbody>
-              {snap.teams.map((team, index) => (
+              {snap.teams.map((team) => (
                 <tr key={team.id}>
                   <td className='font-semibold'>{team.number}</td>
                   <td>{team.name}</td>
                   <td>{team.languageName}</td>
                   <td>
-                    {team.totalPoints}/{snap.maxPoints}
+                    {team.totalPoints}
+                  </td>
+                  <td>
+                    {snap.maxPoints}
+                  </td>
+                  <td>
+                    {team.absPercentage.toFixed(2)}%
+                  </td>
+                  <td>
+                    {snap.highestPoints}
                   </td>
                   <td>
                     <span
@@ -180,6 +192,8 @@ const ResultsContent = () => {
   );
 };
 
+ResultsContent.displayName = 'ResultsContent';
+
 export const Results = () => {
   const valt = useMemo(() => new ResultsValt(), []);
 
@@ -199,3 +213,5 @@ export const Results = () => {
     </ResultsValtContext.Provider>
   );
 };
+
+Results.displayName = 'Results';
