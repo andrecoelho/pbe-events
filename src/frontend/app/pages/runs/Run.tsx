@@ -165,9 +165,8 @@ export const Run = () => {
   const isConnected = snap.connectionState === 'connected';
   const isFirstItem = snap.currentIndex === 0;
   const isLastItem = snap.currentIndex === snap.items.length - 1;
-
-  const isTimeUp =
-    snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt' && snap.run.activeItem.isTimeUp;
+  const isPrompting = snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt';
+  const isTimeUp = isPrompting && snap.run.activeItem.isTimeUp;
 
   return (
     <RunValtContext.Provider value={valt}>
@@ -361,7 +360,11 @@ export const Run = () => {
             )}
 
             {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' disabled={!isConnected || isLastItem || isTimeUp} onClick={handleNextEvent}>
+              <button
+                className='btn btn-neutral'
+                disabled={!isConnected || isLastItem || (isPrompting && !isTimeUp)}
+                onClick={handleNextEvent}
+              >
                 Next
                 <Icon name='chevron-right' className='size-4' />
               </button>
