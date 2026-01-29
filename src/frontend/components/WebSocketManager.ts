@@ -65,6 +65,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.changeStatus('connecting');
     this.reconnectAttempts++;
 
+    if (this.reconnectAttempts === 1) {
+      this.connect();
+      return;
+    }
+
     if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
 
@@ -108,7 +113,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleWSClose = () => {
     const needsReset = !!this.ws;
-    
+
     this.resetWS();
 
     if (window.navigator.onLine) {
