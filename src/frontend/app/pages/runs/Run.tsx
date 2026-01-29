@@ -250,7 +250,7 @@ export const Run = () => {
                       )}
                       {teamChallenged && (
                         <span className='team-badge-challenged'>
-                          <Icon name='face-frown' className='size-4' />
+                          <Icon name='face-frown' variant='solid' className='size-4' />
                         </span>
                       )}
                     </span>

@@ -112,27 +112,31 @@ export function Icon(props: Props) {
     path = outlinePaths[props.name];
   }
 
+  const fillRule = props.variant === 'solid' ? 'evenodd' : undefined;
+  const clipRule = props.variant === 'solid' ? 'evenodd' : undefined;
+  const strokeWidth = props.variant === 'solid' ? undefined : 1.5;
+  const stroke = props.variant === 'solid' ? undefined : 'currentColor';
   let content: React.ReactNode;
 
   if (Array.isArray(path)) {
     const nodes: React.ReactElement[] = [];
 
     for (let i = 0; i < path.length; i += 1) {
-      nodes.push(<path key={i} d={path[i]} />);
+      nodes.push(<path key={i} d={path[i]} fillRule={fillRule} clipRule={clipRule} />);
     }
 
     content = nodes;
   } else {
-    content = <path d={path as string} />;
+    content = <path d={path as string} fillRule={fillRule} clipRule={clipRule} />;
   }
 
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
       viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth={1.5}
+      fill={props.variant === 'solid' ? 'currentColor' : 'none'}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
       {...props}
     >
       {content}
