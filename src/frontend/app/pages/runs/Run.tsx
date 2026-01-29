@@ -321,48 +321,46 @@ export const Run = () => {
 
         <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-between items-center shadow-md-top'>
           <div className='flex gap-2'>
-            {snap.run.status === 'not_started' && (
-              <button className='btn btn-success' disabled={!isConnected} onClick={handleStartEvent}>
+            {isConnected && snap.run.status === 'not_started' && (
+              <button className='btn btn-success' onClick={handleStartEvent}>
                 <Icon name='play' className='size-4' />
                 Start
               </button>
             )}
-            {snap.run.status === 'paused' && (
-              <button className='btn btn-success' disabled={!isConnected} onClick={handleResumeEvent}>
+            {isConnected && snap.run.status === 'paused' && (
+              <button className='btn btn-success' onClick={handleResumeEvent}>
                 <Icon name='play' className='size-4' />
                 Resume
               </button>
             )}
-            {snap.run.status === 'in_progress' && (
-              <button className='btn btn-info' disabled={!isConnected} onClick={handlePauseEvent}>
+            {isConnected && snap.run.status === 'in_progress' && (
+              <button className='btn btn-info' onClick={handlePauseEvent}>
                 <Icon name='pause' className='size-4' />
                 Pause
               </button>
             )}
-            {snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
-              <button className='btn btn-error' disabled={!isConnected} onClick={handleCompleteEvent}>
+            {isConnected && snap.run.status !== 'completed' && snap.run.status !== 'not_started' && (
+              <button className='btn btn-error' onClick={handleCompleteEvent}>
                 <Icon name='stop' className='size-4' />
                 Complete
               </button>
             )}
-            {snap.run.status === 'completed' && (
-              <button className='btn btn-warning' disabled={!isConnected} onClick={handleResetEvent}>
+            {isConnected && snap.run.status === 'completed' && (
+              <button className='btn btn-warning' onClick={handleResetEvent}>
                 <Icon name='arrow-path' className='size-4' />
                 Reset
               </button>
             )}
-
-            {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' disabled={!isConnected || isFirstItem} onClick={handlePreviousEvent}>
+            {isConnected && snap.run.status === 'in_progress' && (
+              <button className='btn btn-neutral' disabled={isFirstItem} onClick={handlePreviousEvent}>
                 <Icon name='chevron-left' className='size-4' />
                 Previous
               </button>
             )}
-
-            {snap.run.status === 'in_progress' && (
+            {isConnected && snap.run.status === 'in_progress' && (
               <button
                 className='btn btn-neutral'
-                disabled={!isConnected || isLastItem || (isPrompting && !isTimeUp)}
+                disabled={isLastItem || (isPrompting && !isTimeUp)}
                 onClick={handleNextEvent}
               >
                 Next
@@ -370,13 +368,13 @@ export const Run = () => {
               </button>
             )}
 
-            {snap.run.activeItem?.type === 'question' &&
+            {isConnected &&
+              snap.run.activeItem?.type === 'question' &&
               snap.run.activeItem.phase !== 'reading' &&
               !snap.run.activeItem.locked && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-amber-600'
                   data-tip='Lock Question'
-                  disabled={!isConnected}
                   aria-label='Lock Question'
                   onClick={handleLockQuestion}
                 >
@@ -395,14 +393,14 @@ export const Run = () => {
                 </button>
               )}
 
-            {snap.run.activeItem?.type === 'question' &&
+            {isConnected &&
+              snap.run.activeItem?.type === 'question' &&
               snap.run.activeItem.phase !== 'reading' &&
               snap.run.activeItem.locked &&
               !snap.run.activeItem.graded && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-indigo-400'
                   data-tip='Unlock Question'
-                  disabled={!isConnected}
                   aria-label='Unlock Question'
                   onClick={handleUnlockQuestion}
                 >
@@ -444,7 +442,8 @@ export const Run = () => {
           )}
 
           <div className='flex gap-2'>
-            {snap.run.activeItem &&
+            {isConnected &&
+              snap.run.activeItem &&
               snap.run.activeItem.type === 'question' &&
               snap.run.activeItem.phase === 'prompt' &&
               !snap.run.activeItem.graded &&
@@ -452,7 +451,6 @@ export const Run = () => {
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-red-400'
                   data-tip='Remove Timer'
-                  disabled={!isConnected}
                   aria-label='Remove Timer'
                   onClick={handleRemoveTimer}
                 >
@@ -472,14 +470,14 @@ export const Run = () => {
                 </button>
               )}
 
-            {snap.run.activeItem &&
+            {isConnected &&
+              snap.run.activeItem &&
               snap.run.activeItem.type === 'question' &&
               snap.run.activeItem.phase === 'prompt' &&
               !snap.run.activeItem.graded && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-sky-600'
                   data-tip='Restart Timer'
-                  disabled={!isConnected}
                   aria-label='Restart Timer'
                   onClick={handleRestartTimer}
                 >
@@ -498,10 +496,12 @@ export const Run = () => {
                 </button>
               )}
 
-            <button className='btn btn-accent' disabled={!isConnected} onClick={handleOpenPresenter}>
-              <Icon name='presentation-chart-bar' className='size-4' />
-              Presenter
-            </button>
+            {isConnected && (
+              <button className='btn btn-accent' onClick={handleOpenPresenter}>
+                <Icon name='presentation-chart-bar' className='size-4' />
+                Presenter
+              </button>
+            )}
           </div>
         </footer>
       </div>
