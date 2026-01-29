@@ -63,14 +63,15 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   reconnect = () => {
     this.changeStatus('connecting');
-    this.reconnectAttempts++;
 
-    if (this.reconnectAttempts === 1) {
+    if (this.reconnectAttempts === 0) {
       this.connect();
       return;
     }
 
-    if (this.reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+    if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      this.reconnectAttempts++;
+
       const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
 
       this.reconnectTimer = window.setTimeout(this.connect, delay);
@@ -127,7 +128,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   handleWSError = (event: Event) => {
     console.log('WS error:', event);
-  }
+  };
 
   handleWSMessage = (event: MessageEvent<string>) => {
     const message = JSON.parse(event.data) as TMessage;
