@@ -9,6 +9,7 @@ export type TeamResult = {
   languageName: string;
   totalPoints: number;
   percentage: number;
+  absPercentage: number;
 };
 
 export type ResultsStore = {
@@ -16,6 +17,7 @@ export type ResultsStore = {
   eventId: string;
   eventName: string;
   maxPoints: number;
+  highestPoints: number;
   teams: TeamResult[];
 };
 
@@ -28,6 +30,7 @@ export class ResultsValt {
       eventId: '',
       eventName: '',
       maxPoints: 0,
+      highestPoints: 0,
       teams: []
     });
   }
@@ -45,11 +48,13 @@ export class ResultsValt {
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
-    this.store.maxPoints = response.teams.reduce((maxPoints: number, team: any) => Math.max(maxPoints, team.totalPoints), 0);
+    this.store.maxPoints = response.maxPoints;
+    this.store.highestPoints = response.teams.reduce((highestPoints: number, team: any) => Math.max(highestPoints, team.totalPoints), 0);
 
     this.store.teams = response.teams.map((team: any) => ({
       ...team,
-      percentage: response.maxPoints > 0 ? (team.totalPoints / this.store.maxPoints) * 100 : 0
+      absPercentage: response.maxPoints > 0 ? (team.totalPoints / response.maxPoints) * 100 : 0,
+      percentage: response.maxPoints > 0 ? (team.totalPoints / this.store.highestPoints) * 100 : 0
     }));
 
     this.store.initialized = true;
@@ -59,13 +64,14 @@ export class ResultsValt {
 
   downloadResultsCSV() {
     const rows = [
-      ['Team Number', 'Team Name', 'Language', 'Total Points', 'Max Points', 'Percentage'],
+      ['Team Number', 'Team Name', 'Language', 'Total Points', 'Max Points', 'Highest Points', 'Percentage'],
       ...this.store.teams.map((team) => [
         team.number.toString(),
         team.name,
         team.languageName,
         team.totalPoints.toString(),
         this.store.maxPoints.toString(),
+        this.store.highestPoints.toString(),
         `${team.percentage.toFixed(2)}%`
       ])
     ];
@@ -92,14 +98,16 @@ export class ResultsValt {
     const response = await result.json();
 
     const rows = [
-      ['Question Number', 'Team Number', 'Team Name', 'Language', 'Answer', 'Points'],
+      ['Question Number', 'Team Number', 'Team Name', 'Language', 'Answer', 'Points', 'Highest Points', 'Max Points'],
       ...response.answers.map((answer: any) => [
         answer.questionNumber.toString(),
         answer.teamNumber.toString(),
         answer.teamName,
         answer.languageName,
         answer.answer,
-        answer.points.toString()
+        answer.points.toString(),
+        this.store.highestPoints.toString(),
+        this.store.maxPoints.toString()
       ])
     ];
 

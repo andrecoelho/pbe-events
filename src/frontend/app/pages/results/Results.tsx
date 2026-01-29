@@ -143,6 +143,7 @@ const ResultsContent = () => {
                 <th>Team Name</th>
                 <th>Language</th>
                 <th>Points</th>
+                <th>Absolute Percentage</th>
                 <th>Percentage</th>
               </tr>
             </thead>
@@ -154,6 +155,9 @@ const ResultsContent = () => {
                   <td>{team.languageName}</td>
                   <td>
                     {team.totalPoints}/{snap.maxPoints}
+                  </td>
+                  <td>
+                    {team.absPercentage.toFixed(2)}%
                   </td>
                   <td>
                     <span
