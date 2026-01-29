@@ -166,7 +166,7 @@ export const Run = () => {
   const isFirstItem = snap.currentIndex === 0;
   const isLastItem = snap.currentIndex === snap.items.length - 1;
   const isPrompting = snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt';
-  const isTimeUp = isPrompting && snap.run.activeItem.isTimeUp;
+  const isTimeUp = isPrompting && (snap.run.activeItem.isTimeUp || snap.run.activeItem.startTime === null);
 
   return (
     <RunValtContext.Provider value={valt}>
