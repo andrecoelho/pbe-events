@@ -11,7 +11,7 @@ import './Run.css';
 
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',
-  connected: 'team-badge--connected',
+  connected: 'team-badge--connected'
 };
 
 const formatTeamNumber = (value: number) => value.toString().padStart(2, '0');
@@ -165,6 +165,9 @@ export const Run = () => {
   const isConnected = snap.connectionState === 'connected';
   const isFirstItem = snap.currentIndex === 0;
   const isLastItem = snap.currentIndex === snap.items.length - 1;
+
+  const isTimeUp =
+    snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt' && snap.run.activeItem.isTimeUp;
 
   return (
     <RunValtContext.Provider value={valt}>
@@ -358,7 +361,7 @@ export const Run = () => {
             )}
 
             {snap.run.status === 'in_progress' && (
-              <button className='btn btn-neutral' disabled={!isConnected || isLastItem} onClick={handleNextEvent}>
+              <button className='btn btn-neutral' disabled={!isConnected || isLastItem || isTimeUp} onClick={handleNextEvent}>
                 Next
                 <Icon name='chevron-right' className='size-4' />
               </button>
