@@ -169,14 +169,14 @@ export const Grade = () => {
                     question.graded && isActive
                       ? 'question-badge--active-graded'
                       : question.locked && isActive
-                      ? 'question-badge--active-locked'
-                      : isActive
-                      ? 'question-badge--active'
-                      : question.graded
-                      ? 'question-badge--graded'
-                      : question.locked
-                      ? 'question-badge--locked'
-                      : ''
+                        ? 'question-badge--active-locked'
+                        : isActive
+                          ? 'question-badge--active'
+                          : question.graded
+                            ? 'question-badge--graded'
+                            : question.locked
+                              ? 'question-badge--locked'
+                              : ''
                   } ${isSelected ? 'question-badge--selected' : ''}`}
                   data-question-id={question.id}
                   onClick={handleSelectQuestion}
@@ -257,20 +257,7 @@ export const Grade = () => {
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
                         <td className='text-center'>
-                          {answer.challenged && (
-                            <svg
-                              xmlns='http://www.w3.org/2000/svg'
-                              viewBox='0 0 24 24'
-                              fill='currentColor'
-                              className='size-6 text-error inline'
-                            >
-                              <path
-                                fillRule='evenodd'
-                                d='M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm-2.625 6c-.54 0-.828.419-.936.634a1.96 1.96 0 0 0-.189.866c0 .298.059.605.189.866.108.215.395.634.936.634.54 0 .828-.419.936-.634.13-.26.189-.568.189-.866 0-.298-.059-.605-.189-.866-.108-.215-.395-.634-.936-.634Zm4.314.634c.108-.215.395-.634.936-.634.54 0 .828.419.936.634.13.26.189.568.189.866 0 .298-.059.605-.189.866-.108.215-.395.634-.936.634-.54 0-.828-.419-.936-.634a1.96 1.96 0 0 1-.189-.866c0-.298.059-.605.189-.866Zm-4.34 7.964a.75.75 0 0 1-1.061-1.06 5.236 5.236 0 0 1 3.73-1.538 5.236 5.236 0 0 1 3.695 1.538.75.75 0 1 1-1.061 1.06 3.736 3.736 0 0 0-2.639-1.098 3.736 3.736 0 0 0-2.664 1.098Z'
-                                clipRule='evenodd'
-                              />
-                            </svg>
-                          )}
+                          {answer.challenged && <Icon name='face-frown' className='size-6 text-error inline' />}
                         </td>
                         <td className='font-mono text-xs text-center'>
                           {answer.languageCode && (
