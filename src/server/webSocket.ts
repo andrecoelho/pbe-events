@@ -45,10 +45,7 @@ export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWeb
 export interface EventConnection {
   eventId: string;
   eventName: string;
-  hosts: ServerWebSocket<HostWebsocketData>[];
-  presenters: ServerWebSocket<PresenterWebsocketData>[];
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
-  judges: Map<string, ServerWebSocket<JudgeWebsocketData>>;
   run: Run;
   activeItem: ActiveItem | null;
   languages?: Record<string, { id: string; code: string; name: string }>;
@@ -291,7 +288,6 @@ export class WebSocketServer {
     }
 
     if (this.isHostWebSocket(ws)) {
-      connection.hosts.push(ws);
       ws.subscribe(`${eventId}:hosts`);
       this.sendTeamStatuses(ws, connection);
       this.sendActiveItem(ws, connection);
@@ -306,14 +302,12 @@ export class WebSocketServer {
         );
       }
     } else if (this.isJudgeWebSocket(ws)) {
-      connection.judges.set(ws.data.wsId, ws);
       ws.subscribe(`${eventId}:judges`);
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
       console.log('Judge connected for event', eventId);
     } else if (this.isPresenterWebSocket(ws)) {
-      connection.presenters.push(ws);
       this.sendLanguages(ws, connection);
       this.sendRunStatus(ws, connection);
       this.sendActiveItem(ws, connection);
@@ -399,17 +393,7 @@ export class WebSocketServer {
       return;
     }
 
-    if (role === 'host') {
-      connection.hosts = connection.hosts.filter((hostWs) => hostWs !== ws);
-      console.log('Host disconnected for event', eventId);
-    } else if (role === 'judge') {
-      connection.judges.delete(ws.data.session.user_id);
-      console.log('Judge disconnected for event', eventId);
-    } else if (role === 'presenter') {
-      connection.presenters = connection.presenters.filter((presenterWs) => presenterWs !== ws);
-      console.log('Presenter disconnected for event', eventId);
-    } else {
-      console.log(`Disconnecting team ${ws.data.number} for event`, eventId);
+    if (role === 'team') {
       const { id, number, languageCode } = ws.data;
       const team = connection.teams.get(id);
 
@@ -534,15 +518,19 @@ export class WebSocketServer {
 
   private async cleanUpEventConnection(eventId: string): Promise<void> {
     const connection = this.eventConnections.get(eventId);
+    const hostCount = this.server?.subscriberCount(`${eventId}:hosts`);
+    const presenterCount = this.server?.subscriberCount(`${eventId}:presenters`);
+    const judgeCount = this.server?.subscriberCount(`${eventId}:judges`);
+    const teamCount = this.server?.subscriberCount(`${eventId}:teams`);
 
     if (
       connection &&
-      connection.hosts.length === 0 &&
-      connection.presenters.length === 0 &&
-      connection.judges.size === 0 &&
-      connection.teams.size === 0
+      hostCount === 0 &&
+      presenterCount === 0 &&
+      judgeCount === 0 &&
+      teamCount === 0
     ) {
-      console.log('Cleaning up event connection for eventId', eventId);
+      console.log('Cleaning up event connection:', eventId);
       this.clearTickTimer(connection);
       this.eventConnections.delete(eventId);
     }
@@ -576,9 +564,6 @@ export class WebSocketServer {
         this.eventConnections.set(eventId, {
           eventId,
           eventName: run.name,
-          hosts: [],
-          presenters: [],
-          judges: new Map(),
           teams: new Map(),
           run: {
             status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
@@ -594,7 +579,7 @@ export class WebSocketServer {
   sendActiveItem(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
     const activeItem = connection.activeItem;
 
-    if (ws.data.role === 'team' && activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+    if (ws.data.role === 'team' && activeItem && 'answers' in activeItem) {
       const team = ws.data;
       const answers = pick(activeItem.answers, team.id);
 
@@ -651,12 +636,12 @@ export class WebSocketServer {
 
   broadcastToManagers(connection: EventConnection, message: string): void {
     this.server?.publish(`${connection.eventId}:hosts`, message);
+    this.server?.publish(`${connection.eventId}:presenters`, message);
     this.server?.publish(`${connection.eventId}:judges`, message);
   }
 
   broadcastActiveItemToManagers(connection: EventConnection) {
-    const activeItem = connection.activeItem;
-    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
+    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
@@ -669,7 +654,7 @@ export class WebSocketServer {
 
     this.broadcastActiveItemToManagers(connection);
 
-    if (activeItem?.type === 'question' && activeItem.phase !== 'reading') {
+    if (activeItem?.type === 'question' && 'answers' in activeItem) {
       connection.teams.forEach((teamWs) => this.sendActiveItem(teamWs, connection));
     } else {
       this.server?.publish(`${connection.eventId}:teams`, message);
@@ -845,7 +830,7 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
+    if (activeItem?.type === 'question' && activeItem.phase === 'answer' && activeItem.id === questionId) {
       const answer = activeItem.answers[ws.data.id];
 
       if (answer) {
