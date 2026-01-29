@@ -62,12 +62,12 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   reconnect = () => {
-    this.changeStatus('connecting');
-
     if (this.reconnectAttempts === 0) {
       this.connect();
       return;
     }
+
+    this.changeStatus('connecting');
 
     if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
       this.reconnectAttempts++;
