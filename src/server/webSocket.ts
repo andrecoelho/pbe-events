@@ -833,7 +833,7 @@ export class WebSocketServer {
     if (activeItem?.type === 'question' && activeItem.phase === 'answer' && activeItem.id === questionId) {
       const answer = activeItem.answers[ws.data.id];
 
-      if (answer) {
+      if (answer?.answerId) {
         await sql`UPDATE answers SET challenged = ${challenged} WHERE id = ${answer.answerId}`;
 
         answer.challenged = challenged;
