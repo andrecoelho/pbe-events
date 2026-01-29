@@ -49,13 +49,17 @@ export class ResultsValt {
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.maxPoints = Number(response.maxPoints);
-    this.store.highestPoints = response.teams.reduce((highestPoints: number, team: any) => Math.max(highestPoints, Number(team.totalPoints)), 0);
+
+    this.store.highestPoints = response.teams.reduce(
+      (highestPoints: number, team: any) => Math.max(highestPoints, Number(team.totalPoints)),
+      0
+    );
 
     this.store.teams = response.teams.map((team: any) => ({
       ...team,
       totalPoints: Number(team.totalPoints),
-      absPercentage: response.maxPoints > 0 ? (Number(team.totalPoints) / Number(response.maxPoints)) * 100 : 0,
-      percentage: response.maxPoints > 0 ? (Number(team.totalPoints) / this.store.highestPoints) * 100 : 0
+      absPercentage: this.store.maxPoints > 0 ? (Number(team.totalPoints) / Number(this.store.maxPoints)) * 100 : 0,
+      percentage: this.store.highestPoints > 0 ? (Number(team.totalPoints) / this.store.highestPoints) * 100 : 0
     }));
 
     this.store.initialized = true;
@@ -65,7 +69,16 @@ export class ResultsValt {
 
   downloadResultsCSV() {
     const rows = [
-      ['Team Number', 'Team Name', 'Language', 'Total Points', 'Max Points', 'ABS Percentage', 'Highest Points', 'Percentage'],
+      [
+        'Team Number',
+        'Team Name',
+        'Language',
+        'Total Points',
+        'Max Points',
+        'ABS Percentage',
+        'Highest Points',
+        'Percentage'
+      ],
       ...this.store.teams.map((team) => [
         team.number.toString(),
         team.name,
