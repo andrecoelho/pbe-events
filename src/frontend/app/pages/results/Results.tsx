@@ -143,7 +143,9 @@ const ResultsContent = () => {
                 <th>Team Name</th>
                 <th>Language</th>
                 <th>Points</th>
-                <th>Absolute Percentage</th>
+                <th>Max Points</th>
+                <th>ABS Percentage</th>
+                <th>Highest Points</th>
                 <th>Percentage</th>
               </tr>
             </thead>
@@ -154,10 +156,16 @@ const ResultsContent = () => {
                   <td>{team.name}</td>
                   <td>{team.languageName}</td>
                   <td>
-                    {team.totalPoints}/{snap.maxPoints}
+                    {team.totalPoints}
+                  </td>
+                  <td>
+                    {snap.maxPoints}
                   </td>
                   <td>
                     {team.absPercentage.toFixed(2)}%
+                  </td>
+                  <td>
+                    {snap.highestPoints}
                   </td>
                   <td>
                     <span
@@ -184,6 +192,8 @@ const ResultsContent = () => {
   );
 };
 
+ResultsContent.displayName = 'ResultsContent';
+
 export const Results = () => {
   const valt = useMemo(() => new ResultsValt(), []);
 
@@ -203,3 +213,5 @@ export const Results = () => {
     </ResultsValtContext.Provider>
   );
 };
+
+Results.displayName = 'Results';

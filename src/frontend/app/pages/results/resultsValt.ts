@@ -64,13 +64,14 @@ export class ResultsValt {
 
   downloadResultsCSV() {
     const rows = [
-      ['Team Number', 'Team Name', 'Language', 'Total Points', 'Max Points', 'Highest Points', 'Percentage'],
+      ['Team Number', 'Team Name', 'Language', 'Total Points', 'Max Points', 'ABS Percentage', 'Highest Points', 'Percentage'],
       ...this.store.teams.map((team) => [
         team.number.toString(),
         team.name,
         team.languageName,
         team.totalPoints.toString(),
         this.store.maxPoints.toString(),
+        team.absPercentage.toString(),
         this.store.highestPoints.toString(),
         `${team.percentage.toFixed(2)}%`
       ])
