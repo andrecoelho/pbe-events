@@ -242,7 +242,7 @@ export const Grade = () => {
                     <tr>
                       <th>#</th>
                       <th className='text-center'>
-                        <Icon name='face-frown' className='size-5 inline' />
+                        <Icon name='face-frown' variant='solid' className='size-5 inline' />
                       </th>
                       <th className='text-center'>
                         <Icon name='language' className='size-5 inline' />
@@ -257,7 +257,7 @@ export const Grade = () => {
                       <tr key={key}>
                         <td>{answer.teamNumber}</td>
                         <td className='text-center'>
-                          {answer.challenged && <Icon name='face-frown' className='size-6 text-error inline' />}
+                          {answer.challenged && <Icon name='face-frown' variant='solid' className='size-6 text-error inline' />}
                         </td>
                         <td className='font-mono text-xs text-center'>
                           {answer.languageCode && (

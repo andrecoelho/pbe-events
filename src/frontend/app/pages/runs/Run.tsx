@@ -367,7 +367,7 @@ export const Run = () => {
                   aria-label='Lock Question'
                   onClick={handleLockQuestion}
                 >
-                  <Icon name='lock-closed' className='size-6 text-amber-600' />
+                  <Icon name='lock-closed' variant='solid' className='size-6 text-amber-600' />
                 </button>
               )}
 
@@ -382,7 +382,7 @@ export const Run = () => {
                   aria-label='Unlock Question'
                   onClick={handleUnlockQuestion}
                 >
-                  <Icon name='lock-open' className='size-6 text-indigo-400' />
+                  <Icon name='lock-open' variant='solid' className='size-6 text-indigo-400' />
                 </button>
               )}
           </div>
@@ -425,7 +425,7 @@ export const Run = () => {
                   aria-label='Remove Timer'
                   onClick={handleRemoveTimer}
                 >
-                  <Icon name='bell-slash' className='size-6 text-red-400' />
+                  <Icon name='bell-slash' variant='solid' className='size-6 text-red-400' />
                 </button>
               )}
 
@@ -440,7 +440,7 @@ export const Run = () => {
                   aria-label='Restart Timer'
                   onClick={handleRestartTimer}
                 >
-                  <Icon name='clock' className='size-6 text-sky-600' />
+                  <Icon name='clock' variant='solid' className='size-6 text-sky-600' />
                 </button>
               )}
 
