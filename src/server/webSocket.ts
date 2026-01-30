@@ -40,7 +40,17 @@ export type PresenterWebsocketData = {
   eventId: string;
 };
 
-export type WebsocketData = HostWebsocketData | PresenterWebsocketData | TeamWebsocketData | JudgeWebsocketData;
+export type ErrorWebsocketData = {
+  role: 'error';
+  message: string;
+};
+
+export type WebsocketData =
+  | HostWebsocketData
+  | PresenterWebsocketData
+  | TeamWebsocketData
+  | JudgeWebsocketData
+  | ErrorWebsocketData;
 
 export interface EventConnection {
   eventId: string;
@@ -100,22 +110,27 @@ export class WebSocketServer {
     const role = url.searchParams.get('role');
     const eventId = url.searchParams.get('eventId');
 
-    if (!eventId || !role) {
-      console.error('Missing eventId or role in WebSocket upgrade request', req.url);
-      return textBadRequest('Missing eventId or role');
+    if (!role) {
+      this.server?.upgrade(req, { data: { role: 'error', message: 'Missing role in URL' } });
+      return;
     }
 
     if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge') {
-      console.error('Invalid role in WebSocket upgrade request', req.url);
-      return textBadRequest('Invalid role');
+      this.server?.upgrade(req, { data: { role: 'error', message: 'Invalid URL role' } });
+      return;
+    }
+
+    if (!eventId) {
+      this.server?.upgrade(req, { data: { role: 'error', message: 'Missing eventId in URL' } });
+      return;
     }
 
     // Check if event exists
     const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
 
     if (events.length === 0) {
-      console.error('Event not found for WebSocket upgrade request', req.url);
-      return textNotFound('Event not found');
+      this.server?.upgrade(req, { data: { role: 'error', message: 'Event not found' } });
+      return;
     }
 
     // Initialize connection tracking if needed
@@ -123,15 +138,16 @@ export class WebSocketServer {
       await this.initializeEventConnection(eventId);
 
       if (!this.eventConnections.has(eventId)) {
-        console.error('Could not initialize event connection for eventId', eventId);
-        return textBadRequest('Could not initialize event connection');
+        this.server?.upgrade(req, {
+          data: { role: 'error', message: 'Could not initialize event connection' }
+        });
+        return;
       }
     }
 
     if (role === 'host') {
       if (!session) {
-        console.error('No session found for host connection', req.url);
-        this.cleanUpEventConnection(eventId);
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
         return;
       }
 
@@ -142,9 +158,8 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
-        console.error('Host permission denied for event', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textForbidden();
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Host permission denied' } });
+        return;
       }
 
       if (this.server?.upgrade(req, { data: { role: 'host', session, eventId } })) {
@@ -152,9 +167,8 @@ export class WebSocketServer {
       }
     } else if (role === 'judge') {
       if (!session) {
-        console.error('No session found for judge connection', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textUnauthorized();
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
+        return;
       }
 
       const permissions: { role_id: string }[] = await sql`
@@ -164,9 +178,8 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
-        console.error('Judge permission denied for event', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textForbidden();
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Judge permission denied' } });
+        return;
       }
 
       if (this.server?.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
@@ -174,9 +187,8 @@ export class WebSocketServer {
       }
     } else if (role === 'presenter') {
       if (!session) {
-        console.error('No session found for presenter connection', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textUnauthorized();
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
+        return;
       }
 
       // Validate session and permissions for host
@@ -187,9 +199,8 @@ export class WebSocketServer {
         `;
 
       if (permissions.length === 0) {
-        console.error('Presenter permission denied for event', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textForbidden();
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Presenter permission denied' } });
+        return;
       }
 
       if (this.server?.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
@@ -199,17 +210,15 @@ export class WebSocketServer {
       const hash = url.searchParams.get('hash');
 
       if (!hash) {
-        console.error('Missing hash for team connection', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textBadRequest('Missing hash');
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Missing hash in URL' } });
+        return;
       }
 
       const teamId = url.searchParams.get('teamId');
 
       if (!teamId) {
-        console.error('Missing teamId for team connection', req.url);
-        this.cleanUpEventConnection(eventId);
-        return textBadRequest('Missing teamId');
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Missing teamId in URL' } });
+        return;
       }
 
       const connection = this.eventConnections.get(eventId);
@@ -218,9 +227,8 @@ export class WebSocketServer {
 
       if (existingTeam || (subscriberCount && subscriberCount > 0)) {
         if (existingTeam?.data.hash !== hash) {
-          console.error('Team already connected for event', req.url);
-          this.cleanUpEventConnection(eventId);
-          return textBadRequest('Team already connected');
+          this.server?.upgrade(req, { data: { role: 'error', message: 'Team already connected' } });
+          return;
         } else {
           existingTeam?.close();
           connection?.teams.delete(teamId);
@@ -248,9 +256,9 @@ export class WebSocketServer {
       const team = teams[0];
 
       if (!team) {
-        console.error('Team not found for WebSocket upgrade request', req.url);
         this.cleanUpEventConnection(eventId);
-        return textNotFound('Team not found');
+        this.server?.upgrade(req, { data: { role: 'error', message: 'Team not found' } });
+        return;
       }
 
       if (
@@ -278,6 +286,13 @@ export class WebSocketServer {
 
   // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
+    const { role } = ws.data;
+
+    if (role === 'error') {
+      ws.send(JSON.stringify({ type: 'CONNECTION_ERROR', message: ws.data.message }));
+      return;
+    }
+
     const { eventId } = ws.data;
 
     const connection = this.eventConnections.get(eventId)!;
@@ -381,7 +396,13 @@ export class WebSocketServer {
 
   // Called when a WebSocket connection is closed
   private handleClose = async (ws: ServerWebSocket<WebsocketData>) => {
-    const { eventId, role } = ws.data;
+    const { role } = ws.data;
+
+    if (role === 'error') {
+      return;
+    }
+
+    const { eventId } = ws.data;
 
     if (!eventId) {
       return;
@@ -425,6 +446,12 @@ export class WebSocketServer {
 
   // Called when a WebSocket message is received
   private handleMessage = async (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
+    const { role } = ws.data;
+
+    if (role === 'error') {
+      return;
+    }
+
     const connection = this.eventConnections.get(ws.data.eventId);
 
     if (!connection) {
@@ -523,13 +550,7 @@ export class WebSocketServer {
     const judgeCount = this.server?.subscriberCount(`${eventId}:judges`);
     const teamCount = this.server?.subscriberCount(`${eventId}:teams`);
 
-    if (
-      connection &&
-      hostCount === 0 &&
-      presenterCount === 0 &&
-      judgeCount === 0 &&
-      teamCount === 0
-    ) {
+    if (connection && hostCount === 0 && presenterCount === 0 && judgeCount === 0 && teamCount === 0) {
       console.log('Cleaning up event connection:', eventId);
       this.clearTickTimer(connection);
       this.eventConnections.delete(eventId);

@@ -46,6 +46,21 @@ export const Team = () => {
     };
   }, []);
 
+  if (snap.connectionState === 'connected' && snap.errorMessage) {
+    return (
+      <div className='absolute bottom-2 left-2'>
+        <span className='alert alert-error w-lg'>
+          <Icon name='x-circle' className='size-5' />
+          {snap.errorMessage}
+          <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
+            <Icon name='arrow-path' className='size-3' />
+            Try Again
+          </button>
+        </span>
+      </div>
+    );
+  }
+
   if (!snap.event || !snap.team || !snap.languages || !snap.team.languageCode) {
     return <div className='flex-1 flex justify-center items-center alert alert-info'>Connecting...</div>;
   }
