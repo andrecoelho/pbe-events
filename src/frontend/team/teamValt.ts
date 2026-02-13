@@ -14,6 +14,7 @@ interface TeamStore {
     languageId: string;
     languageCode: string;
   };
+  errorMessage?: string;
   activeItem: ActiveItem | null;
   gracePeriod: number;
   answer: string | null;
@@ -23,6 +24,7 @@ interface TeamStore {
 }
 
 type WebSocketTeamMessage =
+  | (WebSocketMessage & { type: 'CONNECTION_ERROR'; message: string })
   | (WebSocketMessage & { type: 'EVENT_INFO'; event: { id: string; name: string } })
   | (WebSocketMessage & {
       type: 'TEAM_INFO';
@@ -54,6 +56,8 @@ export class TeamValt {
   }
 
   connect = () => {
+    this.store.errorMessage = undefined;
+
     if (this.ws) {
       this.ws.connect();
     } else {
@@ -82,14 +86,23 @@ export class TeamValt {
 
   cleanup = () => {
     this.ws?.destroy();
+    this.ws = null;
   };
 
   onStatusChange = (status: WebSocketStatus) => {
     this.store.connectionState = status;
+
+    if (status === 'error') {
+      this.cleanup();
+    }
   };
 
   onMessage = (message: WebSocketTeamMessage) => {
     switch (message.type) {
+      case 'CONNECTION_ERROR':
+        this.store.errorMessage = message.message;
+        this.cleanup();
+        break;
       case 'EVENT_INFO':
         this.store.event = message.event;
         break;
