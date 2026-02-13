@@ -117,7 +117,14 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   private handleVisibilityChange = async () => {
     if (document.visibilityState === 'visible') {
-      navigator.wakeLock.request('screen');
+      if ('wakeLock' in navigator && (navigator as any).wakeLock?.request) {
+        try {
+          await (navigator as any).wakeLock.request('screen');
+        } catch (error) {
+          // Failed to acquire wake lock; proceed without it
+          console.error('Failed to acquire wake lock', error);
+        }
+      }
       await this.sendPing();
     }
   };
