@@ -27,7 +27,14 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onMessage = onMessage;
 
     if (document.visibilityState === 'visible') {
-      navigator.wakeLock.request('screen');
+      try {
+        const wakeLock = (navigator as any).wakeLock;
+        if (wakeLock && typeof wakeLock.request === 'function') {
+          void wakeLock.request('screen');
+        }
+      } catch (error) {
+        console.warn('Failed to acquire screen wake lock:', error);
+      }
     }
 
     this.addEventListeners();
