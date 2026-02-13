@@ -293,7 +293,7 @@ export class WebSocketServer {
       return;
     }
 
-    const { eventId } = ws.data;
+    const { eventId } = ws.data as Exclude<WebsocketData, ErrorWebsocketData>;
 
     const connection = this.eventConnections.get(eventId)!;
 
