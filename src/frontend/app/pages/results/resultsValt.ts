@@ -19,6 +19,7 @@ export type ResultsStore = {
   maxPoints: number;
   highestPoints: number;
   teams: TeamResult[];
+  excludedTeamIds: Set<string>;
 };
 
 export class ResultsValt {
@@ -31,7 +32,8 @@ export class ResultsValt {
       eventName: '',
       maxPoints: 0,
       highestPoints: 0,
-      teams: []
+      teams: [],
+      excludedTeamIds: new Set()
     });
   }
 
@@ -65,6 +67,29 @@ export class ResultsValt {
     this.store.initialized = true;
 
     return { ok: true } as const;
+  }
+
+  excludeTeam(teamId: string) {
+    if (this.store.excludedTeamIds.has(teamId)) {
+      this.store.excludedTeamIds.delete(teamId);
+    } else {
+      this.store.excludedTeamIds.add(teamId);
+    }
+
+    this.store.excludedTeamIds = new Set(this.store.excludedTeamIds);
+
+    this.store.highestPoints = this.store.teams.reduce((highestPoints: number, team) => {
+      if (this.store.excludedTeamIds.has(team.id)) {
+        return highestPoints;
+      }
+
+      return Math.max(highestPoints, team.totalPoints);
+    }, 0);
+
+    this.store.teams = this.store.teams.map((team) => ({
+      ...team,
+      percentage: this.store.highestPoints > 0 ? (team.totalPoints / this.store.highestPoints) * 100 : 0
+    }));
   }
 
   downloadResultsCSV() {

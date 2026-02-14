@@ -2,10 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import { ResultsValt, ResultsValtContext, useResultsValt } from './resultsValt';
 import { Loading } from '@/frontend/components/Loading';
+import './Results.css';
 
 const FIRST_THRESHOLD = 90;
 const SECOND_THRESHOLD = 80;
-const THIRD_THRESHOLD = 70;
 
 const ResultsContent = () => {
   const valt = useResultsValt();
@@ -20,6 +20,16 @@ const ResultsContent = () => {
       valt.init(eventId);
     }
   }, [valt, snap.initialized]);
+
+  const handleExcludeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const teamId = e.currentTarget.dataset.teamId;
+
+    if (!teamId) {
+      return;
+    }
+
+    valt.excludeTeam(teamId);
+  };
 
   if (!snap.initialized) {
     return (
@@ -59,42 +69,36 @@ const ResultsContent = () => {
             <span className='absolute -left-12 -top-3 text-sm text-neutral-500'>100%</span>
           </div>
           <div
-            className='absolute left-0 right-0 border-t-2 border-dashed border-success/50 pointer-events-none'
+            className='absolute left-0 right-0 border-t-2 border-dashed border-primary/50 pointer-events-none'
             style={{ top: `${100 - FIRST_THRESHOLD}%` }}
           >
-            <span className='absolute -left-12 -top-3 text-sm text-success'>{FIRST_THRESHOLD}%</span>
+            <span className='absolute -left-12 -top-3 text-sm text-primary'>{FIRST_THRESHOLD}%</span>
           </div>
           <div
-            className='absolute left-0 right-0 border-t-2 border-dashed border-accent/50 pointer-events-none'
+            className='absolute left-0 right-0 border-t-2 border-dashed border-secondary/50 pointer-events-none'
             style={{ top: `${100 - SECOND_THRESHOLD}%` }}
           >
-            <span className='absolute -left-12 -top-3 text-sm text-accent'>{SECOND_THRESHOLD}%</span>
-          </div>
-          <div
-            className='absolute left-0 right-0 border-t-2 border-dashed border-error/50 pointer-events-none'
-            style={{ top: `${100 - THIRD_THRESHOLD}%` }}
-          >
-            <span className='absolute -left-12 -top-3 text-sm text-error'>{THIRD_THRESHOLD}%</span>
+            <span className='absolute -left-12 -top-3 text-sm text-secondary'>{SECOND_THRESHOLD}%</span>
           </div>
 
           {/* Bar chart */}
           <div className='flex h-96 items-end gap-2'>
             {snap.teams.map((team) => {
-              const height = team.percentage;
+              const height = Math.min(team.percentage, 100);
               let colorClass = 'bg-neutral';
 
               if (height >= FIRST_THRESHOLD) {
-                colorClass = 'bg-success';
+                colorClass = 'bg-primary';
               } else if (height >= SECOND_THRESHOLD) {
-                colorClass = 'bg-accent';
-              } else if (height >= THIRD_THRESHOLD) {
-                colorClass = 'bg-error';
+                colorClass = 'bg-secondary';
+              } else {
+                colorClass = 'bg-success';
               }
 
               return (
                 <div
                   key={team.id}
-                  className={`flex-1 rounded-sm ${colorClass} transition-all duration-300 hover:opacity-80 cursor-pointer z-1 text-center pt-2`}
+                  className={`flex-1 rounded-sm ${colorClass} z-1 text-center pt-2 text-primary-content`}
                   style={{ height: `${Math.max(height, 2)}%` }}
                   title={`${team.name}: ${team.totalPoints}/${snap.maxPoints} (${height.toFixed(1)}%)`}
                 >
@@ -117,20 +121,16 @@ const ResultsContent = () => {
         {/* Legend */}
         <div className='mt-8 flex justify-center gap-6 text-sm'>
           <div className='flex items-center gap-2'>
-            <div className='w-4 h-4 bg-success rounded'></div>
+            <div className='w-4 h-4 bg-primary rounded'></div>
             <span>≥ {FIRST_THRESHOLD}%</span>
           </div>
           <div className='flex items-center gap-2'>
-            <div className='w-4 h-4 bg-accent rounded'></div>
+            <div className='w-4 h-4 bg-secondary rounded'></div>
             <span>≥ {SECOND_THRESHOLD}%</span>
           </div>
           <div className='flex items-center gap-2'>
-            <div className='w-4 h-4 bg-error rounded'></div>
-            <span>≥ {THIRD_THRESHOLD}%</span>
-          </div>
-          <div className='flex items-center gap-2'>
-            <div className='w-4 h-4 bg-neutral rounded'></div>
-            <span>&lt; {THIRD_THRESHOLD}%</span>
+            <div className='w-4 h-4 bg-success rounded'></div>
+            <span>&lt; {SECOND_THRESHOLD}%</span>
           </div>
         </div>
 
@@ -139,6 +139,7 @@ const ResultsContent = () => {
           <table className='table table-md'>
             <thead>
               <tr>
+                <th>Include</th>
                 <th>Team #</th>
                 <th>Team Name</th>
                 <th>Language</th>
@@ -152,31 +153,30 @@ const ResultsContent = () => {
             <tbody>
               {snap.teams.map((team) => (
                 <tr key={team.id}>
+                  <td className='font-semibold'>
+                    <input
+                      type='checkbox'
+                      className='checkbox results-team-checkbox'
+                      data-team-id={team.id}
+                      checked={!snap.excludedTeamIds.has(team.id)}
+                      onChange={handleExcludeChange}
+                    />
+                  </td>
                   <td className='font-semibold'>{team.number}</td>
                   <td>{team.name}</td>
                   <td>{team.languageName}</td>
-                  <td>
-                    {team.totalPoints}
-                  </td>
-                  <td>
-                    {snap.maxPoints}
-                  </td>
-                  <td>
-                    {team.absPercentage.toFixed(2)}%
-                  </td>
-                  <td>
-                    {snap.highestPoints}
-                  </td>
+                  <td>{team.totalPoints}</td>
+                  <td>{snap.maxPoints}</td>
+                  <td>{team.absPercentage.toFixed(2)}%</td>
+                  <td>{snap.highestPoints}</td>
                   <td>
                     <span
                       className={`badge ${
                         team.percentage >= 90
-                          ? 'badge-success'
+                          ? 'badge-primary'
                           : team.percentage >= 80
-                          ? 'badge-accent'
-                          : team.percentage >= 70
-                          ? 'badge-error'
-                          : 'badge-ghost'
+                            ? 'badge-secondary'
+                            : 'badge-success'
                       }`}
                     >
                       {team.percentage.toFixed(2)}%

@@ -1,0 +1,5 @@
+.results-team-checkbox,
+.results-team-checkbox::before {
+  transition: none !important;
+  animation: none !important;
+}
