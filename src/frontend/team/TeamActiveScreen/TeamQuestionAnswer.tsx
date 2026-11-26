@@ -1,7 +1,7 @@
 import { Icon } from '@/frontend/components/Icon';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
-import logo from 'src/assets/PBE-logo_600px.png';
+import logo from '@/assets/PBE-logo_600px.png';
 import { useSnapshot, type Snapshot } from 'valtio';
 
 export const TeamQuestionAnswer = () => {

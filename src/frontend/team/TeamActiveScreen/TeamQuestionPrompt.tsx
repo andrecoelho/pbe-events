@@ -4,7 +4,7 @@ import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import { debounce } from '@/frontend/utils/debounce';
 import { useEffect, useRef, useState } from 'react';
-import logo from 'src/assets/PBE-logo_600px.png';
+import logo from '@/assets/PBE-logo_600px.png';
 import { useSnapshot, type Snapshot } from 'valtio';
 
 // Parse prompt and return array of text segments and input placeholders

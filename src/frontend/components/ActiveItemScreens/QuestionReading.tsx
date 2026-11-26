@@ -1,6 +1,6 @@
 import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionTimer';
 import type { ActiveItem } from '@/types';
-import logo from 'src/assets/PBE-logo_600px.png';
+import logo from '@/assets/PBE-logo_600px.png';
 import type { Snapshot } from 'valtio';
 
 interface Props {

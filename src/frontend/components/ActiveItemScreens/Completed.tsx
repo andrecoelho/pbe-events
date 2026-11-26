@@ -1,4 +1,4 @@
-import logo from 'src/assets/PBE-logo_600px.png';
+import logo from '@/assets/PBE-logo_600px.png';
 
 export const Completed = () => {
   return (
