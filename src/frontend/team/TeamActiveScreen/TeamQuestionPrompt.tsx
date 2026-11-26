@@ -2,7 +2,7 @@ import { QuestionTimer } from '@/frontend/components/ActiveItemScreens/QuestionT
 import { toast } from '@/frontend/components/Toast';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
-import { debounce } from 'lodash';
+import { debounce } from '@/frontend/utils/debounce';
 import { useEffect, useRef, useState } from 'react';
 import logo from 'src/assets/PBE-logo_600px.png';
 import { useSnapshot, type Snapshot } from 'valtio';

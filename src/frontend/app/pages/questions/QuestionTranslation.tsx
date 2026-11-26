@@ -1,4 +1,4 @@
-import { debounce } from 'lodash';
+import { debounce } from '@/frontend/utils/debounce';
 import { memo, useCallback, useRef } from 'react';
 import { useQuestionsValt, type IQuestionTranslation, type Question } from './questionsValt';
 import { useSnapshot } from 'valtio';

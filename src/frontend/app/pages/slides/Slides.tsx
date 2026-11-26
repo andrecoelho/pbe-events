@@ -1,7 +1,7 @@
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
-import { debounce } from 'lodash';
+import { debounce } from '@/frontend/utils/debounce';
 import { useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import './Slides.css';

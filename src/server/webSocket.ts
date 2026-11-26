@@ -8,7 +8,6 @@ import {
 } from '@/server/utils/responses';
 import type { ActiveItem } from '@/types';
 import { sql, type ServerWebSocket } from 'bun';
-import { pick } from 'lodash';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -602,7 +601,7 @@ export class WebSocketServer {
 
     if (ws.data.role === 'team' && activeItem && 'answers' in activeItem) {
       const team = ws.data;
-      const answers = pick(activeItem.answers, team.id);
+      const answers = team.id in activeItem.answers ? { [team.id]: activeItem.answers[team.id] } : {};
 
       ws.send(
         JSON.stringify({
