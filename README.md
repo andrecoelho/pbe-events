@@ -15,6 +15,17 @@ mise run dev                                     # install dependencies and star
 
 Run `mise tasks` to list all tasks.
 
+### Using the staging database
+
+The staging Postgres has no public address. With the [Railway CLI](https://docs.railway.com/guides/cli) logged in and linked:
+
+```bash
+mise run dev:staging   # dev server against staging (opens and closes an SSH tunnel itself)
+mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like TablePlus
+```
+
+These only ever connect to **staging**, never production.
+
 ## Without mise
 
 To install dependencies:
