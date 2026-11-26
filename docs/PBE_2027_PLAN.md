@@ -48,7 +48,8 @@ Status: **draft 2**, updated with review comments. Once agreed, each `- [ ]` ite
 - [ ] Add `mise.toml` pinning `bun = "1.4.4"`, loading `.env`, with `dev` and `db` tasks.
 - [ ] Upgrade all dependencies, pin `@types/bun`, and replace lodash with small helpers.
 - [ ] Scripts: `typecheck`, `format`, `format:check`, `test`.
-- [ ] CI (GitHub Actions): mise install, then typecheck, format check and tests on PRs.
+- [ ] Switch formatting from Prettier to oxfmt and add oxlint (`lint`, `lint:fix`).
+- [ ] CI (GitHub Actions): mise install, then typecheck, lint, format check and tests on PRs.
 - [ ] **Bring the Railway deploy setup into the repo** (Railway keeps deploying):
   - Read the current settings with the Railway CLI (`brew install railway`, then `railway login`, which you run yourself).
   - Move build/start commands, branches, health check and volume settings into `railway.json`. Secrets stay in Railway.

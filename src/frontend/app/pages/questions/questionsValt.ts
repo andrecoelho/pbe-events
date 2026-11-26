@@ -479,7 +479,7 @@ export class QuestionsValt {
 
       const response = (await result.json()) as { error: string };
       return { ok: false, error: response.error };
-    } catch (error) {
+    } catch {
       return { ok: false, error: 'Failed to export questions' };
     }
   }

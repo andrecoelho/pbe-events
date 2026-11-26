@@ -1,11 +1,5 @@
 import type { Session } from '@/server/types';
-import {
-  textBadRequest,
-  textForbidden,
-  textNotFound,
-  textServerError,
-  textUnauthorized
-} from '@/server/utils/responses';
+import { textServerError } from '@/server/utils/responses';
 import type { ActiveItem } from '@/types';
 import { sql, type ServerWebSocket } from 'bun';
 
@@ -45,7 +39,11 @@ export type ErrorWebsocketData = {
 };
 
 export type WebsocketData =
-  HostWebsocketData | PresenterWebsocketData | TeamWebsocketData | JudgeWebsocketData | ErrorWebsocketData;
+  | HostWebsocketData
+  | PresenterWebsocketData
+  | TeamWebsocketData
+  | JudgeWebsocketData
+  | ErrorWebsocketData;
 
 export interface EventConnection {
   eventId: string;

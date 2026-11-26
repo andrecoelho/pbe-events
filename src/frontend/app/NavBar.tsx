@@ -2,7 +2,6 @@ import logo from '@/assets/PBE-logo_600px.png';
 import { useAppValt } from '@/frontend/app/appValt';
 import { alertModal } from '@/frontend/components/AlertModal';
 import { Avatar } from '@/frontend/components/Avatar';
-import { Icon } from '@/frontend/components/Icon';
 import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { useSnapshot } from 'valtio';
 

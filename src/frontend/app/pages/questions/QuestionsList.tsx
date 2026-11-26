@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionListItem } from './QuestionListItem';
-import { useQuestionsValt, type Question } from './questionsValt';
+import { useQuestionsValt } from './questionsValt';
 
 export const QuestionsList = memo(() => {
   const questionsValt = useQuestionsValt();

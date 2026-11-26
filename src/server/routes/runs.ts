@@ -8,7 +8,7 @@ import type { ActiveItem } from '@/types';
 import type { BunRequest } from 'bun';
 import { sql } from 'bun';
 
-export function createRunsRoutes(wsServer: WebSocketServer): Routes {
+export function createRunsRoutes(_wsServer: WebSocketServer): Routes {
   return {
     '/api/events/:eventId/run': {
       GET: async (req: BunRequest<'/api/events/:eventId/run'>) => {
