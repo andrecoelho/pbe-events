@@ -1,3 +1,9 @@
 [serve.static]
 plugins = ["bun-plugin-tailwind"]
 env = "BUN_PUBLIC_*"
+
+[install]
+# Don't auto-install peer dependencies: bun-plugin-tailwind's `bun` peer would put an
+# npm copy of Bun in node_modules/.bin, which `bun run` then uses instead of the
+# Bun pinned in mise.toml. All other peers (react, @types/react) are direct deps.
+peer = false
