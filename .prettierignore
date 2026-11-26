@@ -1,0 +1,6 @@
+# Generated or external content
+bun.lock
+data/
+node_modules/
+dist/
+.github/instructions/

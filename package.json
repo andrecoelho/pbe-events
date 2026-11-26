@@ -8,7 +8,11 @@
   },
   "scripts": {
     "dev": "bun --hot src/server/index.ts",
-    "start": "NODE_ENV=production bun src/server/index.ts"
+    "start": "NODE_ENV=production bun src/server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "bun test"
   },
   "dependencies": {
     "bun-plugin-tailwind": "^0.1.2",
@@ -21,6 +25,8 @@
     "@types/bun": "1.4.4",
     "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",
-    "daisyui": "^5.8.3"
+    "daisyui": "^5.8.3",
+    "prettier": "^3.10.1",
+    "typescript": "^7.0.2"
   }
 }

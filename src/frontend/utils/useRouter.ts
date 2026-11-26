@@ -24,7 +24,6 @@ export const useRouter = (routes: Routes) => {
       store.page = NotFound;
     };
 
-    // @ts-expect-error - Navigation API is not fully typed yet
     if (window.navigation && window.navigation.addEventListener) {
       // Modern Navigation API (Chrome, Edge, etc.)
       const handleNavigate = (event: any) => {
@@ -45,7 +44,6 @@ export const useRouter = (routes: Routes) => {
         });
       };
 
-      // @ts-expect-error
       window.navigation.addEventListener('navigate', handleNavigate);
     } else {
       // Fallback for browsers without Navigation API (Safari, Firefox, etc.)
