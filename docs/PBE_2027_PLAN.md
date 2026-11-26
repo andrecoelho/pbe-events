@@ -85,6 +85,7 @@ export const route = (...stack: [...Middleware[], Handler]) => (req: BunRequest)
 ## Phase 2 — WebSocket, timer & clear errors
 
 ### Security
+
 - [ ] Scope `UPDATE_POINTS`, `SET_QUESTION_LOCKED` and `SET_QUESTION_GRADED` writes to the connected event (today they can reach other events).
 - [ ] **Team join codes** (replace the team ID in links):
   1. Each team gets a code like `K7P-4QX` (`teams.join_code`: unique, no look-alike characters).
@@ -92,11 +93,12 @@ export const route = (...stack: [...Middleware[], Handler]) => (req: BunRequest)
   3. The first device to join gets a private device token and reconnects automatically after that.
   4. A second device is refused with a clear message ("already connected on another device, ask the host to release it").
   5. The host can **Release device** (the team moves computers) or create a **New code** (the old link stops working).
-  The join code and the rotatable link token are one mechanism with two ways to deliver it.
+     The join code and the rotatable link token are one mechanism with two ways to deliver it.
 - [ ] Close host/judge sockets when their session ends.
 - [ ] Validate WS messages with Zod, guard `JSON.parse`, and set a max message size.
 
 ### Accurate timer with less traffic
+
 - [ ] **Server clock sync + deadline countdowns:**
   1. On connect, the client sends 5 pings and keeps the offset from the fastest round trip (`offset = serverTime − (sent + received)/2`). It re-syncs every minute and when the tab becomes visible.
   2. The server broadcasts `endsAt` (server time) once, and each client shows `ceil((endsAt − (Date.now() + offset))/1000)`, updated locally.
@@ -107,6 +109,7 @@ export const route = (...stack: [...Middleware[], Handler]) => (req: BunRequest)
   Precision: typically under 20–30 ms, with no drift (today's per-tick network jitter is 20–200 ms). No more per-second DB writes. About 60–80 lines changed in total.
 
 ### Clear error messages everywhere
+
 - [ ] Connection errors with codes and specific messages, and the socket closes properly (#30).
 - [ ] Per-team connection status on the Run screen (connected / reconnecting / offline, last seen).
 - [ ] Reconnect forever with backoff and a "Reconnecting…" banner (today the client stops after 3 attempts).
@@ -114,6 +117,7 @@ export const route = (...stack: [...Middleware[], Handler]) => (req: BunRequest)
 - [ ] Error-message pass across the app (login, saving, imports, team links), paired with #10.
 
 ### Smaller fixes
+
 - [ ] Prevent setting up the same event twice when two connections arrive at once; handle events with no languages clearly.
 - [ ] Add the missing awaits; acknowledge messages after the write succeeds.
 - [ ] Make `answers` the single source of truth (not copied into `runs.active_item`).
@@ -147,12 +151,12 @@ Same app, at `/app/admin`. Needs `users.is_super_admin` and `admin_audit_log`.
 
 **Question type audit:**
 
-| Type | Special handling today | Finding |
-|---|---|---|
-| PG | none | identical to PS in code; only the label differs |
-| PS | none | identical to PG |
-| TF | checkbox; stored as "true"/"false" | stored per translation, though it can't differ (why #9 exists) |
-| FB | one input per `__` blank | parts are comma-separated (breaks on commas); no blank count check (#14) |
+| Type | Special handling today             | Finding                                                                  |
+| ---- | ---------------------------------- | ------------------------------------------------------------------------ |
+| PG   | none                               | identical to PS in code; only the label differs                          |
+| PS   | none                               | identical to PG                                                          |
+| TF   | checkbox; stored as "true"/"false" | stored per translation, though it can't differ (why #9 exists)           |
+| FB   | one input per `__` blank           | parts are comma-separated (breaks on commas); no blank count check (#14) |
 
 `answers.auto_points_awarded` is read but never written.
 

@@ -45,11 +45,7 @@ export type ErrorWebsocketData = {
 };
 
 export type WebsocketData =
-  | HostWebsocketData
-  | PresenterWebsocketData
-  | TeamWebsocketData
-  | JudgeWebsocketData
-  | ErrorWebsocketData;
+  HostWebsocketData | PresenterWebsocketData | TeamWebsocketData | JudgeWebsocketData | ErrorWebsocketData;
 
 export interface EventConnection {
   eventId: string;

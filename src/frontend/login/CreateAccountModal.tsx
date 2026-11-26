@@ -146,8 +146,7 @@ export function CreateAccountModal() {
     }
   };
 
-  const initials =
-    firstName && lastName ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() : '';
+  const initials = firstName && lastName ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() : '';
 
   return (
     <div className='modal-box max-w-md'>
@@ -173,12 +172,7 @@ export function CreateAccountModal() {
               )}
             </div>
             <div className='flex flex-col gap-2'>
-              <button
-                type='button'
-                className='btn btn-secondary btn-sm'
-                onClick={handleAvatarClick}
-                disabled={saving}
-              >
+              <button type='button' className='btn btn-secondary btn-sm' onClick={handleAvatarClick} disabled={saving}>
                 <Icon name='camera' className='size-4' />
                 {avatarPreview ? 'Change Photo' : 'Upload Photo'}
               </button>

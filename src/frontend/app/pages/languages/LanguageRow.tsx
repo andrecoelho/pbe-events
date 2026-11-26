@@ -130,20 +130,10 @@ export function LanguageRow({ language, valt, isAddMode, onCancelAdd }: Props) {
           {nameError && <div className='text-error text-xs mt-0.5'>{nameError}</div>}
         </div>
         <div className='col-actions col-border-bottom flex gap-2 justify-center'>
-          <button
-            className='tooltip tooltip-neutral'
-            data-tip='Save'
-            onClick={handleAdd}
-            aria-label='Save language'
-          >
+          <button className='tooltip tooltip-neutral' data-tip='Save' onClick={handleAdd} aria-label='Save language'>
             <Icon name='check' className='text-success cursor-pointer hover:brightness-75' />
           </button>
-          <button
-            className='tooltip tooltip-neutral'
-            data-tip='Cancel'
-            onClick={handleCancelAdd}
-            aria-label='Cancel'
-          >
+          <button className='tooltip tooltip-neutral' data-tip='Cancel' onClick={handleCancelAdd} aria-label='Cancel'>
             <Icon name='x-mark' className='text-error cursor-pointer hover:brightness-75' />
           </button>
         </div>

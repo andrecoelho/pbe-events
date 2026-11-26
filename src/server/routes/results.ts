@@ -58,9 +58,9 @@ export const resultsRoutes: Routes = {
       return apiData({
         eventName: event.name,
         maxPoints,
-        teams,
+        teams
       });
-    },
+    }
   },
 
   '/api/events/:id/results/raw': {
@@ -103,6 +103,6 @@ export const resultsRoutes: Routes = {
       `;
 
       return apiData({ answers });
-    },
-  },
+    }
+  }
 };

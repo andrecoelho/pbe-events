@@ -167,9 +167,7 @@ export const Settings = memo(() => {
     );
   }
 
-  const initials = snap.user
-    ? `${snap.user.firstName.charAt(0)}${snap.user.lastName.charAt(0)}`.toUpperCase()
-    : '';
+  const initials = snap.user ? `${snap.user.firstName.charAt(0)}${snap.user.lastName.charAt(0)}`.toUpperCase() : '';
 
   return (
     <SettingsValtContext.Provider value={valt}>
@@ -344,12 +342,7 @@ export const Settings = memo(() => {
             <p className='Settings__danger-text'>
               Once you delete your account, there is no going back. All your data will be permanently removed.
             </p>
-            <button
-              type='button'
-              className='btn btn-error'
-              onClick={handleDeleteAccount}
-              disabled={snap.saving}
-            >
+            <button type='button' className='btn btn-error' onClick={handleDeleteAccount} disabled={snap.saving}>
               <Icon name='trash' className='size-4' />
               Delete Account
             </button>

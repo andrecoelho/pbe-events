@@ -304,8 +304,8 @@ async function importQuestions(
       await sql`
         INSERT INTO translations (id, prompt, answer, clarification, language_id, question_id)
         VALUES (${translationId}, ${translation.prompt.trim()}, ${answerValue}, ${
-        translation.clarification ? translation.clarification.trim() : null
-      }, ${languageId}, ${questionId})
+          translation.clarification ? translation.clarification.trim() : null
+        }, ${languageId}, ${questionId})
       `;
     }
 

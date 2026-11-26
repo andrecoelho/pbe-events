@@ -38,7 +38,14 @@ export class PermissionsValt {
     return { ok: true } as const;
   }
 
-  async addPermission(userId: string, roleId: 'admin' | 'judge', email: string, firstName: string, lastName: string, avatarUrl?: string) {
+  async addPermission(
+    userId: string,
+    roleId: 'admin' | 'judge',
+    email: string,
+    firstName: string,
+    lastName: string,
+    avatarUrl?: string
+  ) {
     await fetch(`/api/events/${this.store.eventId}/permissions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

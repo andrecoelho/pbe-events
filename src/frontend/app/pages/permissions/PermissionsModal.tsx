@@ -41,7 +41,9 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
     store.searchStatus = 'done';
 
     if (result.status === 200) {
-      const response = (await result.json()) as { user: { id: string; firstName: string; lastName: string; avatarUrl?: string } };
+      const response = (await result.json()) as {
+        user: { id: string; firstName: string; lastName: string; avatarUrl?: string };
+      };
 
       store.user = {
         userId: response.user.id,
@@ -187,9 +189,7 @@ function PermissionsModal(props: Props) {
                 popoverTarget={popoverId}
                 style={{ anchorName } as CSSProperties}
               >
-                <span
-                  className={snap.user.roleId ? `badge ${roleBadgeColors[snap.user.roleId]}` : ''}
-                >
+                <span className={snap.user.roleId ? `badge ${roleBadgeColors[snap.user.roleId]}` : ''}>
                   {snap.user.roleId || 'Choose Role'}
                 </span>
                 <Icon name='chevron-down' className='size-4' />

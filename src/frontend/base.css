@@ -6,7 +6,7 @@
     for consistent PBE branding, and we don't have a dark mode theme so the default dark mode looks bad.
   */
   themes: false;
-};
+}
 
 @plugin "daisyui/theme" {
   name: 'pbe';

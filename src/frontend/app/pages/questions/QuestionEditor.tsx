@@ -28,12 +28,7 @@ export const QuestionEditor = memo(() => {
           {Object.values(selectedQuestion.translations)
             .sort((a, b) => a.languageCode.localeCompare(b.languageCode))
             .map((translation) => {
-              return (
-                <QuestionTranslation
-                  key={translation.languageCode}
-                  languageCode={translation.languageCode}
-                />
-              );
+              return <QuestionTranslation key={translation.languageCode} languageCode={translation.languageCode} />;
             })}
         </div>
       </div>

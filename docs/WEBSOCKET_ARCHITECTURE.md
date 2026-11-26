@@ -10,7 +10,9 @@ The PBE Events application uses WebSockets for real-time communication during ev
 ## Connection Setup
 
 ### WebSocket Server
+
 The WebSocket server is created in `src/server/index.ts` and passed to the routes that need it. Connections are managed per event, with support for:
+
 - One host connection per event
 - Multiple team connections per event
 - Language-specific pub/sub channels for broadcasting translations
@@ -20,12 +22,14 @@ The WebSocket server is created in `src/server/index.ts` and passed to the route
 Authentication requirements differ between host and team connections:
 
 #### Host Authentication
+
 - **Requires**: Valid session cookie (user must be logged in)
 - **Permission Check**: User must have `owner` or `admin` role for the event
 - **Validation**: Session is validated from the upgrade request's cookies before establishing the connection
 - **Single Connection**: Only one host can be connected per event at a time. If a second host attempts to connect, the connection is rejected with an error.
 
 #### Team Authentication
+
 - **Requires**: Valid team ID in the URL path
 - **No Login Required**: Teams do not need to be logged in or have a session
 - **Validation**: Server validates that the team ID exists and belongs to the specified event
@@ -59,6 +63,7 @@ All messages are JSON strings with a `type` field and associated payload.
 ### Messages FROM Teams TO Server
 
 #### `SELECT_LANGUAGE`
+
 Team selects their language for receiving question translations. Must be done before the run starts.
 
 ```typescript
@@ -71,12 +76,14 @@ Team selects their language for receiving question translations. Must be done be
 **Response**: Team is subscribed to the language channel and notified to host via `TEAM_READY`
 
 **Errors**:
+
 - `RUN_ALREADY_STARTED` if run has begun
 - `INVALID_ROLE` if language not found
 
 ---
 
 #### `SUBMIT_ANSWER` / `UPDATE_ANSWER`
+
 Team submits or updates their answer for the active question. Both message types are handled identically.
 
 ```typescript
@@ -87,11 +94,13 @@ Team submits or updates their answer for the active question. Both message types
 ```
 
 **Response**:
+
 - Answer stored in database with timestamps
 - Host notified via `ANSWER_RECEIVED`
 - If past deadline (activeStartTime + seconds + gracePeriod), returns `DEADLINE_EXCEEDED` error
 
 **Errors**:
+
 - `NO_LANGUAGE_SELECTED` if team hasn't selected a language
 - `NO_ACTIVE_QUESTION` if no question is running
 - `DEADLINE_EXCEEDED` if submitted too late
@@ -101,6 +110,7 @@ Team submits or updates their answer for the active question. Both message types
 ### Messages FROM Host TO Server
 
 #### `START_QUESTION`
+
 Host starts a specific question.
 
 ```typescript
@@ -112,6 +122,7 @@ Host starts a specific question.
 ```
 
 **Process**:
+
 1. Validates question belongs to event
 2. Updates run record with `active_id`, `active_type` ('question'), and `active_start_time`
 3. Loads question translations for all languages
@@ -119,20 +130,23 @@ Host starts a specific question.
 5. Calculates deadline: `startTime + seconds + gracePeriod`
 
 **Errors**:
+
 - `INVALID_ROLE` if question not found
 
 ---
 
 #### `PAUSE`
+
 Host pauses/ends the current question.
 
 ```typescript
 {
-  type: 'PAUSE'
+  type: 'PAUSE';
 }
 ```
 
 **Process**:
+
 1. Clears `active_id`, `active_type`, and `active_start_time` in run record
 2. Broadcasts `QUESTION_ENDED` to all language channels
 3. Grades all submitted answers for the question
@@ -140,6 +154,7 @@ Host pauses/ends the current question.
 ---
 
 #### `SHOW_SLIDE`
+
 Host displays a slide to all teams.
 
 ```typescript
@@ -150,24 +165,28 @@ Host displays a slide to all teams.
 ```
 
 **Process**:
+
 1. Looks up slide by number for the event
 2. Broadcasts `SLIDE_SHOWN` to all language channels with slide content
 
 **Errors**:
+
 - `SLIDE_NOT_FOUND` if slide doesn't exist
 
 ---
 
 #### `COMPLETE_RUN`
+
 Host completes the entire run.
 
 ```typescript
 {
-  type: 'COMPLETE_RUN'
+  type: 'COMPLETE_RUN';
 }
 ```
 
 **Process**:
+
 1. Updates run status to `completed`
 2. Calculates final scores for all teams
 3. Broadcasts `RUN_COMPLETED` to all language channels
@@ -182,6 +201,7 @@ Host completes the entire run.
 Teams receive messages on their language-specific pub/sub channel (`${eventId}:${languageCode}`).
 
 #### `QUESTION_STARTED`
+
 A question has started with translation in the team's language.
 
 ```typescript
@@ -206,11 +226,12 @@ A question has started with translation in the team's language.
 ---
 
 #### `QUESTION_ENDED`
+
 Current question has ended/paused.
 
 ```typescript
 {
-  type: 'QUESTION_ENDED'
+  type: 'QUESTION_ENDED';
 }
 ```
 
@@ -219,6 +240,7 @@ Current question has ended/paused.
 ---
 
 #### `SLIDE_SHOWN`
+
 A slide is being displayed.
 
 ```typescript
@@ -239,11 +261,12 @@ A slide is being displayed.
 ---
 
 #### `RUN_COMPLETED`
+
 Run finished. Sent to all teams when the run is completed.
 
 ```typescript
 {
-  type: 'RUN_COMPLETED'
+  type: 'RUN_COMPLETED';
 }
 ```
 
@@ -254,6 +277,7 @@ Run finished. Sent to all teams when the run is completed.
 ---
 
 #### `YOUR_ANSWER`
+
 Sent to reconnecting team if they have an existing answer for the active question.
 
 ```typescript
@@ -269,6 +293,7 @@ Sent to reconnecting team if they have an existing answer for the active questio
 ---
 
 #### `ERROR`
+
 An error occurred processing the team's request.
 
 ```typescript
@@ -280,6 +305,7 @@ An error occurred processing the team's request.
 ```
 
 **Error Codes**:
+
 - `NO_ACTIVE_RUN` - No active run exists for the event
 - `INVALID_TEAM` - Team ID is invalid or doesn't belong to event
 - `UNAUTHORIZED` - Session/authentication required
@@ -298,6 +324,7 @@ An error occurred processing the team's request.
 Host receives direct messages (not via pub/sub) about team activity.
 
 #### `TEAM_CONNECTED`
+
 A team connected or reconnected.
 
 ```typescript
@@ -313,6 +340,7 @@ A team connected or reconnected.
 ---
 
 #### `TEAM_DISCONNECTED`
+
 A team disconnected.
 
 ```typescript
@@ -325,6 +353,7 @@ A team disconnected.
 ---
 
 #### `ANSWER_RECEIVED`
+
 Team submitted or updated an answer.
 
 ```typescript
@@ -340,6 +369,7 @@ Team submitted or updated an answer.
 ---
 
 #### `TEAM_READY`
+
 Team selected a language and is ready to participate.
 
 ```typescript
@@ -355,6 +385,7 @@ Team selected a language and is ready to participate.
 ---
 
 #### `GRACE_PERIOD_UPDATED`
+
 Grace period was changed via API (not from WebSocket).
 
 ```typescript
@@ -371,6 +402,7 @@ Grace period was changed via API (not from WebSocket).
 ## State Management
 
 ### Connection Cache
+
 The WebSocket server maintains in-memory state for each event:
 
 ```typescript
@@ -396,12 +428,15 @@ The WebSocket server maintains in-memory state for each event:
 ```
 
 ### Language Channels
+
 Teams are subscribed to pub/sub channels based on their selected language:
+
 - Channel format: `${eventId}:${languageCode}`
 - Example: `abc123:en`, `abc123:es`
 - All broadcasts use these channels to send language-specific translations
 
 ### Answer Persistence
+
 Answers are immediately persisted to the database:
 
 ```sql
@@ -417,6 +452,7 @@ This allows teams to reconnect and resume their work without losing progress.
 ## Timing & Deadlines
 
 ### Question Timer Flow
+
 1. Host sends `START_QUESTION` with `hasTimer: true`
 2. Server records `active_start_time` in database
 3. Teams receive `QUESTION_STARTED` with:
@@ -426,9 +462,11 @@ This allows teams to reconnect and resume their work without losing progress.
 4. **Deadline**: `startTime + (seconds * 1000) + (gracePeriod * 1000)`
 
 ### Answer Submission Validation
+
 When a team submits an answer:
+
 ```typescript
-const deadline = activeStartTime + (seconds * 1000) + (gracePeriod * 1000);
+const deadline = activeStartTime + seconds * 1000 + gracePeriod * 1000;
 const now = Date.now();
 
 if (now > deadline) {
@@ -437,7 +475,9 @@ if (now > deadline) {
 ```
 
 ### Grace Period Updates
+
 Grace period can be updated via REST API:
+
 ```bash
 PATCH /api/runs/:runId
 { "action": "updateGracePeriod", "gracePeriod": 5 }
@@ -450,15 +490,18 @@ This sends `GRACE_PERIOD_UPDATED` to the host and updates the cached run state.
 ## Error Handling
 
 ### Connection Errors
+
 - **Authentication failure**: Upgrade request rejected with 401
 - **Permission denied**: Connection closed with error message
 - **Host already connected**: Second host connection rejected
 - **Invalid team**: Team connection rejected if team doesn't belong to event
 
 ### Message Errors
+
 All validation errors are sent back to the client as `ERROR` messages with specific error codes. The connection remains open for retry.
 
 ### Disconnection Handling
+
 - **Team disconnect**: Host notified, team can reconnect without losing state
 - **Host disconnect**: Teams continue running, new host can connect
 - **Server restart**: All connections lost, clients should implement reconnection logic
@@ -498,6 +541,7 @@ These endpoints use the same database tables as the WebSocket handlers, ensuring
 ## Example Flows
 
 ### Complete Run Flow
+
 1. Admin creates run via `POST /api/events/:eventId/runs`
 2. Host connects via WebSocket
 3. Teams connect and select languages via `SELECT_LANGUAGE`
@@ -514,6 +558,7 @@ These endpoints use the same database tables as the WebSocket handlers, ensuring
 14. Connections close
 
 ### Team Reconnection Flow
+
 1. Team's connection drops during active question
 2. Team reconnects with same session
 3. Server validates team and event
@@ -521,6 +566,7 @@ These endpoints use the same database tables as the WebSocket handlers, ensuring
 5. Team can continue editing and resubmit
 
 ### Grace Period Update Flow
+
 1. Admin calls `PATCH /api/runs/:runId` with `updateGracePeriod`
 2. Server updates database
 3. Server updates cached run state

@@ -77,8 +77,8 @@ class ToastManager {
   show(message: string): void;
   show(optionsOrMessage: ShowToastOptions | string): void {
     const message = typeof optionsOrMessage === 'string' ? optionsOrMessage : optionsOrMessage.message;
-    const type = typeof optionsOrMessage === 'string' ? 'info' : optionsOrMessage.type ?? 'info';
-    const persist = typeof optionsOrMessage === 'string' ? false : optionsOrMessage.persist ?? false;
+    const type = typeof optionsOrMessage === 'string' ? 'info' : (optionsOrMessage.type ?? 'info');
+    const persist = typeof optionsOrMessage === 'string' ? false : (optionsOrMessage.persist ?? false);
 
     const container = this.getContainer();
     const toastId = this.nextId++;

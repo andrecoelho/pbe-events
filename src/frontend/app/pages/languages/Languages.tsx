@@ -49,11 +49,7 @@ export function Languages() {
         </div>
       </div>
       <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-        <button
-          className='btn btn-primary'
-          disabled={!snap.initialized || isAdding}
-          onClick={() => setIsAdding(true)}
-        >
+        <button className='btn btn-primary' disabled={!snap.initialized || isAdding} onClick={() => setIsAdding(true)}>
           <Icon name='plus' className='size-4' />
           Add Language
         </button>

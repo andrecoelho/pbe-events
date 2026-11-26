@@ -153,12 +153,15 @@ export const FillInTheBlankAnswer = ({
     if (typeof snap.answer === 'string' && snap.answer) {
       const answerParts = snap.answer.split(' | ');
 
-      const parsed = answerParts.reduce((acc, val, idx) => {
-        if (val && val !== '__') {
-          acc[idx] = val;
-        }
-        return acc;
-      }, {} as Record<number, string>);
+      const parsed = answerParts.reduce(
+        (acc, val, idx) => {
+          if (val && val !== '__') {
+            acc[idx] = val;
+          }
+          return acc;
+        },
+        {} as Record<number, string>
+      );
 
       setSavedAnswers(parsed);
     }

@@ -26,6 +26,7 @@ Exports all questions for a specific event as a YAML file. The exported file can
 **Content-Type:** `multipart/form-data`
 
 **Form Data:**
+
 - `file` (File): YAML file containing languages and questions
 
 ## YAML File Format
@@ -53,13 +54,14 @@ The `languages` array defines all languages that will be available for the event
 
 ```yaml
 languages:
-  - code: en        # Required: Language code (e.g., en, es, fr)
-    name: English   # Required: Language display name
+  - code: en # Required: Language code (e.g., en, es, fr)
+    name: English # Required: Language display name
   - code: es
     name: Spanish
 ```
 
 **Language Object:**
+
 - `code`: String - Unique language code (e.g., "en", "es", "fr")
 - `name`: String - Display name for the language (e.g., "English", "Spanish")
 
@@ -70,13 +72,13 @@ An array of question objects.
 ### Question Object Structure
 
 ```yaml
-- type: PS                  # Required: Question type (PG, PS, TF, or FB)
-  maxPoints: 10             # Required: Maximum points (positive number)
-  seconds: 30               # Required: Time limit in seconds (positive number)
-  translations:             # Required: Array of question translations (at least one)
-    - lang: en              # Required: Language code (must be defined in languages section)
-      body: Question?       # Required: Question text (non-empty string, supports multi-line)
-      answer: Answer        # Required: Answer text (non-empty string)
+- type: PS # Required: Question type (PG, PS, TF, or FB)
+  maxPoints: 10 # Required: Maximum points (positive number)
+  seconds: 30 # Required: Time limit in seconds (positive number)
+  translations: # Required: Array of question translations (at least one)
+    - lang: en # Required: Language code (must be defined in languages section)
+      body: Question? # Required: Question text (non-empty string, supports multi-line)
+      answer: Answer # Required: Answer text (non-empty string)
 ```
 
 **Note:** Question bodies support multi-line text using YAML's `|` syntax:
@@ -134,6 +136,7 @@ questions:
 ```
 
 **Important:**
+
 - Each question must include a translation for all languages
 - Duplicate translations for the same language in a question are not allowed
 - The validation will fail if any question is missing a translation for any defined language
@@ -317,6 +320,7 @@ Returns a YAML file in the same format used for import. The file will be automat
 **Error Responses**
 
 **Status:** 400 Bad Request
+
 ```json
 {
   "error": "Nothing to export - event has no languages or questions configured"
@@ -324,6 +328,7 @@ Returns a YAML file in the same format used for import. The file will be automat
 ```
 
 **Status:** 401 Unauthorized
+
 ```json
 {
   "error": "Unauthorized"
@@ -331,6 +336,7 @@ Returns a YAML file in the same format used for import. The file will be automat
 ```
 
 **Status:** 403 Forbidden
+
 ```json
 {
   "error": "Forbidden"
@@ -338,6 +344,7 @@ Returns a YAML file in the same format used for import. The file will be automat
 ```
 
 **Status:** 500 Internal Server Error
+
 ```json
 {
   "error": "Failed to generate YAML file"
