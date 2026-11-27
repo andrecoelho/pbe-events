@@ -175,7 +175,7 @@ describe('json', () => {
     const res = await call(handler, { body: JSON.stringify({ name: ' ' }) });
     expect(res).toMatchObject({
       status: 400,
-      body: { error: 'name: Enter a name', fields: { name: ['Enter a name'] } }
+      body: { error: 'Enter a name', fields: { name: ['Enter a name'] } }
     });
   });
 

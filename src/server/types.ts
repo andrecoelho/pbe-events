@@ -1,8 +1,11 @@
-import type { BunRequest } from 'bun';
+import type { BunRequest, Server } from 'bun';
 
 // `any` lets each handler type its own path params, e.g. `BunRequest<'/api/events/:id'>`
 // (@types/bun 1.4 no longer accepts those as `BunRequest<string>`).
-export type Routes = Record<string, Record<string, (req: BunRequest<any>) => Promise<Response> | Response>>;
+export type Routes = Record<
+  string,
+  Record<string, (req: BunRequest<any>, server: Server<any>) => Promise<Response> | Response>
+>;
 
 export interface Session {
   id: string;

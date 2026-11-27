@@ -75,8 +75,8 @@ export function eventRole(...args: [...Role[]] | [...Role[], EventRoleOptions]) 
   });
 }
 
-// Parses the JSON body with a Zod schema. 400 with the first problem in `error` and every
-// problem by field in `fields`. Adds `body`, typed from the schema.
+// Parses the JSON body with a Zod schema. 400 with the first problem's message in `error` and
+// every problem by field in `fields`. Adds `body`, typed from the schema.
 export const json = <S extends z.ZodType>(schema: S) =>
   middleware<{ body: z.output<S> }>(async (ctx, next) => {
     let raw: unknown;
@@ -90,10 +90,8 @@ export const json = <S extends z.ZodType>(schema: S) =>
     const result = schema.safeParse(raw);
 
     if (!result.success) {
-      const issue = result.error.issues[0];
-      const where = issue && issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
-
-      throw badRequest(`${where}${issue?.message ?? 'Invalid request'}`, {
+      // The message goes straight to the user, so schemas should word their errors for people.
+      throw badRequest(result.error.issues[0]?.message ?? 'Invalid request', {
         fields: z.flattenError(result.error).fieldErrors
       });
     }

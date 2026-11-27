@@ -1,113 +1,37 @@
-import type { Routes } from '@/server/types';
-import { getSession } from '@/server/session';
+import { auth, eventRole, json } from '@/server/http/middleware';
+import { route } from '@/server/http/route';
 import { createEvent, deleteEvent, duplicateEvent, listEventsForUser, renameEvent } from '@/server/services/events';
-import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
-import type { BunRequest } from 'bun';
-import { apiBadRequest, apiData, apiForbidden, apiServerError, apiUnauthorized } from '@/server/utils/responses';
+import type { Routes } from '@/server/types';
+import { z } from 'zod';
+
+const EventName = z.object({
+  name: z.string({ error: 'Invalid event name' }).trim().min(1, 'Invalid event name')
+});
 
 export const eventsRoutes: Routes = {
   '/api/events': {
-    GET: async (req) => {
-      const session = await getSession(req);
+    GET: route(auth(), async ({ user }) => ({ events: await listEventsForUser(user.id) })),
 
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const events = await listEventsForUser(session.user_id);
-
-      return apiData({ events });
-    },
-    POST: async (req) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const { name } = await req.json();
-
-      if (!name || typeof name !== 'string' || name.trim() === '') {
-        return apiBadRequest('Invalid event name');
-      }
-
-      try {
-        return apiData(await createEvent(session.user_id, name.trim()));
-      } catch (error) {
-        console.error('Error creating event:', error);
-
-        return apiServerError('Failed to create event');
-      }
-    }
+    POST: route(auth(), json(EventName), async ({ user, body }) => await createEvent(user.id, body.name))
   },
+
   '/api/events/:id': {
-    PATCH: async (req: BunRequest<'/api/events/:id'>) => {
-      const session = await getSession(req);
+    PATCH: route(eventRole('owner', 'admin'), json(EventName), async ({ event, body }) => {
+      await renameEvent(event.id, body.name);
+      return { id: event.id, name: body.name };
+    }),
 
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const { name } = await req.json();
-
-      if (!name || typeof name !== 'string' || name.trim() === '') {
-        return apiBadRequest('Invalid event name');
-      }
-
-      const id = req.params.id;
-
-      if (!(await getEventForRoles(id, session.user_id, MANAGER_ROLES))) {
-        return apiForbidden();
-      }
-
-      await renameEvent(id, name.trim());
-
-      return apiData({ id, name: name.trim() });
-    },
-    DELETE: async (req: BunRequest<'/api/events/:id'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const id = req.params.id;
-
-      if (!(await getEventForRoles(id, session.user_id, ['owner']))) {
-        return apiForbidden();
-      }
-
-      await deleteEvent(id);
-
-      return apiData();
-    }
+    DELETE: route(eventRole('owner'), async ({ event }) => {
+      await deleteEvent(event.id);
+      return {};
+    })
   },
+
   '/api/events/:id/duplicate': {
-    POST: async (req: BunRequest<'/api/events/:id/duplicate'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const sourceEventId = req.params.id;
-
-      if (!(await getEventForRoles(sourceEventId, session.user_id, MANAGER_ROLES))) {
-        return apiForbidden();
-      }
-
-      const { name } = await req.json();
-
-      if (!name || typeof name !== 'string' || name.trim() === '') {
-        return apiBadRequest('Invalid event name');
-      }
-
-      try {
-        return apiData(await duplicateEvent(sourceEventId, session.user_id, name.trim()));
-      } catch (error) {
-        console.error('Error duplicating event:', error);
-        return apiServerError('Failed to duplicate event');
-      }
-    }
+    POST: route(
+      eventRole('owner', 'admin'),
+      json(EventName),
+      async ({ user, event, body }) => await duplicateEvent(event.id, user.id, body.name)
+    )
   }
 };
