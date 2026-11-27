@@ -16,3 +16,19 @@ export async function querySelectEvent(eventId: string, userId: string): Promise
 
   return result[0] || null;
 }
+
+export interface EventWithRole extends PBEEvent {
+  role_id: 'owner' | 'admin' | 'judge';
+}
+
+// The event and the user's role on it, or null when the user has no role there.
+export async function querySelectEventRole(eventId: string, userId: string): Promise<EventWithRole | null> {
+  const result: EventWithRole[] = await sql`
+    SELECT events.id, events.name, events.title_remarks, permissions.role_id
+    FROM events
+    JOIN permissions ON events.id = permissions.event_id
+    WHERE permissions.user_id = ${userId} AND events.id = ${eventId}
+  `;
+
+  return result[0] || null;
+}

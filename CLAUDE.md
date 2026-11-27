@@ -30,6 +30,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests. Ru
 - `src/server/index.ts`: the server. Spreads each `src/server/routes/*.ts` object into `Bun.serve({ routes })`; `fetch` handles the WebSocket upgrade, `/user-image/*`, and sends pages to the login, app, team or presenter bundle.
 - `src/server/routes/*.ts`: API routes, `export const fooRoutes: Routes = { '/api/foo/:id': { GET, POST, ... } }`. Type params with `BunRequest<'/api/foo/:id'>`.
 - `src/server/webSocket.ts`: running an event live (host, presenter, team and judge connections). See `docs/WEBSOCKET_ARCHITECTURE.md`.
+- `src/server/http/`: `route()` and its middlewares (`auth()`, `superAdmin()`, `eventRole(...)`, `json(schema)`, `rateLimit()`). New and converted routes use it.
 - `src/server/utils/responses.ts`: response helpers. `apiData(obj)` returns JSON with keys converted to camelCase; errors use `apiBadRequest`, `apiUnauthorized`, `apiForbidden`, `apiNotFound`, `apiServerError`, which return `{ error: message }`.
 - `src/server/queries.ts`: shared permission-checked queries such as `querySelectEvent(eventId, userId)`.
 - `src/frontend/{app,login,team,presenter}/`: one HTML entry point each. The organizer app routes with `useRouter` (a `Map` of path regex to page) in `src/frontend/app/App.tsx`; pages live in `src/frontend/app/pages/<feature>/`.
@@ -40,7 +41,8 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests. Ru
 
 - Import from `src/` with the `@/` alias, including assets (`@/assets/...`).
 - Queries are tagged templates: `` await sql`SELECT ... WHERE id = ${id}` `` (values are parameters, never string concatenation). Use `sql.begin(async (tx) => ...)` for transactions. Rows come back snake_case; `apiData` camelCases them.
-- Check the session in every API route: `const session = await getSession(req); if (!session) return apiUnauthorized();`, then check the user's role on the event (`permissions.role_id` is `owner`, `admin` or `judge`).
+- Write API handlers with `route()`: `PATCH: route(eventRole('owner', 'admin'), json(Schema), async ({ event, body }) => ...)`. `eventRole` and `superAdmin` sign the user in themselves; use `auth()` when no event is involved. Roles (`permissions.role_id`) are `owner`, `admin` and `judge`. Validate bodies with Zod schemas through `json()`. Return an object (sent with `apiData`) or a `Response`; `throw notFound(...)`/`badRequest(...)`/`forbidden(...)` for errors. Unexpected errors become a logged 500 with a request id. Routes not yet converted check `getSession(req)` by hand.
+- Sessions expire 30 days after their last use; `getSession` and `auth()` both enforce it.
 - IDs are `Bun.randomUUIDv7()` strings. Passwords use `Bun.password.hash` / `Bun.password.verify`.
 - Frontend state: each feature has a Valt class holding a Valtio `proxy` store, created with `useMemo(init, [])`, provided through a React context (`useFooValt()`), and read with `useSnapshot(valt.store)`. Methods mutate the store directly.
 - UI is daisyUI 5 components on Tailwind 4. Before writing or changing UI, read `docs/daisyui.md` (the daisyUI reference for agents).

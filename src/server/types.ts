@@ -7,7 +7,8 @@ export type Routes = Record<string, Record<string, (req: BunRequest<any>) => Pro
 export interface Session {
   id: string;
   user_id: string;
-  created_at: string;
+  created_at: Date;
+  expires_at: Date;
 }
 
 export interface User {
