@@ -213,6 +213,7 @@ Same app, at `/app/admin`. Needs `users.is_super_admin` and `admin_audit_log`.
 - MCP server. Version 1 = question tools for organizers (list events, export/import/edit questions) with access tokens; about 3–5 days once the service layer exists.
 - #16 usage metrics.
 - "View as user" mode.
+- Postgres 18 upgrade (both environments run `postgres-ssl:17`). Not just an image change: 18 can't read 17's data directory, and the official image keeps data in a different folder, so it could start empty. Dump, restore into a new Postgres 18 service with its own volume, switch `POSTGRES_URL`, keep the old one until checked. Brings a built-in `uuidv7()`.
 
 ## Suggested order
 

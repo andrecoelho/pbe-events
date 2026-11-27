@@ -6,6 +6,9 @@ import { database, defineRailway, github, project, service, volume } from 'railw
 
 export default defineRailway((ctx) => {
   const production = ctx.isEnvironment('production');
+  if (!production && !ctx.isEnvironment('staging')) {
+    throw new Error('Only the staging and production environments are described here; add the new one first.');
+  }
   const region = 'us-west2';
   const volumeAlerts = { usage: { '100': {}, '80': {}, '95': {} } };
 
@@ -16,7 +19,8 @@ export default defineRailway((ctx) => {
   });
   postgresDatabase.deploy = { multiRegionConfig: { [region]: { numReplicas: 1 } } };
 
-  const volumeSize = production ? 500 : 5000;
+  // Sizes as they are on Railway today. Volumes can grow but never shrink.
+  const volumeSize = production ? 500 : 5000; // production: 500 MB, staging: 5000 MB
   const postgresDbVolume = volume('postgres-db-volume', {
     alerts: volumeAlerts,
     allowOnlineResize: true,
