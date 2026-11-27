@@ -55,6 +55,7 @@ describe('parseMessage', () => {
     const accepted = [
       [TeamMessage, { type: 'PING', __ACK__: 'a' }],
       [TeamMessage, { type: 'SUBMIT_ANSWER', answer: 'Ten days', __ACK__: 'a' }],
+      [TeamMessage, { type: 'SUBMIT_ANSWER', answer: true, __ACK__: 'a' }],
       [TeamMessage, { type: 'SUBMIT_CHALLENGE', questionId: 'q1', challenged: true, __ACK__: 'a' }],
       [HostMessage, { type: 'UPDATE_RUN_STATUS', status: 'in_progress', __ACK__: 'a' }],
       [HostMessage, { type: 'UPDATE_GRACE_PERIOD', gracePeriod: 3, __ACK__: 'a' }],
@@ -94,6 +95,13 @@ describe('parseMessage', () => {
     for (const [schema, message] of refused) {
       expect(parseMessage(schema, frame(message))).toMatchObject({ ok: false, ack: 'x' });
     }
+  });
+
+  test('turns a true/false answer into the text that is saved', () => {
+    expect(parseMessage(TeamMessage, frame({ type: 'SUBMIT_ANSWER', answer: false }))).toEqual({
+      ok: true,
+      message: { type: 'SUBMIT_ANSWER', answer: 'false' }
+    });
   });
 
   test('names the bad field', () => {

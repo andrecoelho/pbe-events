@@ -71,7 +71,12 @@ const Ping = z.object({ type: z.literal('PING'), __ACK__: ack });
 
 export const TeamMessage = z.discriminatedUnion('type', [
   Ping,
-  z.object({ type: z.literal('SUBMIT_ANSWER'), answer: z.string().max(2000), __ACK__: ack }),
+  // True/false answers arrive as booleans and are saved as 'true' / 'false'.
+  z.object({
+    type: z.literal('SUBMIT_ANSWER'),
+    answer: z.union([z.string().max(2000), z.boolean().transform(String)]),
+    __ACK__: ack
+  }),
   z.object({ type: z.literal('SUBMIT_CHALLENGE'), questionId: id, challenged: z.boolean(), __ACK__: ack })
 ]);
 
