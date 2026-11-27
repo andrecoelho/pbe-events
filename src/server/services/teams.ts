@@ -1,3 +1,4 @@
+import { hashToken, newToken } from '@/server/utils/tokens';
 import { sql } from 'bun';
 
 export interface Team {
@@ -95,13 +96,8 @@ export async function deleteTeam(eventId: string, teamId: string) {
 // keeps only its SHA-256.
 export const TEAM_TOKEN_COOKIE = 'teamToken';
 
-export function newDeviceToken() {
-  return Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
-}
-
-export function hashDeviceToken(token: string) {
-  return new Bun.CryptoHasher('sha256').update(token).digest('hex');
-}
+export const newDeviceToken = newToken;
+export const hashDeviceToken = hashToken;
 
 // The team with this join code (already normalized), with its event's name and the device token hash.
 export async function getTeamByJoinCode(code: string) {

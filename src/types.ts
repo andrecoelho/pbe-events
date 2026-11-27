@@ -204,13 +204,23 @@ export type AdminTeam = {
   lastMessageAt: number | null;
 };
 
+// What the admin audit log records (#61).
+export type AuditAction =
+  | 'event.reset'
+  | 'team.release_device'
+  | 'user.update'
+  | 'user.reset_link'
+  | 'user.sign_out'
+  | 'user.disable'
+  | 'user.enable';
+
 // One entry of the admin audit log (#61).
 export type AuditLogEntry = {
   id: string;
   createdAt: string;
   userId: string;
   userEmail: string;
-  action: 'event.reset' | 'team.release_device';
+  action: AuditAction;
   eventId: string | null;
   eventName: string | null;
   details: Record<string, unknown>;
@@ -218,6 +228,29 @@ export type AuditLogEntry = {
 
 // `nextBefore`: pass as `before` for older entries; null when there are none.
 export type AuditLogResponse = { entries: AuditLogEntry[]; nextBefore: string | null };
+
+// A user on the admin page's Users section (#58). Times are ISO strings.
+export type AdminUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isSuperAdmin: boolean;
+  disabledAt: string | null;
+  createdAt: string;
+  eventCount: number;
+  sessionCount: number;
+  // To within a day (sessions are renewed daily); null when they've never signed in or it's long ago.
+  lastActiveAt: string | null;
+};
+
+// `more`: there are more matches than shown; narrow the search.
+export type AdminUsersResponse = { users: AdminUser[]; more: boolean };
+
+export type AdminUserResponse = { user: AdminUser; events: { id: string; name: string; role: string }[] };
+
+// A one-time password reset link (#58): the page's path, to put after the site's address.
+export type ResetLinkResponse = { path: string; expiresAt: string };
 
 export type AdminEventResponse = {
   serverTime: number;

@@ -6,7 +6,12 @@ import { useSnapshot } from 'valtio';
 
 const ACTION_LABELS: Record<AuditLogEntry['action'], string> = {
   'event.reset': 'Reset the event in memory',
-  'team.release_device': 'Released a team’s device'
+  'team.release_device': 'Released a team’s device',
+  'user.update': 'Edited a user',
+  'user.reset_link': 'Created a password reset link',
+  'user.sign_out': 'Signed a user out everywhere',
+  'user.disable': 'Disabled a user',
+  'user.enable': 'Enabled a user'
 };
 
 const formatTime = (iso: string) =>
@@ -14,9 +19,20 @@ const formatTime = (iso: string) =>
 
 // What the action was done to, beyond the event.
 function describeDetails(entry: AuditLogEntry) {
-  const { teamNumber, teamName } = entry.details as { teamNumber?: number; teamName?: string };
+  const { teamNumber, teamName, targetEmail, changes } = entry.details as {
+    teamNumber?: number;
+    teamName?: string;
+    targetEmail?: string;
+    changes?: Record<string, { from: string; to: string }>;
+  };
 
-  return teamNumber === undefined ? '' : `Team ${teamNumber} · ${teamName ?? ''}`;
+  if (teamNumber !== undefined) {
+    return `Team ${teamNumber} · ${teamName ?? ''}`;
+  }
+
+  const changed = Object.entries(changes ?? {}).map(([field, { from, to }]) => `${field}: ${from} → ${to}`);
+
+  return [targetEmail, ...changed].filter(Boolean).join(' · ');
 }
 
 function AuditLogList() {

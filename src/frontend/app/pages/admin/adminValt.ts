@@ -1,5 +1,13 @@
 import { api, type Outcome } from '@/frontend/utils/api';
-import type { AdminEventResponse, AuditLogEntry, AuditLogResponse, LiveConnectionsResponse } from '@/types';
+import type {
+  AdminEventResponse,
+  AdminUserResponse,
+  AdminUsersResponse,
+  AuditLogEntry,
+  AuditLogResponse,
+  LiveConnectionsResponse,
+  ResetLinkResponse
+} from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -25,6 +33,14 @@ export type AdminStore = {
     // Where the next (older) page starts; null when there's none.
     nextBefore: string | null;
   };
+  users: { query: string; loaded: boolean; error: string | null; data: AdminUsersResponse | null };
+  user: {
+    loaded: boolean;
+    error: string | null;
+    data: AdminUserResponse | null;
+    // The last reset link made on this page, shown until the page changes (the server keeps only its hash).
+    resetLink: { url: string; expiresAt: string } | null;
+  };
 };
 
 const empty = () => ({ loaded: false, error: null, data: null });
@@ -36,7 +52,9 @@ export class AdminValt {
     this.store = proxy<AdminStore>({
       connections: empty(),
       event: empty(),
-      auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null }
+      auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null },
+      users: { query: '', loaded: false, error: null, data: null },
+      user: { loaded: false, error: null, data: null, resetLink: null }
     });
   }
 
@@ -59,6 +77,83 @@ export class AdminValt {
   loadConnections = () => this.load('connections', '/api/admin/connections');
 
   loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
+
+  // Users matching the search (#58). Only the latest search's answer is kept.
+  async searchUsers(query: string) {
+    const users = this.store.users;
+
+    users.query = query;
+
+    const result = await api<AdminUsersResponse>(`/api/admin/users?q=${encodeURIComponent(query)}`);
+
+    if (users.query !== query) {
+      return;
+    }
+
+    if (result.ok) {
+      users.data = result.data;
+      users.error = null;
+    } else {
+      users.error = result.error;
+    }
+
+    users.loaded = true;
+  }
+
+  // The user's page opened: forget the last page's reset link.
+  openUser(userId: string) {
+    this.store.user.resetLink = null;
+
+    return this.loadUser(userId);
+  }
+
+  async loadUser(userId: string) {
+    const user = this.store.user;
+    const result = await api<AdminUserResponse>(`/api/admin/users/${userId}`);
+
+    if (result.ok) {
+      user.data = result.data;
+      user.error = null;
+    } else {
+      user.error = result.error;
+    }
+
+    user.loaded = true;
+  }
+
+  async saveUser(userId: string, details: { email: string; firstName: string; lastName: string }): Promise<Outcome> {
+    const result = await api(`/api/admin/users/${userId}`, { method: 'PATCH', json: details });
+
+    if (result.ok) {
+      await this.loadUser(userId);
+    }
+
+    return result.ok ? { ok: true } : result;
+  }
+
+  // A user action (sign-out, disable, enable), then the user again.
+  async userAction(userId: string, action: 'sign-out' | 'disable' | 'enable'): Promise<Outcome> {
+    const result = await api(`/api/admin/users/${userId}/${action}`, { method: 'POST' });
+
+    await this.loadUser(userId);
+
+    return result.ok ? { ok: true } : result;
+  }
+
+  async createResetLink(userId: string): Promise<Outcome> {
+    const result = await api<ResetLinkResponse>(`/api/admin/users/${userId}/reset-link`, { method: 'POST' });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    this.store.user.resetLink = {
+      url: `${window.location.origin}${result.data.path}`,
+      expiresAt: result.data.expiresAt
+    };
+
+    return { ok: true };
+  }
 
   // The audit log's newest page, or with `more` the next older one (#61).
   async loadAuditLog(more = false) {

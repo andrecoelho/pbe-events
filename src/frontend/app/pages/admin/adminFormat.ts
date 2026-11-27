@@ -52,3 +52,10 @@ export function formatDuration(ms: number) {
 // "3 s ago", or `never` when there's no time.
 export const formatAgo = (serverTime: number, time: number | null, never = 'None yet') =>
   time === null ? never : `${formatDuration(serverTime - time)} ago`;
+
+// "Nov 27, 2026", or with the time.
+export const formatDate = (iso: string, withTime = false) =>
+  new Date(iso).toLocaleString(
+    undefined,
+    withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }
+  );

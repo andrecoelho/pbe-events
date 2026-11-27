@@ -5,6 +5,7 @@ import login from '@/frontend/login/login.html';
 import presenter from '@/frontend/presenter/presenter.html';
 import team from '@/frontend/team/team.html';
 import { createAdminRoutes } from '@/server/routes/admin';
+import { adminUserRoutes } from '@/server/routes/adminUsers';
 import { answersRoutes } from '@/server/routes/answers';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
@@ -59,7 +60,8 @@ const server = Bun.serve({
     ...slidesRoutes,
     ...resultsRoutes,
     ...createRunsRoutes(wsServer),
-    ...createAdminRoutes(wsServer)
+    ...createAdminRoutes(wsServer),
+    ...adminUserRoutes
   },
   async fetch(req): Promise<Response | undefined> {
     const url = new URL(req.url);
@@ -74,7 +76,8 @@ const server = Bun.serve({
       return await fetch(`${server.url}${teamNounce}`);
     }
 
-    if (!session) {
+    // Setting a new password with a reset link (#58) works signed in or not.
+    if (!session || url.pathname.startsWith('/reset-password/')) {
       return await fetch(`${server.url}${loginNounce}`);
     }
 

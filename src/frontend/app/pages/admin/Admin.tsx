@@ -7,10 +7,11 @@ import { useSnapshot } from 'valtio';
 // its tab active. Event admins see only the sections not marked superAdminOnly (#89).
 const TABS: { id: string; href: string; label: string; superAdminOnly?: boolean }[] = [
   { id: 'connections', href: '/admin', label: 'Live connections' },
+  { id: 'users', href: '/admin/users', label: 'Users', superAdminOnly: true },
   { id: 'audit-log', href: '/admin/audit-log', label: 'Audit log', superAdminOnly: true }
 ];
 
-export type AdminTab = 'connections' | 'audit-log';
+export type AdminTab = 'connections' | 'users' | 'audit-log';
 
 const init = () => new AdminValt();
 

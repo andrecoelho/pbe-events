@@ -1,7 +1,9 @@
 // The admin audit log (#61): every action taken from the admin page.
 import { sql } from 'bun';
 
-export type AuditAction = 'event.reset' | 'team.release_device';
+import type { AuditAction } from '@/types';
+
+export type { AuditAction };
 
 export interface AuditEntry {
   id: string;
@@ -14,17 +16,19 @@ export interface AuditEntry {
   details: Record<string, unknown>;
 }
 
+// `target`: the user the action was done to, kept in the details.
 export async function logAdminAction(entry: {
   user: { id: string; email: string };
   action: AuditAction;
   event?: { id: string; name: string } | null;
+  target?: { id: string; email: string };
   details?: Record<string, unknown>;
 }) {
   await sql`
     INSERT INTO admin_audit_log (id, user_id, user_email, action, event_id, event_name, details)
     VALUES (
       ${Bun.randomUUIDv7()}, ${entry.user.id}, ${entry.user.email}, ${entry.action},
-      ${entry.event?.id ?? null}, ${entry.event?.name ?? null}, ${JSON.stringify(entry.details ?? {})}::text::jsonb
+      ${entry.event?.id ?? null}, ${entry.event?.name ?? null}, ${JSON.stringify({ ...(entry.target && { targetUserId: entry.target.id, targetEmail: entry.target.email }), ...entry.details })}::text::jsonb
     )
   `;
 }

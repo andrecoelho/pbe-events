@@ -30,7 +30,9 @@ export async function findUserByEmail(email: string): Promise<PublicUser | null>
 
 // The user's id and password hash, for signing in.
 export async function getLoginByEmail(email: string) {
-  const rows: { id: string; password: string }[] = await sql`SELECT id, password FROM users WHERE email = ${email}`;
+  const rows: { id: string; password: string; disabled_at: Date | null }[] = await sql`
+    SELECT id, password, disabled_at FROM users WHERE email = ${email}
+  `;
 
   return rows[0] ?? null;
 }

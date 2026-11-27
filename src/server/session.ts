@@ -51,7 +51,8 @@ export async function getSession(req: Request) {
   }
 
   const result: Session[] = await sql`
-    SELECT * FROM sessions WHERE id = ${sessionId} AND expires_at > CURRENT_TIMESTAMP
+    SELECT sessions.* FROM sessions JOIN users ON users.id = sessions.user_id
+    WHERE sessions.id = ${sessionId} AND sessions.expires_at > CURRENT_TIMESTAMP AND users.disabled_at IS NULL
   `;
   const session = result[0];
 
@@ -77,7 +78,7 @@ export async function getSessionUser(req: Request): Promise<{ session: Session; 
       users.id, users.email, users.first_name, users.last_name, users.avatar_url, users.is_super_admin
     FROM sessions
     JOIN users ON users.id = sessions.user_id
-    WHERE sessions.id = ${sessionId} AND sessions.expires_at > CURRENT_TIMESTAMP
+    WHERE sessions.id = ${sessionId} AND sessions.expires_at > CURRENT_TIMESTAMP AND users.disabled_at IS NULL
   `;
   const row = rows[0];
 
@@ -110,6 +111,15 @@ export async function deleteSession(req: BunRequest) {
   await sql`DELETE FROM sessions WHERE id = ${sessionId}`;
 
   sessionEndedListeners.forEach((listener) => listener(sessionId));
+}
+
+// Signs the user out everywhere: deletes every session and closes their sockets. Returns how many there were.
+export async function endUserSessions(userId: string) {
+  const rows: { id: string }[] = await sql`DELETE FROM sessions WHERE user_id = ${userId} RETURNING id`;
+
+  rows.forEach(({ id }) => sessionEndedListeners.forEach((listener) => listener(id)));
+
+  return rows.length;
 }
 
 // The ids, out of sessionIds, of sessions that still exist and haven't expired.
