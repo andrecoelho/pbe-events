@@ -101,6 +101,7 @@ The server keeps one deadline per open question and broadcasts it only when it c
 ## Sessions and security
 
 - When a host, judge or presenter session logs out, the server closes its sockets at once with code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted (#45). Pages reload on 4001, which shows the login page.
+- A super admin can reset an event in memory from the admin page (#57): the server drops the event's state, stops its timers and closes all its sockets with code 4004 (`EVENT_RESET_CLOSE_CODE`). Pages reconnect as after a deploy, and the event is set up again from the database.
 - Every frame is parsed with its role's schema (#46); frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009.
 - Join attempts (`POST /api/join`) are rate limited to 60 a minute per address. Codes are six characters from an alphabet without look-alikes (about 887 million values).
 
@@ -111,4 +112,5 @@ The server keeps one deadline per open question and broadcasts it only when it c
 | 1009  | Frame too large            | reconnects                   |
 | 4001  | Session ended              | reloads (login page)         |
 | 4003  | Team opened in another tab | stops, offers "Use this tab" |
+| 4004  | Event reset by an admin    | reconnects with backoff      |
 | other | Connection dropped         | reconnects with backoff      |
