@@ -26,7 +26,7 @@ export const sectionsFor = (roleId: EventRoleId) => SECTIONS.filter((s) => s.rol
 export const openPresenter = (eventId: string) =>
   window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,popup=yes');
 
-// The event workspace's frame (#15): the event's name, a menu of its sections and the section's page.
+// The event workspace's frame (#15): breadcrumbs (#70), a menu of the event's sections and the section's page.
 export const EventLayout = memo(({ section, Page }: { section: EventSection | null; Page: ElementType }) => {
   const appValt = useAppValt();
   const snap = useSnapshot(appValt.store);
@@ -58,17 +58,46 @@ export const EventLayout = memo(({ section, Page }: { section: EventSection | nu
 
   const sections = sectionsFor(event.roleId);
   const canPresent = MANAGERS.includes(event.roleId);
+  const current = SECTIONS.find((s) => s.id === section);
 
   return (
     <div className='flex-1 min-h-0 flex flex-col'>
-      <nav
-        aria-label='Event'
-        className='flex-none flex items-center gap-4 bg-base-200 px-8 border-b border-base-300 overflow-x-auto'
-      >
-        <a href={eventUrl(eventId)} className='font-semibold truncate max-w-64 py-2 hover:underline' title={event.name}>
-          {event.name}
-        </a>
-        <div role='tablist' className='tabs tabs-border flex-nowrap'>
+      <nav aria-label='Event' className='flex-none bg-base-200 px-8 border-b border-base-300'>
+        <div className='flex items-center gap-4 pt-2'>
+          <div className='breadcrumbs text-sm py-0 flex-1 min-w-0'>
+            <ul>
+              <li>
+                <a href='/'>Events</a>
+              </li>
+              <li className='min-w-0'>
+                {current ? (
+                  <a href={eventUrl(eventId)} className='truncate max-w-64 inline-block' title={event.name}>
+                    {event.name}
+                  </a>
+                ) : (
+                  <span aria-current='page' className='truncate max-w-64 inline-block' title={event.name}>
+                    {event.name}
+                  </span>
+                )}
+              </li>
+              {current && (
+                <li>
+                  {/* The section's name is the page's heading. */}
+                  <h1 aria-current='page' className='font-semibold'>
+                    {current.label}
+                  </h1>
+                </li>
+              )}
+            </ul>
+          </div>
+          {canPresent && (
+            <button className='btn btn-ghost btn-sm flex-none' onClick={() => openPresenter(eventId)}>
+              <Icon name='presentation-chart-bar' className='size-4' />
+              Present
+            </button>
+          )}
+        </div>
+        <div role='tablist' className='tabs tabs-border flex-nowrap overflow-x-auto -ml-3'>
           {sections.map((s) => (
             <a
               key={s.id}
@@ -81,13 +110,6 @@ export const EventLayout = memo(({ section, Page }: { section: EventSection | nu
             </a>
           ))}
         </div>
-        <div className='flex-1' />
-        {canPresent && (
-          <button className='btn btn-ghost btn-sm flex-none' onClick={() => openPresenter(eventId)}>
-            <Icon name='presentation-chart-bar' className='size-4' />
-            Present
-          </button>
-        )}
       </nav>
       <div className='flex-1 min-h-0 flex flex-col'>
         <Page />

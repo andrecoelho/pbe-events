@@ -68,9 +68,6 @@ export function Teams() {
   return (
     <div className='Teams bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8'>
-        <h1 className='text-3xl font-bold mb-1 text-center'>Event Teams</h1>
-        <h2 className='text-2xl font-bold mb-4 text-center text-neutral brightness-75'>{snap.eventName}</h2>
-
         {snap.initialized && languageCount === 0 && (
           <div className='flex-1 flex items-center justify-center mt-40'>
             <div className='text-center'>

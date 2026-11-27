@@ -32,6 +32,9 @@ export const NavBar = memo(() => {
         <img src={logo} className='h-8' />
       </a>
       <span className='text-2xl font-bold ml-4'>Pathfinder Bible Experience</span>
+      <a href='/' className='btn btn-ghost ml-6'>
+        Events
+      </a>
       <div className='flex-1' />
       <div className='flex-none'>
         <button

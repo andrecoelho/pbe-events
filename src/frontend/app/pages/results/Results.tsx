@@ -49,9 +49,6 @@ const ResultsContent = () => {
   if (snap.teams.length === 0) {
     return (
       <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
-        <h1 className='text-3xl font-bold mb-1 text-center'>
-          Results <span className='text-neutral brightness-75'>{snap.eventName}</span>
-        </h1>
         <div className='text-center mt-8'>
           <p className='text-lg text-base-content/60'>No results available yet</p>
         </div>
@@ -61,17 +58,13 @@ const ResultsContent = () => {
 
   return (
     <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
-      <h1 className='text-3xl font-bold mb-4 text-center'>
-        Results <span className='text-neutral brightness-75'>{snap.eventName}</span>
-        {snap.live && (
-          <span
-            className='badge badge-success badge-sm ml-3 align-middle tooltip tooltip-bottom'
-            data-tip='Updates as judges grade'
-          >
+      {snap.live && (
+        <div className='text-center mb-4'>
+          <span className='badge badge-success badge-sm tooltip tooltip-bottom' data-tip='Updates as judges grade'>
             Live
           </span>
-        )}
-      </h1>
+        </div>
+      )}
 
       {/* Chart container */}
       <div className=''>

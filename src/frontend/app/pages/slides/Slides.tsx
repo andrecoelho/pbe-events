@@ -89,9 +89,6 @@ export function Slides() {
   return (
     <div className='Slides bg-base-100/95 flex-1 relative flex flex-col overflow-auto'>
       <div className='flex-1 overflow-auto p-8'>
-        <h1 className='text-3xl font-bold mb-1 text-center'>Event Slides</h1>
-        <h2 className='text-2xl font-bold mb-6 text-center text-neutral brightness-75'>{snap.eventName}</h2>
-
         <div className='slides-content'>
           {/* Title Remarks */}
           <div className='slide-section'>
