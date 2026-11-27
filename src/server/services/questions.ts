@@ -385,7 +385,7 @@ export async function addTranslation(translation: {
   languageId: string;
   prompt: string;
   answer: string;
-  clarification?: string;
+  clarification?: string | null;
 }) {
   const id = Bun.randomUUIDv7();
 

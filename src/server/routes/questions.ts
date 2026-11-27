@@ -42,12 +42,14 @@ const NewTranslation = z.object({
   languageCode: z.string({ error: missingTranslation }),
   prompt: z.string({ error: missingTranslation }).trim(),
   answer: z.string({ error: missingTranslation }).trim(),
-  clarification: z.string().trim().optional()
+  // The questions page sends null for "no clarification".
+  clarification: z.string().trim().nullish()
 });
 const TranslationChange = z.object({
   prompt: z.string({ error: 'prompt must be a string' }).trim().optional(),
   answer: z.string({ error: 'answer must be a string' }).trim().optional(),
-  clarification: z.string().trim().optional()
+  // null clears it; leaving it out keeps it.
+  clarification: z.string().trim().nullish()
 });
 
 function checkTrueFalse(type: string, answer: string | undefined) {
@@ -206,7 +208,7 @@ export const questionsRoutes: Routes = {
         ...translation,
         prompt: body.prompt ?? translation.prompt,
         answer: body.answer ?? translation.answer,
-        clarification: body.clarification ?? translation.clarification
+        clarification: body.clarification === undefined ? translation.clarification : body.clarification
       });
 
       return {};
