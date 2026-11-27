@@ -245,13 +245,18 @@ const importedQ = await call(demo, 'GET', `${iv}/questions`);
 const someTranslation = Object.values(importedQ.questions as Record<string, any>)
   .flatMap((q: any) => Object.values(q.translations))
   .at(0) as any;
-await call(
-  sam,
-  'PATCH',
-  `/api/questions/translations/${someTranslation.id}`,
-  { answer: 'judge edit' },
-  'judge PATCH translation'
-);
+// Skipped when the import failed (older versions reject the example file), so the rest still runs.
+if (someTranslation) {
+  await call(
+    sam,
+    'PATCH',
+    `/api/questions/translations/${someTranslation.id}`,
+    { answer: 'judge edit' },
+    'judge PATCH translation'
+  );
+} else {
+  out.push('judge PATCH translation: skipped, nothing was imported');
+}
 await call(demo, 'PATCH', `${ev}/permissions`, { userId: samId, roleId: 'owner' });
 await call(demo, 'PATCH', `${ev}/permissions`, { userId: samId, roleId: 'admin' });
 await call(sam, 'GET', `${ev}/teams`, undefined, 'admin GET teams');
