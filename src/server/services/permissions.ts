@@ -83,3 +83,18 @@ export async function hasAnyEventRole(userId: string, roles: readonly Role[]) {
 
   return rows.length > 0;
 }
+
+// Why a role change from the Permissions page isn't allowed, or null when it is (#90). `current` is the person's
+// role on the event (null: none); `next` the role asked for (null: remove them). The owner only changes with
+// Transfer ownership on the admin page, so an event always keeps exactly one owner.
+export function roleChangeError(current: Role | null, next: Role | null): string | null {
+  if (next === 'owner') {
+    return 'An event has one owner. A super admin can transfer ownership from the admin page.';
+  }
+
+  if (current === 'owner') {
+    return 'The owner’s role can’t be changed or removed. A super admin can transfer ownership first.';
+  }
+
+  return null;
+}
