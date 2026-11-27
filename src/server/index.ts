@@ -4,6 +4,7 @@ import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import presenter from '@/frontend/presenter/presenter.html';
 import team from '@/frontend/team/team.html';
+import { createAdminRoutes } from '@/server/routes/admin';
 import { answersRoutes } from '@/server/routes/answers';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
@@ -57,7 +58,8 @@ const server = Bun.serve({
     ...questionsRoutes,
     ...slidesRoutes,
     ...resultsRoutes,
-    ...createRunsRoutes(wsServer)
+    ...createRunsRoutes(wsServer),
+    ...createAdminRoutes(wsServer)
   },
   async fetch(req): Promise<Response | undefined> {
     const url = new URL(req.url);

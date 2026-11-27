@@ -8,6 +8,8 @@ interface User {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
+  // Can open the admin page (/admin).
+  isSuperAdmin: boolean;
 }
 
 interface AppStore {

@@ -80,13 +80,39 @@ type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterW
 // How often signed-in sockets are checked for sessions that expired or were deleted.
 const SESSION_CHECK_MS = 60_000;
 
-export type WebsocketData =
+// Set on every socket once it opens, for the admin page's live connections (#56). Server time (ms).
+type SocketTimes = {
+  connectedAt?: number;
+  // The last message other than a PING (pages ping every few seconds to keep the socket open).
+  lastMessageAt?: number;
+};
+
+export type WebsocketData = (
   | HostWebsocketData
   | PresenterWebsocketData
   | ResultsWebsocketData
   | TeamWebsocketData
   | JudgeWebsocketData
-  | ErrorWebsocketData;
+  | ErrorWebsocketData
+) &
+  SocketTimes;
+
+// One open socket, as the admin page lists it (#56). The route adds the user's name.
+export type LiveSocket = {
+  role: Exclude<WebsocketData['role'], 'error'>;
+  userId: string | null;
+  team: { id: string; name: string; number: number } | null;
+  connectedAt: number;
+  lastMessageAt: number | null;
+};
+
+export type LiveEventState = {
+  eventId: string;
+  eventName: string;
+  runStatus: RunStatus;
+  activeItem: ActiveItem | null;
+  sockets: LiveSocket[];
+};
 
 // What a message's ACK carries: whether it worked, and if not, why (shown to the person).
 export type MessageResult = { ok: true } | { ok: false; error: string };
@@ -134,6 +160,8 @@ export class WebSocketServer {
   private server: Bun.Server<WebsocketData> | null = null;
   // Host, judge and presenter sockets by session id, so they can be closed when the session ends.
   private sessionSockets = new Map<string, Set<ServerWebSocket<SignedInWebsocketData>>>();
+  // Every open socket by event id, for the admin page (#56).
+  private eventSockets = new Map<string, Set<ServerWebSocket<WebsocketData>>>();
 
   constructor() {
     this.eventConnections = new Map();
@@ -353,6 +381,33 @@ export class WebSocketServer {
     return textServerError('WebSocket upgrade failed');
   }
 
+  // The events open in memory and their sockets, for the admin page (#56).
+  liveEvents(): LiveEventState[] {
+    return [...this.eventConnections.values()].map((connection) => ({
+      eventId: connection.eventId,
+      eventName: connection.eventName,
+      runStatus: connection.run.status,
+      activeItem: connection.activeItem,
+      sockets: [...(this.eventSockets.get(connection.eventId) ?? [])].flatMap((ws): LiveSocket[] => {
+        const { data } = ws;
+
+        if (data.role === 'error') {
+          return [];
+        }
+
+        return [
+          {
+            role: data.role,
+            userId: data.role === 'team' ? null : data.session.user_id,
+            team: data.role === 'team' ? { id: data.id, name: data.name, number: data.number } : null,
+            connectedAt: data.connectedAt ?? Date.now(),
+            lastMessageAt: data.lastMessageAt ?? null
+          }
+        ];
+      })
+    }));
+  }
+
   // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
     const { role } = ws.data;
@@ -372,6 +427,13 @@ export class WebSocketServer {
       ws.close();
       return;
     }
+
+    ws.data.connectedAt = Date.now();
+
+    const sockets = this.eventSockets.get(eventId) ?? new Set();
+
+    sockets.add(ws);
+    this.eventSockets.set(eventId, sockets);
 
     if (this.isSignedInWebSocket(ws)) {
       this.trackSession(ws);
@@ -468,6 +530,14 @@ export class WebSocketServer {
       return;
     }
 
+    const sockets = this.eventSockets.get(eventId);
+
+    sockets?.delete(ws);
+
+    if (sockets?.size === 0) {
+      this.eventSockets.delete(eventId);
+    }
+
     const connection = this.eventConnections.get(eventId);
 
     if (!connection) {
@@ -540,6 +610,10 @@ export class WebSocketServer {
 
     if (!msg) {
       return;
+    }
+
+    if (msg.type !== 'PING') {
+      ws.data.lastMessageAt = Date.now();
     }
 
     let result: MessageResult | void;

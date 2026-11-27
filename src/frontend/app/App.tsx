@@ -1,5 +1,6 @@
 import '../base.css';
 
+import { Admin } from '@/frontend/app/pages/admin/Admin';
 import { AppValt, AppValtContext } from '@/frontend/app/appValt';
 import { NavBar } from '@/frontend/app/NavBar';
 import { Events } from '@/frontend/app/pages/events/Events';
@@ -27,6 +28,7 @@ const routes: Routes = new Map([
   [/^\/settings/, Settings],
   [/^\/grade/, Grade],
   [/^\/results/, Results],
+  [/^\/admin(\/|$)/, Admin],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);
 

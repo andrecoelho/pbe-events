@@ -154,3 +154,29 @@ export type JudgeClientMessage =
 export type PresenterClientMessage = Ping;
 
 export type ResultsClientMessage = Ping;
+
+// Admin page (Phase 3): the events open in the server's memory and who is connected to each (#56).
+export type LiveConnectionRole = 'host' | 'judge' | 'presenter' | 'results' | 'team';
+
+export type LiveConnection = {
+  role: LiveConnectionRole;
+  // The signed-in user, or the team.
+  name: string;
+  detail: string;
+  userId: string | null;
+  teamId: string | null;
+  // Server time (ms since the epoch).
+  connectedAt: number;
+  lastMessageAt: number | null;
+};
+
+export type LiveEvent = {
+  eventId: string;
+  eventName: string;
+  runStatus: RunStatus;
+  // What the presenter shows, e.g. "Question 3 · answering"; null before the run starts.
+  activeItem: string | null;
+  connections: LiveConnection[];
+};
+
+export type LiveConnectionsResponse = { serverTime: number; events: LiveEvent[] };

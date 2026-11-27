@@ -151,3 +151,16 @@ export async function deleteUser(userId: string) {
 
   await removeAvatarFile(avatarUrl);
 }
+
+// Names and emails of the given users, by id (the admin page's live connections, #56).
+export async function getUsersByIds(ids: string[]): Promise<Map<string, PublicUser>> {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const rows: PublicUser[] = await sql`
+    SELECT id, email, first_name, last_name, avatar_url FROM users WHERE id IN ${sql(ids)}
+  `;
+
+  return new Map(rows.map((row) => [row.id, row]));
+}

@@ -4,8 +4,8 @@ import type { Routes } from '@/server/types';
 
 export const sessionRoutes: Routes = {
   '/api/session': {
-    GET: route(auth(), ({ user: { id, email, first_name, last_name, avatar_url } }) => ({
-      user: { id, email, first_name, last_name, avatar_url }
+    GET: route(auth(), ({ user: { id, email, first_name, last_name, avatar_url, is_super_admin } }) => ({
+      user: { id, email, first_name, last_name, avatar_url, is_super_admin }
     }))
   }
 };

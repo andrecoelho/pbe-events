@@ -8,6 +8,7 @@
 //   password: demo-password locally (a test value for local development only);
 //             on staging, set once from SEED_DEMO_PASSWORD (kept in a password manager, not the repo).
 //             Later staging runs keep the existing password unless SEED_DEMO_PASSWORD is set again.
+// The demo user is a super admin, so the admin page (/admin) can be tried and tested.
 import { sql } from 'bun';
 import { requireLocalDatabase, requireStagingTunnel } from './local-db';
 
@@ -127,8 +128,8 @@ await sql.begin(async (tx) => {
   await tx`DELETE FROM users WHERE id = ${userId} OR email = ${DEMO_EMAIL}`;
 
   await tx`
-    INSERT INTO users (id, email, password, first_name, last_name)
-    VALUES (${userId}, ${DEMO_EMAIL}, ${passwordHash}, 'Demo', 'Organizer')
+    INSERT INTO users (id, email, password, first_name, last_name, is_super_admin)
+    VALUES (${userId}, ${DEMO_EMAIL}, ${passwordHash}, 'Demo', 'Organizer', true)
   `;
   await tx`
     INSERT INTO events (id, name, title_remarks)
