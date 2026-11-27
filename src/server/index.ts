@@ -19,12 +19,16 @@ import { sessionRoutes } from '@/server/routes/session';
 import { slidesRoutes } from '@/server/routes/slides';
 import { teamsRoutes } from '@/server/routes/teams';
 import { userRoutes } from '@/server/routes/users';
+import { recordConsoleProblems } from '@/server/recentErrors';
 import { getSession } from '@/server/session';
 import { apiNotFound, textNotFound } from '@/server/utils/responses';
 import { WebSocketServer } from '@/server/webSocket';
 import { sql } from 'bun';
 import { join } from 'node:path';
 import { styleText } from 'node:util';
+
+// The admin page's Health section shows the last errors and warnings (#60).
+recordConsoleProblems();
 
 const appNounce = Bun.randomUUIDv7();
 const loginNounce = Bun.randomUUIDv7();

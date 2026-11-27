@@ -6,6 +6,7 @@ import type {
   AdminUsersResponse,
   AuditLogEntry,
   AuditLogResponse,
+  HealthResponse,
   LiveConnectionsResponse,
   ResetLinkResponse
 } from '@/types';
@@ -26,6 +27,7 @@ type Polled<T> = {
 export type AdminStore = {
   connections: Polled<LiveConnectionsResponse>;
   event: Polled<AdminEventResponse>;
+  health: Polled<HealthResponse>;
   auditLog: {
     loaded: boolean;
     loading: boolean;
@@ -54,6 +56,7 @@ export class AdminValt {
     this.store = proxy<AdminStore>({
       connections: empty(),
       event: empty(),
+      health: empty(),
       auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null },
       users: { query: '', loaded: false, error: null, data: null },
       events: { query: '', loaded: false, error: null, data: null },
@@ -61,7 +64,7 @@ export class AdminValt {
     });
   }
 
-  private async load<K extends 'connections' | 'event'>(key: K, path: string) {
+  private async load<K extends 'connections' | 'event' | 'health'>(key: K, path: string) {
     const result = await api<NonNullable<AdminStore[K]['data']>>(path);
     const polled = this.store[key];
 
@@ -78,6 +81,8 @@ export class AdminValt {
   }
 
   loadConnections = () => this.load('connections', '/api/admin/connections');
+
+  loadHealth = () => this.load('health', '/api/admin/health');
 
   loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
 

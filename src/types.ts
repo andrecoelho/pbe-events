@@ -282,3 +282,22 @@ export type AdminEventResponse = {
   live: { runStatus: RunStatus; activeItem: string | null; connections: LiveConnection[] } | null;
   teams: AdminTeam[];
 };
+
+// The admin page's Health section (#60). Times are ms since the epoch (server time).
+export type HealthResponse = {
+  serverTime: number;
+  version: { commit: string | null; environment: string; bun: string; startedAt: number };
+  process: { uptimeSeconds: number; rssBytes: number; heapUsedBytes: number; heapTotalBytes: number };
+  // Null when the database couldn't be reached (`databaseError` says why).
+  database: {
+    latencyMs: number;
+    sizeBytes: number;
+    latestMigration: { name: string; appliedAt: string } | null;
+  } | null;
+  databaseError: string | null;
+  live: { events: number; sockets: number };
+  problems: {
+    totals: { error: number; warn: number };
+    recent: { time: number; level: 'error' | 'warn'; message: string }[];
+  };
+};

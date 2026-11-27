@@ -4,6 +4,7 @@ import { AdminEvent } from '@/frontend/app/pages/admin/AdminEvent';
 import { AdminUser } from '@/frontend/app/pages/admin/AdminUser';
 import { AuditLog } from '@/frontend/app/pages/admin/AuditLog';
 import { Events as AdminEvents } from '@/frontend/app/pages/admin/Events';
+import { Health } from '@/frontend/app/pages/admin/Health';
 import { Users } from '@/frontend/app/pages/admin/Users';
 import { LiveConnections } from '@/frontend/app/pages/admin/LiveConnections';
 import { AppValt, AppValtContext } from '@/frontend/app/appValt';
@@ -36,6 +37,7 @@ const routes: Routes = new Map([
   [/^\/admin\/events\/[^/]+/, AdminEvent],
   [/^\/admin\/events\/?$/, AdminEvents],
   [/^\/admin\/audit-log/, AuditLog],
+  [/^\/admin\/health/, Health],
   [/^\/admin\/users\/[^/]+/, AdminUser],
   [/^\/admin\/users\/?$/, Users],
   [/^\/admin\/?$/, LiveConnections],

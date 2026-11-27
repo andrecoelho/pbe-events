@@ -46,7 +46,27 @@ export function formatDuration(ms: number) {
 
   const hours = Math.floor(minutes / 60);
 
-  return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+  if (hours < 24) {
+    return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  return hours % 24 === 0 ? `${days} d` : `${days} d ${hours % 24} h`;
+}
+
+// "512 KB", "84.2 MB".
+export function formatBytes(bytes: number) {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+
+  return `${unit === 0 ? value : value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
 // "3 s ago", or `never` when there's no time.

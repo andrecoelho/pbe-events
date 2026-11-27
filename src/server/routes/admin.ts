@@ -4,6 +4,8 @@ import { badRequest, notFound, route } from '@/server/http/route';
 import { joinEvent, leaveEvent, listAllEvents, transferOwnership } from '@/server/services/adminEvents';
 import { listAdminActions, logAdminAction } from '@/server/services/audit';
 import { getEventName } from '@/server/services/events';
+import { databaseInfo, processInfo, versionInfo } from '@/server/services/health';
+import { recentProblems } from '@/server/recentErrors';
 import { listEventIdsForRoles, listEventPermissions, MANAGER_ROLES } from '@/server/services/permissions';
 import { countTeams, getTeam, listTeams } from '@/server/services/teams';
 import { findUserByEmail, getUsersByIds } from '@/server/services/users';
@@ -14,6 +16,7 @@ import type {
   AdminEventResponse,
   AdminEventsResponse,
   AuditLogResponse,
+  HealthResponse,
   LiveConnection,
   LiveConnectionRole,
   LiveConnectionsResponse
@@ -170,6 +173,32 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
           };
         }
       )
+    },
+
+    // The running version, uptime, memory, database and the last errors (#60). Super admins only.
+    '/api/admin/health': {
+      GET: route(superAdmin(), async (): Promise<HealthResponse> => {
+        const events = wsServer.liveEvents();
+        const problems = recentProblems();
+        let database: HealthResponse['database'] = null;
+        let databaseError: string | null = null;
+
+        try {
+          database = await databaseInfo();
+        } catch (error) {
+          databaseError = error instanceof Error ? error.message : String(error);
+        }
+
+        return {
+          serverTime: Date.now(),
+          version: versionInfo(),
+          process: processInfo(),
+          database,
+          databaseError,
+          live: { events: events.length, sockets: events.reduce((sum, event) => sum + event.sockets.length, 0) },
+          problems: { totals: problems.totals, recent: problems.entries }
+        };
+      })
     },
 
     // Every event, newest first; ?q= matches its name or its owner's email (#59). Super admins only.
