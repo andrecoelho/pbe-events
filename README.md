@@ -26,6 +26,17 @@ mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like T
 
 These only ever connect to **staging**, never production.
 
+## Railway infrastructure
+
+Railway deploys `staging` to the staging environment and `main` to production, each after GitHub CI passes. The services, database and volumes are described in [`.railway/railway.ts`](.railway/railway.ts); secrets stay in Railway. Changes to that file are not applied on deploy. Preview, then apply each environment by hand:
+
+```bash
+railway config plan --environment staging
+railway config apply --environment staging
+```
+
+Anything removed from the file can be deleted on apply, so read the plan first. Node (pinned in `mise.toml`) is only there to evaluate this file.
+
 ## Without mise
 
 To install dependencies:

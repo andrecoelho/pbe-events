@@ -37,6 +37,13 @@ const server = Bun.serve({
     [`/${appNounce}`]: app,
     [`/${teamNounce}`]: team,
     [`/${presenterNounce}`]: presenter,
+    // Railway's deploy health check: the server is up and can reach the database.
+    '/api/health': {
+      GET: async () => {
+        await sql`select 1`;
+        return new Response('ok');
+      }
+    },
     ...authRoutes,
     ...answersRoutes,
     ...sessionRoutes,

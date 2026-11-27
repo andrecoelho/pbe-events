@@ -30,6 +30,7 @@
     "daisyui": "^5.8.3",
     "oxfmt": "^0.80.0",
     "oxlint": "^1.95.0",
+    "railway": "^3.19.0",
     "typescript": "^7.0.2"
   }
 }

@@ -1,8 +1,10 @@
 # Tool versions, environment and tasks for local development.
-# Setup: `brew install mise`, add `eval "$(mise activate zsh)"` to ~/.zshrc, then run `mise install`.
+# Setup: install mise (see README), add `eval "$(mise activate zsh)"` to ~/.zshrc, then run `mise install`.
 
 [tools]
 bun = "1.4.4"
+# Only for evaluating the Railway config in .railway/railway.ts (`railway config plan`).
+node = "26.13.1"
 
 [env]
 # Local settings and secrets (git-ignored); see .env.example.
