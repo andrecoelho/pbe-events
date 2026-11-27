@@ -1,6 +1,8 @@
 // The writes a live run makes (grading, locking, challenges) only touch the event they're given (#43).
 // Runs only when POSTGRES_URL is a local dev database (`mise run db`); CI has none, so it skips there.
-import { setAnswerChallenged, setAnswerPoints } from '@/server/services/answers';
+import { getQuestionAnswers, setAnswerChallenged, setAnswerPoints } from '@/server/services/answers';
+import { getRun, saveActiveItem } from '@/server/services/runs';
+import type { ActiveItem } from '@/types';
 import { setQuestionGraded, setQuestionLocked } from '@/server/services/questions';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'bun';
@@ -79,5 +81,63 @@ describe.skipIf(!isLocalDatabase())('live run writes', () => {
     await setAnswerChallenged(a.eventId, b.answerId, true);
 
     expect(await state(b.questionId)).toEqual(untouched);
+  });
+});
+
+describe.skipIf(!isLocalDatabase())('answers in the active item (#54)', () => {
+  test('come from the answers table, one entry per team', async () => {
+    const a = await makeEvent();
+    await setAnswerPoints(a.eventId, a.answerId, 2);
+
+    expect(await getQuestionAnswers(a.eventId, a.questionId)).toEqual({
+      [a.teamId]: {
+        answerId: a.answerId,
+        answerText: 'x',
+        languageCode: 'en',
+        teamId: a.teamId,
+        teamNumber: 1,
+        points: 2,
+        autoPoints: null,
+        challenged: false
+      }
+    });
+  });
+
+  test('are not stored with the run, and are read back from the table', async () => {
+    const a = await makeEvent();
+    await sql`INSERT INTO runs (event_id) VALUES (${a.eventId})`;
+
+    const item: ActiveItem = {
+      type: 'question',
+      id: a.questionId,
+      number: 1,
+      phase: 'answer',
+      locked: true,
+      graded: false,
+      translations: [{ languageCode: 'en', answer: 'A' }],
+      answers: {
+        stale: {
+          answerId: 'stale',
+          answerText: 'old copy',
+          languageCode: 'en',
+          teamId: 'stale',
+          teamNumber: 9,
+          points: 4,
+          autoPoints: null,
+          challenged: false
+        }
+      }
+    };
+
+    await saveActiveItem(a.eventId, item);
+
+    const [stored] = await sql`SELECT active_item FROM runs WHERE event_id = ${a.eventId}`;
+    expect('answers' in stored.active_item).toBe(false);
+
+    const run = await getRun(a.eventId);
+    const answers =
+      run?.active_item?.type === 'question' && run.active_item.phase === 'answer' ? run.active_item.answers : null;
+    expect(Object.keys(answers ?? {})).toEqual([a.teamId]);
+    expect(answers?.[a.teamId]?.answerText).toBe('x');
   });
 });

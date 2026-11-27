@@ -1,7 +1,7 @@
 import type { Session } from '@/server/types';
 import { textServerError } from '@/server/utils/responses';
 import type { ActiveItem } from '@/types';
-import { saveAnswer, setAnswerChallenged, setAnswerPoints } from '@/server/services/answers';
+import { saveAnswer, setAnswerChallenged, setAnswerPoints, withAnswers } from '@/server/services/answers';
 import { eventExists } from '@/server/services/events';
 import { getLanguagesByCode, type Language } from '@/server/services/languages';
 import { ALL_ROLES, getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
@@ -1023,6 +1023,11 @@ export class WebSocketServer {
 
     connection.run.status = status;
 
+    // Starting over erased every answer: the open question's copy must match (#54).
+    if (status === 'not_started') {
+      connection.activeItem = await withAnswers(connection.eventId, connection.activeItem);
+    }
+
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
     this.broadcastToAll(connection, message);
@@ -1044,8 +1049,10 @@ export class WebSocketServer {
     }
   }
 
-  private async handleSET_ACTIVE_ITEM(connection: EventConnection, nextActiveItem: ActiveItem | null): Promise<void> {
+  private async handleSET_ACTIVE_ITEM(connection: EventConnection, sentItem: ActiveItem | null): Promise<void> {
     const currentActiveItem = connection.activeItem;
+    // The answers come from the answers table, not the host page's copy (#54).
+    const nextActiveItem = await withAnswers(connection.eventId, sentItem);
 
     if (
       nextActiveItem?.type === 'question' &&

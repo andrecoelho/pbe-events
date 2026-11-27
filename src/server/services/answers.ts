@@ -1,3 +1,4 @@
+import type { ActiveItem } from '@/types';
 import { sql } from 'bun';
 
 // Every question with its translations and an entry per team (answerText null when the team has not answered).
@@ -153,6 +154,58 @@ export async function getQuestionsWithAnswers(eventId: string) {
   const questions = Array.from(questionsMap.values()).sort((a, b) => a.number - b.number);
 
   return questions;
+}
+
+type QuestionItem = Extract<ActiveItem, { type: 'question'; phase: 'prompt' | 'answer' }>;
+
+// Every team's answer to one question (#54), keyed by team id, as the live run shows them: a team that hasn't
+// answered has answerId null. The answers table is the source of truth; the run's active item holds a copy
+// only in memory.
+export async function getQuestionAnswers(eventId: string, questionId: string): Promise<QuestionItem['answers']> {
+  const rows: {
+    team_id: string;
+    team_number: number;
+    answer_id: string | null;
+    answer: string | null;
+    language_code: string | null;
+    points_awarded: number | null;
+    auto_points_awarded: number | null;
+    challenged: boolean | null;
+  }[] = await sql`
+    SELECT t.id AS team_id, t.number AS team_number, a.id AS answer_id, a.answer, l.code AS language_code,
+      a.points_awarded, a.auto_points_awarded, a.challenged
+    FROM teams t
+    LEFT JOIN answers a ON a.team_id = t.id AND a.question_id = ${questionId}
+    LEFT JOIN translations tr ON tr.id = a.translation_id
+    LEFT JOIN languages l ON l.id = tr.language_id
+    WHERE t.event_id = ${eventId}
+    ORDER BY t.number
+  `;
+
+  return Object.fromEntries(
+    rows.map((row) => [
+      row.team_id,
+      {
+        answerId: row.answer_id,
+        answerText: row.answer,
+        languageCode: row.language_code,
+        teamId: row.team_id,
+        teamNumber: row.team_number,
+        points: row.points_awarded,
+        autoPoints: row.auto_points_awarded,
+        challenged: row.challenged
+      }
+    ])
+  );
+}
+
+// The item with its answers read from the answers table, when it's a question taking or showing answers.
+export async function withAnswers<T extends ActiveItem | null>(eventId: string, item: T): Promise<T> {
+  if (item?.type === 'question' && item.phase !== 'reading') {
+    return { ...item, answers: await getQuestionAnswers(eventId, item.id) };
+  }
+
+  return item;
 }
 
 export async function saveAnswer(answer: { questionId: string; teamId: string; translationId: string; text: string }) {

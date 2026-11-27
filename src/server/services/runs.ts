@@ -1,5 +1,6 @@
 // An event's run: status, grace period and the item on screen.
 import type { ActiveItem } from '@/types';
+import { withAnswers } from '@/server/services/answers';
 import { sql } from 'bun';
 
 export type RunStatus = 'not_started' | 'in_progress' | 'paused' | 'completed';
@@ -22,11 +23,21 @@ export async function getRun(eventId: string): Promise<Run | null> {
     WHERE runs.event_id = ${eventId}
   `;
 
-  return rows[0] ?? null;
+  const run = rows[0];
+
+  if (!run) {
+    return null;
+  }
+
+  // Answers aren't stored in the active item (#54): they come from the answers table.
+  return { ...run, active_item: await withAnswers(eventId, run.active_item) };
 }
 
+// Saves the item on screen without its answers, which live in the answers table (#54).
 export async function saveActiveItem(eventId: string, activeItem: ActiveItem | null) {
-  await sql`UPDATE runs SET active_item = ${activeItem}::jsonb WHERE event_id = ${eventId}`;
+  const stored = activeItem && 'answers' in activeItem ? { ...activeItem, answers: undefined } : activeItem;
+
+  await sql`UPDATE runs SET active_item = ${stored}::jsonb WHERE event_id = ${eventId}`;
 }
 
 // Back to `not_started` also erases every answer and unlocks every question, all or nothing.

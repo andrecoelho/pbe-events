@@ -54,7 +54,8 @@ export const ActiveItemSchema = z.union([
     pausedMs: z.number().nullable().default(null),
     isTimeUp: z.boolean(),
     translations: z.array(z.object({ languageCode: z.string(), prompt: z.string() })),
-    answers: z.record(z.string(), ActiveAnswer)
+    // Ignored: the server reads answers from the answers table (#54).
+    answers: z.record(z.string(), ActiveAnswer).default({})
   }),
   z.object({
     ...questionBase,
@@ -64,7 +65,8 @@ export const ActiveItemSchema = z.union([
     translations: z.array(
       z.object({ languageCode: z.string(), answer: z.string(), clarification: z.string().nullish() })
     ),
-    answers: z.record(z.string(), ActiveAnswer)
+    // Ignored: the server reads answers from the answers table (#54).
+    answers: z.record(z.string(), ActiveAnswer).default({})
   })
 ]);
 

@@ -437,17 +437,9 @@ Teams are subscribed to pub/sub channels based on their selected language:
 - Example: `abc123:en`, `abc123:es`
 - All broadcasts use these channels to send language-specific translations
 
-### Answer Persistence
+### Answer Persistence (#54)
 
-Answers are immediately persisted to the database:
-
-```sql
-INSERT INTO answers (id, run_id, team_id, question_id, answer, submitted_at)
-ON CONFLICT (run_id, team_id, question_id)
-DO UPDATE SET answer = EXCLUDED.answer, submitted_at = EXCLUDED.submitted_at
-```
-
-This allows teams to reconnect and resume their work without losing progress.
+The `answers` table is the only place answers are stored. The active item's `answers` (one entry per team) is a copy kept in memory: the server builds it from the table when a question opens (`SET_ACTIVE_ITEM` ignores the answers the host page sends), when an event's live state loads, and when a run starts over. Submitting, challenging and grading write the table first and then update the copy. `runs.active_item` is saved without answers, and `GET /api/events/:id/run` adds them back from the table.
 
 ---
 
