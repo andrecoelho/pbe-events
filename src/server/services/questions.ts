@@ -411,12 +411,22 @@ export async function deleteTranslation(translationId: string) {
 }
 
 // Used by the live run. Not yet scoped to an event: #43 adds that for the WebSocket writes.
-export async function setQuestionLocked(questionId: string, locked: boolean) {
-  await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
+// Returns false when the event has no such question.
+export async function setQuestionLocked(eventId: string, questionId: string, locked: boolean) {
+  const rows = await sql`
+    UPDATE questions SET locked = ${locked} WHERE id = ${questionId} AND event_id = ${eventId} RETURNING id
+  `;
+
+  return rows.length > 0;
 }
 
-export async function setQuestionGraded(questionId: string, graded: boolean) {
-  await sql`UPDATE questions SET graded = ${graded} WHERE id = ${questionId}`;
+// Returns false when the event has no such question.
+export async function setQuestionGraded(eventId: string, questionId: string, graded: boolean) {
+  const rows = await sql`
+    UPDATE questions SET graded = ${graded} WHERE id = ${questionId} AND event_id = ${eventId} RETURNING id
+  `;
+
+  return rows.length > 0;
 }
 
 // The question's translation in a language, with the language code.

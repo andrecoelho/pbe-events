@@ -170,15 +170,21 @@ export async function saveAnswer(answer: { questionId: string; teamId: string; t
   return rows[0]!.id;
 }
 
-export async function setAnswerChallenged(answerId: string, challenged: boolean) {
-  await sql`UPDATE answers SET challenged = ${challenged} WHERE id = ${answerId}`;
+export async function setAnswerChallenged(eventId: string, answerId: string, challenged: boolean) {
+  await sql`
+    UPDATE answers a SET challenged = ${challenged}
+    FROM questions q
+    WHERE a.id = ${answerId} AND q.id = a.question_id AND q.event_id = ${eventId}
+  `;
 }
 
-// Returns the answer's question and team, or null when there's no such answer.
-export async function setAnswerPoints(answerId: string, points: number | null) {
+// Returns the answer's question and team, or null when the event has no such answer.
+export async function setAnswerPoints(eventId: string, answerId: string, points: number | null) {
   const rows: { question_id: string; team_id: string }[] = await sql`
-    UPDATE answers SET points_awarded = ${points} WHERE id = ${answerId}
-    RETURNING question_id, team_id
+    UPDATE answers a SET points_awarded = ${points}
+    FROM questions q
+    WHERE a.id = ${answerId} AND q.id = a.question_id AND q.event_id = ${eventId}
+    RETURNING a.question_id, a.team_id
   `;
 
   return rows[0] ?? null;

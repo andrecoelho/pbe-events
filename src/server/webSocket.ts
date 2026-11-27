@@ -779,7 +779,7 @@ export class WebSocketServer {
       const answer = activeItem.answers[ws.data.id];
 
       if (answer?.answerId) {
-        await setAnswerChallenged(answer.answerId, challenged);
+        await setAnswerChallenged(connection.eventId, answer.answerId, challenged);
 
         answer.challenged = challenged;
 
@@ -845,7 +845,9 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    await setQuestionLocked(questionId, locked);
+    if (!(await setQuestionLocked(connection.eventId, questionId, locked))) {
+      return;
+    }
 
     const message = JSON.stringify({
       type: 'QUESTION_LOCKED',
@@ -895,7 +897,9 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    await setQuestionGraded(questionId, graded);
+    if (!(await setQuestionGraded(connection.eventId, questionId, graded))) {
+      return;
+    }
 
     const message = JSON.stringify({
       type: 'QUESTION_GRADED',
@@ -917,7 +921,7 @@ export class WebSocketServer {
     answerId: string,
     points: number | null
   ): Promise<void> {
-    const answer = await setAnswerPoints(answerId, points);
+    const answer = await setAnswerPoints(connection.eventId, answerId, points);
 
     if (!answer) {
       return;

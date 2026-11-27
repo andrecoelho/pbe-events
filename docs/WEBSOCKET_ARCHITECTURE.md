@@ -513,7 +513,7 @@ All validation errors are sent back to the client as `ERROR` messages with speci
 1. **Session Validation**: Host connections validate the session cookie; team connections validate team ID only
 2. **Permission Checks**: Host actions require `owner` or `admin` role
 3. **Team Isolation**: Teams can only submit answers for their own team
-4. **Event Isolation**: All operations scoped to specific event IDs
+4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event
 5. **SQL Injection Prevention**: All queries use parameterized statements via Bun SQL
 
 ---
