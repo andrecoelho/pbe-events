@@ -3,14 +3,14 @@
 # local database, and diffs the transcripts. Use it to check a server change keeps the API and the live
 # run behaving as before. Local only: scripts/seed.ts refuses any other database.
 #
-# Usage: scripts/smoke/compare.sh [ref]     (bun run smoke [ref])
+# Usage: scripts/smoke/compare.sh [ref]     (bun run smoke [ref]); SMOKE_PORT picks the port (default 3456).
 set -euo pipefail
 
 ref="${1:-origin/staging}"
 root="$(git rev-parse --show-toplevel)"
 out="$(mktemp -d)"
 base="$out/base"
-port=3456
+port="${SMOKE_PORT:-3456}"
 
 cleanup() {
   [[ -n "${pid:-}" ]] && kill "$pid" 2>/dev/null || true
@@ -34,8 +34,15 @@ run() {
     sleep 0.2
   done
 
-  bun "$root/scripts/smoke/run.ts" "http://localhost:$port" >"$out/$label-run.txt"
-  bun "$root/scripts/smoke/writes.ts" "http://localhost:$port" >"$out/$label-writes.txt"
+  local part
+  for part in run writes; do
+    if ! bun "$root/scripts/smoke/$part.ts" "http://localhost:$port" >"$out/$label-$part.txt" 2>&1; then
+      echo "The $part smoke test failed against $label. Its output and the end of the server log:"
+      tail -n 15 "$out/$label-$part.txt"
+      tail -n 15 "$out/$label-server.log"
+      exit 2
+    fi
+  done
   kill "$pid"
   wait "$pid" 2>/dev/null || true
   pid=
