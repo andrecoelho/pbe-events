@@ -1,6 +1,7 @@
 import '../base.css';
 
 import { AdminEvent } from '@/frontend/app/pages/admin/AdminEvent';
+import { AuditLog } from '@/frontend/app/pages/admin/AuditLog';
 import { LiveConnections } from '@/frontend/app/pages/admin/LiveConnections';
 import { AppValt, AppValtContext } from '@/frontend/app/appValt';
 import { NavBar } from '@/frontend/app/NavBar';
@@ -30,6 +31,7 @@ const routes: Routes = new Map([
   [/^\/grade/, Grade],
   [/^\/results/, Results],
   [/^\/admin\/events\/[^/]+/, AdminEvent],
+  [/^\/admin\/audit-log/, AuditLog],
   [/^\/admin\/?$/, LiveConnections],
   [/^\/$/, Events]
 ] as [RegExp, ElementType][]);

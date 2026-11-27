@@ -1,21 +1,25 @@
 // The admin page's API (Phase 3). Super admins see every event; event admins (owner or admin) see theirs (#89).
-import { auth, eventRoleOrSuperAdmin } from '@/server/http/middleware';
+import { auth, eventRoleOrSuperAdmin, superAdmin } from '@/server/http/middleware';
 import { badRequest, notFound, route } from '@/server/http/route';
+import { listAdminActions, logAdminAction } from '@/server/services/audit';
 import { getEventName } from '@/server/services/events';
 import { listEventIdsForRoles, MANAGER_ROLES } from '@/server/services/permissions';
-import { countTeams, listTeams } from '@/server/services/teams';
+import { countTeams, getTeam, listTeams } from '@/server/services/teams';
 import { getUsersByIds } from '@/server/services/users';
 import type { Routes } from '@/server/types';
 import type { LiveSocket, WebSocketServer } from '@/server/webSocket';
 import type {
   ActiveItem,
   AdminEventResponse,
+  AuditLogResponse,
   LiveConnection,
   LiveConnectionRole,
   LiveConnectionsResponse
 } from '@/types';
 
 const ROLE_ORDER: Record<LiveConnection['role'], number> = { host: 0, presenter: 1, judge: 2, results: 3 };
+
+const AUDIT_PAGE = 50;
 
 const latest = (times: (number | null)[]) =>
   times.reduce<number | null>((max, t) => (t !== null && (max === null || t > max) ? t : max), null);
@@ -154,8 +158,7 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
           throw badRequest('This event isn’t open in the server’s memory, so there’s nothing to reset.');
         }
 
-        // Until the audit log (#61).
-        console.log(`${user.email} reset event ${id} in memory`);
+        await logAdminAction({ user, action: 'event.reset', event: await getEventName(id) });
 
         return {};
       })
@@ -164,13 +167,43 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
     // Frees a team for another device, as the host's Release device does (#57).
     '/api/admin/events/:id/teams/:teamId/release': {
       POST: route(eventRoleOrSuperAdmin(...MANAGER_ROLES), async ({ params: { id = '', teamId = '' }, user }) => {
-        if (!(await wsServer.releaseDevice(id, teamId))) {
+        const team = await getTeam(id, teamId);
+
+        if (!team || !(await wsServer.releaseDevice(id, teamId))) {
           throw notFound('Team not found');
         }
 
-        console.log(`${user.email} released the device of team ${teamId} in event ${id}`);
+        await logAdminAction({
+          user,
+          action: 'team.release_device',
+          event: await getEventName(id),
+          details: { teamId, teamNumber: team.number, teamName: team.name }
+        });
 
         return {};
+      })
+    },
+
+    // The audit log (#61), newest first, a page at a time. Super admins only.
+    '/api/admin/audit-log': {
+      GET: route(superAdmin(), async ({ req }): Promise<AuditLogResponse> => {
+        const before = new URL(req.url).searchParams.get('before') ?? undefined;
+        const rows = await listAdminActions(AUDIT_PAGE + 1, before);
+        const entries = rows.slice(0, AUDIT_PAGE);
+
+        return {
+          entries: entries.map((row) => ({
+            id: row.id,
+            createdAt: new Date(row.created_at).toISOString(),
+            userId: row.user_id,
+            userEmail: row.user_email,
+            action: row.action,
+            eventId: row.event_id,
+            eventName: row.event_name,
+            details: row.details
+          })),
+          nextBefore: rows.length > AUDIT_PAGE ? entries.at(-1)!.id : null
+        };
       })
     }
   };

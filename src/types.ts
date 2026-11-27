@@ -204,6 +204,21 @@ export type AdminTeam = {
   lastMessageAt: number | null;
 };
 
+// One entry of the admin audit log (#61).
+export type AuditLogEntry = {
+  id: string;
+  createdAt: string;
+  userId: string;
+  userEmail: string;
+  action: 'event.reset' | 'team.release_device';
+  eventId: string | null;
+  eventName: string | null;
+  details: Record<string, unknown>;
+};
+
+// `nextBefore`: pass as `before` for older entries; null when there are none.
+export type AuditLogResponse = { entries: AuditLogEntry[]; nextBefore: string | null };
+
 export type AdminEventResponse = {
   serverTime: number;
   event: { id: string; name: string };

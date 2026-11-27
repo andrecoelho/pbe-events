@@ -6,15 +6,17 @@ import { useSnapshot } from 'valtio';
 // The admin page's sections. Each has its own route in App.tsx; pages inside a section (an event's page) keep
 // its tab active. Event admins see only the sections not marked superAdminOnly (#89).
 const TABS: { id: string; href: string; label: string; superAdminOnly?: boolean }[] = [
-  { id: 'connections', href: '/admin', label: 'Live connections' }
+  { id: 'connections', href: '/admin', label: 'Live connections' },
+  { id: 'audit-log', href: '/admin/audit-log', label: 'Audit log', superAdminOnly: true }
 ];
 
-export type AdminTab = 'connections';
+export type AdminTab = 'connections' | 'audit-log';
 
 const init = () => new AdminValt();
 
 // The admin page's frame: title, tabs and the section's content. Super admins and event admins get past it.
 export function AdminLayout({ tab, children }: { tab: AdminTab; children: ReactNode }) {
+  const superAdminOnly = TABS.find((t) => t.id === tab)?.superAdminOnly;
   const appValt = useAppValt();
   const appSnap = useSnapshot(appValt.store);
   const valt = useMemo(init, []);
@@ -31,7 +33,13 @@ export function AdminLayout({ tab, children }: { tab: AdminTab; children: ReactN
               </a>
             ))}
           </div>
-          {children}
+          {superAdminOnly && !appSnap.user.isSuperAdmin ? (
+            <div role='status' className='alert max-w-xl'>
+              Only super admins can see this section.
+            </div>
+          ) : (
+            children
+          )}
         </AdminValtContext.Provider>
       ) : (
         <div role='status' className='alert max-w-xl'>

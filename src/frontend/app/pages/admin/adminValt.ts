@@ -1,5 +1,5 @@
 import { api, type Outcome } from '@/frontend/utils/api';
-import type { AdminEventResponse, LiveConnectionsResponse } from '@/types';
+import type { AdminEventResponse, AuditLogEntry, AuditLogResponse, LiveConnectionsResponse } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -17,6 +17,14 @@ type Polled<T> = {
 export type AdminStore = {
   connections: Polled<LiveConnectionsResponse>;
   event: Polled<AdminEventResponse>;
+  auditLog: {
+    loaded: boolean;
+    loading: boolean;
+    error: string | null;
+    entries: AuditLogEntry[];
+    // Where the next (older) page starts; null when there's none.
+    nextBefore: string | null;
+  };
 };
 
 const empty = () => ({ loaded: false, error: null, data: null });
@@ -25,10 +33,14 @@ export class AdminValt {
   store: AdminStore;
 
   constructor() {
-    this.store = proxy<AdminStore>({ connections: empty(), event: empty() });
+    this.store = proxy<AdminStore>({
+      connections: empty(),
+      event: empty(),
+      auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null }
+    });
   }
 
-  private async load<K extends keyof AdminStore>(key: K, path: string) {
+  private async load<K extends 'connections' | 'event'>(key: K, path: string) {
     const result = await api<NonNullable<AdminStore[K]['data']>>(path);
     const polled = this.store[key];
 
@@ -47,6 +59,27 @@ export class AdminValt {
   loadConnections = () => this.load('connections', '/api/admin/connections');
 
   loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
+
+  // The audit log's newest page, or with `more` the next older one (#61).
+  async loadAuditLog(more = false) {
+    const log = this.store.auditLog;
+    const query = more && log.nextBefore ? `?before=${encodeURIComponent(log.nextBefore)}` : '';
+
+    log.loading = true;
+
+    const result = await api<AuditLogResponse>(`/api/admin/audit-log${query}`);
+
+    if (result.ok) {
+      log.entries = more ? [...log.entries, ...result.data.entries] : result.data.entries;
+      log.nextBefore = result.data.nextBefore;
+      log.error = null;
+    } else {
+      log.error = result.error;
+    }
+
+    log.loaded = true;
+    log.loading = false;
+  }
 
   // Drops the event's in-memory state; its pages reconnect and reload it (#57).
   async resetEvent(eventId: string): Promise<Outcome> {
