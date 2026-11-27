@@ -164,6 +164,7 @@ export const Run = () => {
   useEffect(() => valt.cleanup, [valt]);
 
   const isConnected = snap.connectionState === 'connected';
+  const hasQuestions = snap.items.some((item) => item.type === 'question');
   const isFirstItem = snap.currentIndex === 0;
   const isLastItem = snap.currentIndex === snap.items.length - 1;
   const isPrompting = snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt';
@@ -177,6 +178,30 @@ export const Run = () => {
             Run &nbsp;
             <span className='text-neutral brightness-75'>{snap.eventName}</span>
           </h1>
+
+          {/* Nothing to run yet (#52): say what's missing instead of showing a run with no controls. */}
+          {snap.initialized && !hasQuestions && (
+            <div role='alert' className='alert alert-info w-200 mb-4'>
+              <Icon name='information-circle' className='size-6' />
+              {Object.keys(snap.languages).length === 0 ? (
+                <span>
+                  This event has no languages or questions yet, so there’s nothing to run. Start by{' '}
+                  <a className='link' href={`/languages/${snap.eventId}`}>
+                    adding a language
+                  </a>
+                  .
+                </span>
+              ) : (
+                <span>
+                  This event has no questions yet, so there’s nothing to run.{' '}
+                  <a className='link' href={`/questions/${snap.eventId}`}>
+                    Add questions
+                  </a>{' '}
+                  first.
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Current Slide */}
           <div className='card shadow-md w-200 h-150 bg-primary relative flex items-center justify-center'>

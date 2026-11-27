@@ -102,6 +102,7 @@ export interface Run {
 
 export class WebSocketServer {
   private eventConnections: Map<string, EventConnection>;
+  private pendingSetups = new Map<string, Promise<EventConnection | null>>();
   private server: Bun.Server<WebsocketData> | null = null;
   // Host, judge and presenter sockets by session id, so they can be closed when the session ends.
   private sessionSockets = new Map<string, Set<ServerWebSocket<SignedInWebsocketData>>>();
@@ -238,13 +239,9 @@ export class WebSocketServer {
       }
     }
 
-    // Initialize connection tracking if needed
-    if (!this.eventConnections.has(eventId)) {
-      await this.initializeEventConnection(eventId);
-
-      if (!this.eventConnections.has(eventId)) {
-        return refuse('Could not initialize event connection');
-      }
+    if (!(await this.getEventConnection(eventId))) {
+      // Every event gets its run when it's created or copied, so this is damaged data.
+      return refuse('This event is missing its run record, so it can’t be run. Ask an administrator to check it.');
     }
 
     if (role === 'host') {
@@ -322,11 +319,7 @@ export class WebSocketServer {
     const { eventId } = ws.data as Exclude<WebsocketData, ErrorWebsocketData>;
 
     // A socket this one replaced (the same team device reconnecting) may have cleaned the connection up.
-    if (!this.eventConnections.has(eventId)) {
-      await this.initializeEventConnection(eventId);
-    }
-
-    const connection = this.eventConnections.get(eventId);
+    const connection = await this.getEventConnection(eventId);
 
     if (!connection) {
       console.error('No event connection found for eventId', eventId, ws.data);
@@ -578,29 +571,54 @@ export class WebSocketServer {
     }
   }
 
-  private async initializeEventConnection(eventId: string): Promise<void> {
+  // The event's live state, set up from the database on first use. Connections that arrive together share
+  // one setup (#52), so a second setup can't replace the first and lose the sockets already registered on it.
+  // Null when the event has no run.
+  private getEventConnection(eventId: string): Promise<EventConnection | null> {
+    const existing = this.eventConnections.get(eventId);
+
+    if (existing) {
+      return Promise.resolve(existing);
+    }
+
+    let setup = this.pendingSetups.get(eventId);
+
+    if (!setup) {
+      setup = this.setUpEventConnection(eventId).finally(() => this.pendingSetups.delete(eventId));
+      this.pendingSetups.set(eventId, setup);
+    }
+
+    return setup;
+  }
+
+  private async setUpEventConnection(eventId: string): Promise<EventConnection | null> {
     const run = await getRun(eventId);
 
-    if (run) {
-      const languages = await getLanguagesByCode(eventId);
-
-      if (Object.keys(languages).length > 0) {
-        console.log('Initializing event connection for eventId', eventId);
-
-        this.eventConnections.set(eventId, {
-          eventId,
-          queue: Promise.resolve(),
-          eventName: run.event_name,
-          teams: new Map(),
-          run: {
-            status: run.status,
-            gracePeriod: run.grace_period
-          },
-          activeItem: run.active_item,
-          languages
-        });
-      }
+    if (!run) {
+      return null;
     }
+
+    // An event without languages can still show its title and slides; teams need a language, so it has none.
+    const languages = await getLanguagesByCode(eventId);
+
+    console.log('Initializing event connection for eventId', eventId);
+
+    const connection: EventConnection = {
+      eventId,
+      queue: Promise.resolve(),
+      eventName: run.event_name,
+      teams: new Map(),
+      run: {
+        status: run.status,
+        gracePeriod: run.grace_period
+      },
+      activeItem: run.active_item,
+      languages
+    };
+
+    this.eventConnections.set(eventId, connection);
+
+    return connection;
   }
 
   sendActiveItem(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
