@@ -24,8 +24,12 @@ export type ActiveItem =
       seconds: number;
       locked: boolean;
       graded: boolean;
-      startTime: number | null;
-      remainingSeconds: number;
+      // The timer (#47), in server time (ms since the epoch): `endsAt` while it runs, `pausedMs` (time left)
+      // while the run is paused, both null when there's no timer. Pages count down to `endsAt` on their own,
+      // using their offset from the server clock (src/frontend/utils/serverClock.ts).
+      endsAt: number | null;
+      pausedMs: number | null;
+      // Set by the server once the time and the grace period have passed; answers are refused from then on.
       isTimeUp: boolean;
       translations: Array<{ languageCode: string; prompt: string }>;
       answers: Record<

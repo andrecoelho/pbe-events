@@ -168,7 +168,10 @@ export const Run = () => {
   const isFirstItem = snap.currentIndex === 0;
   const isLastItem = snap.currentIndex === snap.items.length - 1;
   const isPrompting = snap.run.activeItem?.type === 'question' && snap.run.activeItem.phase === 'prompt';
-  const isTimeUp = isPrompting && (snap.run.activeItem.isTimeUp || snap.run.activeItem.startTime === null);
+  // Next is allowed once the time is up, or straight away when the question has no timer.
+  const isTimeUp =
+    isPrompting &&
+    (snap.run.activeItem.isTimeUp || (snap.run.activeItem.endsAt === null && snap.run.activeItem.pausedMs === null));
 
   return (
     <RunValtContext.Provider value={valt}>
@@ -448,7 +451,7 @@ export const Run = () => {
               snap.run.activeItem.type === 'question' &&
               snap.run.activeItem.phase === 'prompt' &&
               !snap.run.activeItem.graded &&
-              snap.run.activeItem.startTime !== null && (
+              (snap.run.activeItem.endsAt !== null || snap.run.activeItem.pausedMs !== null) && (
                 <button
                   className='btn btn-outline tooltip tooltip-neutral font-normal border-red-400'
                   data-tip='Remove Timer'

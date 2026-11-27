@@ -1,15 +1,21 @@
 import { Icon } from '@/frontend/components/Icon';
+import { secondsLeft, useServerNow } from '@/frontend/utils/serverClock';
 
 interface Props {
   seconds: number; // total seconds for the timer
   active?: boolean; // whether to render the timer (default: true)
   locked?: boolean; // whether the question is locked (default: false)
-  gracePeriod?: number; // optional grace period in seconds
-  remainingSeconds: number; // optional externally controlled remaining seconds
-  hasStartTime: boolean;
+  // The deadline in server time while the timer runs, the time left while the run is paused; both null when
+  // there's no timer (#47). The page counts down on its own.
+  endsAt?: number | null;
+  pausedMs?: number | null;
 }
 
-export const QuestionTimer = ({ seconds, active = true, locked = false, remainingSeconds, hasStartTime }: Props) => {
+export const QuestionTimer = ({ seconds, active = true, locked = false, endsAt = null, pausedMs = null }: Props) => {
+  const now = useServerNow(active && !locked && endsAt !== null);
+  const hasStartTime = endsAt !== null || pausedMs !== null;
+  const remainingSeconds =
+    endsAt !== null ? secondsLeft(endsAt, now) : pausedMs !== null ? Math.ceil(pausedMs / 1000) : seconds;
   const percentRemaining = (remainingSeconds / seconds) * 100;
 
   // Determine gradient class based on percentage

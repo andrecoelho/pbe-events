@@ -15,8 +15,9 @@ function normalize(value: unknown): unknown {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => [
           k,
-          /^(id|answerId|requestId|startTime|createdAt|created_at|__ACK__|joinCode|join_code)$/.test(k) &&
-          typeof v !== 'object'
+          /^(id|answerId|requestId|startTime|endsAt|pausedMs|createdAt|created_at|__ACK__|joinCode|join_code)$/.test(
+            k
+          ) && typeof v !== 'object'
             ? '<x>'
             : k === 'answers' && v && typeof v === 'object' && !Array.isArray(v)
               ? Object.fromEntries(

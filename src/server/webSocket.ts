@@ -83,6 +83,11 @@ export type MessageResult = { ok: true } | { ok: false; error: string };
 
 const refused = (error: string): MessageResult => ({ ok: false, error });
 
+type PromptItem = Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>;
+
+// While a question's timer runs, its state is re-sent this often, in case a page missed a message (#47).
+const RESEND_MS = 5000;
+
 export interface EventConnection {
   eventId: string;
   // The event's messages, handled one at a time (see handleMessage).
@@ -92,7 +97,10 @@ export interface EventConnection {
   run: Run;
   activeItem: ActiveItem | null;
   languages?: Record<string, Language>;
-  tickTimer?: NodeJS.Timeout;
+  // The running question's timer (#47): fires once its time and grace period are up. While it runs, the state
+  // is also re-sent every few seconds (resendTimer) as a safety net.
+  timeUpTimer?: NodeJS.Timeout;
+  resendTimer?: NodeJS.Timeout;
 }
 
 export interface Run {
@@ -537,7 +545,8 @@ export class WebSocketServer {
 
   private sendAck(ws: ServerWebSocket<WebsocketData>, ackId: string | undefined, result: MessageResult) {
     if (ackId !== undefined) {
-      ws.send(JSON.stringify({ type: 'ACK', id: ackId, ...result }));
+      // serverTime lets pages measure their offset from the server clock (#47).
+      ws.send(JSON.stringify({ type: 'ACK', id: ackId, serverTime: Date.now(), ...result }));
     }
   }
 
@@ -566,7 +575,7 @@ export class WebSocketServer {
 
     if (connection && hostCount === 0 && presenterCount === 0 && judgeCount === 0 && teamCount === 0) {
       console.log('Cleaning up event connection:', eventId);
-      this.clearTickTimer(connection);
+      this.clearTimer(connection);
       this.eventConnections.delete(eventId);
     }
   }
@@ -601,6 +610,14 @@ export class WebSocketServer {
     // An event without languages can still show its title and slides; teams need a language, so it has none.
     const languages = await getLanguagesByCode(eventId);
 
+    // An open question saved before #47 has startTime/remainingSeconds instead: treat it as having no timer.
+    const activeItem = run.active_item;
+
+    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
+      activeItem.endsAt ??= null;
+      activeItem.pausedMs ??= null;
+    }
+
     console.log('Initializing event connection for eventId', eventId);
 
     const connection: EventConnection = {
@@ -612,11 +629,14 @@ export class WebSocketServer {
         status: run.status,
         gracePeriod: run.grace_period
       },
-      activeItem: run.active_item,
+      activeItem,
       languages
     };
 
     this.eventConnections.set(eventId, connection);
+
+    // A question that was open when the server restarted keeps its deadline (or is marked time up).
+    this.scheduleTimeUp(connection);
 
     return connection;
   }
@@ -712,51 +732,95 @@ export class WebSocketServer {
     await saveActiveItem(connection.eventId, activeItem);
   }
 
-  private clearTickTimer(connection: EventConnection): void {
-    if (connection.tickTimer) {
-      clearTimeout(connection.tickTimer);
-      connection.tickTimer = undefined;
-    }
+  // Timer (#47). The server only keeps a deadline (`endsAt`, server time) and broadcasts it when it changes;
+  // pages count down on their own. One timeout marks the time up once the grace period has passed.
+
+  private clearTimer(connection: EventConnection): void {
+    clearTimeout(connection.timeUpTimer);
+    clearInterval(connection.resendTimer);
+    connection.timeUpTimer = undefined;
+    connection.resendTimer = undefined;
   }
 
-  private scheduleTick(connection: EventConnection): void {
-    this.clearTickTimer(connection);
+  private promptItem(connection: EventConnection) {
+    const item = connection.activeItem;
 
-    // Through the event's queue, so a tick can't interleave with a message changing the active item.
-    connection.tickTimer = setTimeout(() => {
+    return item?.type === 'question' && item.phase === 'prompt' ? item : null;
+  }
+
+  // Schedules the time-up for the running question (or marks it at once when it's already past).
+  private scheduleTimeUp(connection: EventConnection): void {
+    this.clearTimer(connection);
+
+    const item = this.promptItem(connection);
+
+    if (!item || item.endsAt === null || item.isTimeUp) {
+      return;
+    }
+
+    const delay = Math.max(item.endsAt + connection.run.gracePeriod * 1000 - Date.now(), 0);
+
+    // Through the event's queue, so the time-up can't interleave with a message changing the active item.
+    connection.timeUpTimer = setTimeout(() => {
       connection.queue = connection.queue.then(() =>
-        this.tick(connection).catch((error) => console.error('Timer tick failed for event', connection.eventId, error))
+        this.markTimeUp(connection).catch((error) => console.error('Timer failed for event', connection.eventId, error))
       );
-    }, 1000);
+    }, delay);
+
+    connection.resendTimer = setInterval(() => this.broadcastActiveItemToAll(connection), RESEND_MS);
   }
 
-  private async tick(connection: EventConnection): Promise<void> {
-    // In case we start a timer when there is already one running
-    // For example, if the host clicks "Start Timer" multiple times quickly or comes
-    // back from the answer phase to the prompt phase
-    this.clearTickTimer(connection);
+  private async markTimeUp(connection: EventConnection): Promise<void> {
+    const item = this.promptItem(connection);
 
-    const activeItem = connection.activeItem;
-
-    if (activeItem?.type === 'question' && activeItem.phase === 'prompt' && activeItem.startTime !== null) {
-      const now = Date.now();
-      const startTime = new Date(activeItem.startTime).getTime();
-      const elapsedSeconds = Math.floor((now - startTime) / 1000);
-      const remainingSeconds = Math.max(activeItem.seconds - elapsedSeconds, 0);
-      const isTimeUp = elapsedSeconds >= activeItem.seconds + connection.run.gracePeriod;
-
-      activeItem.remainingSeconds = remainingSeconds;
-      activeItem.isTimeUp = isTimeUp;
-
-      await this.saveActiveItem(connection, activeItem);
-      this.broadcastActiveItemToAll(connection);
-
-      if (activeItem.isTimeUp) {
-        return;
-      }
-
-      this.scheduleTick(connection);
+    if (!item || item.endsAt === null || item.isTimeUp) {
+      return;
     }
+
+    // A grace period lengthened since this was scheduled moves the time-up later.
+    if (Date.now() < item.endsAt + connection.run.gracePeriod * 1000) {
+      this.scheduleTimeUp(connection);
+      return;
+    }
+
+    this.clearTimer(connection);
+    item.isTimeUp = true;
+
+    await this.saveActiveItem(connection, item);
+    this.broadcastActiveItemToAll(connection);
+  }
+
+  // Starts (or restarts) the prompt's full time. While the run is paused it waits, paused, with its full time.
+  private startTimer(connection: EventConnection, item: PromptItem): void {
+    const ms = item.seconds * 1000;
+    const paused = connection.run.status === 'paused';
+
+    item.endsAt = paused ? null : Date.now() + ms;
+    item.pausedMs = paused ? ms : null;
+    item.isTimeUp = false;
+  }
+
+  // Pausing the run keeps the time left; resuming gives every page the same new deadline (#25).
+  private async pauseOrResumeTimer(connection: EventConnection, status: RunStatus): Promise<void> {
+    const item = this.promptItem(connection);
+
+    if (!item || item.isTimeUp) {
+      return;
+    }
+
+    if (status === 'paused' && item.endsAt !== null) {
+      item.pausedMs = Math.max(item.endsAt - Date.now(), 0);
+      item.endsAt = null;
+    } else if (status === 'in_progress' && item.pausedMs !== null) {
+      item.endsAt = Date.now() + item.pausedMs;
+      item.pausedMs = null;
+    } else {
+      return;
+    }
+
+    await this.saveActiveItem(connection, item);
+    this.scheduleTimeUp(connection);
+    this.broadcastActiveItemToAll(connection);
   }
 
   private async handleSUBMIT_ANSWER(
@@ -771,7 +835,10 @@ export class WebSocketServer {
       return refused('The question isn’t open for answers right now.');
     }
 
-    if (activeItem.isTimeUp) {
+    if (
+      activeItem.isTimeUp ||
+      (activeItem.endsAt !== null && Date.now() >= activeItem.endsAt + connection.run.gracePeriod * 1000)
+    ) {
       return refused('Time is up: your answer wasn’t saved.');
     }
 
@@ -881,6 +948,7 @@ export class WebSocketServer {
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
     this.broadcastToAll(connection, message);
+    await this.pauseOrResumeTimer(connection, status);
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
@@ -891,6 +959,11 @@ export class WebSocketServer {
     const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
     this.broadcastToAll(connection, message);
+
+    // The running question's time-up moves with the grace period.
+    if (connection.timeUpTimer) {
+      this.scheduleTimeUp(connection);
+    }
   }
 
   private async handleSET_ACTIVE_ITEM(connection: EventConnection, nextActiveItem: ActiveItem | null): Promise<void> {
@@ -905,20 +978,16 @@ export class WebSocketServer {
       await this.handleSET_QUESTION_LOCKED(connection, currentActiveItem.id, true);
     }
 
+    // Opening a question for answers starts its timer.
     if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
-      nextActiveItem.startTime = Date.now();
-      nextActiveItem.remainingSeconds = nextActiveItem.seconds;
-      nextActiveItem.isTimeUp = false;
+      this.startTimer(connection, nextActiveItem);
     }
 
     await this.saveActiveItem(connection, nextActiveItem);
     connection.activeItem = nextActiveItem;
 
-    if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
-      await this.tick(connection);
-    } else {
-      this.broadcastActiveItemToAll(connection);
-    }
+    this.scheduleTimeUp(connection);
+    this.broadcastActiveItemToAll(connection);
   }
 
   private async handleSET_QUESTION_LOCKED(
@@ -948,30 +1017,33 @@ export class WebSocketServer {
     }
   }
 
-  private async handleSTART_TIMER(connection: EventConnection): Promise<void> {
-    const activeItem = connection.activeItem;
+  private async handleSTART_TIMER(connection: EventConnection): Promise<MessageResult | void> {
+    const item = this.promptItem(connection);
 
-    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
-      activeItem.startTime = Date.now();
-      activeItem.remainingSeconds = activeItem.seconds;
-      activeItem.isTimeUp = false;
-      await this.saveActiveItem(connection, activeItem);
-      await this.tick(connection);
+    if (!item) {
+      return refused('The timer only runs while a question is open for answers.');
     }
+
+    this.startTimer(connection, item);
+    await this.saveActiveItem(connection, item);
+    this.scheduleTimeUp(connection);
+    this.broadcastActiveItemToAll(connection);
   }
 
-  private async handleREMOVE_TIMER(connection: EventConnection): Promise<void> {
-    this.clearTickTimer(connection);
+  // No time limit for the open question: teams can answer until the host moves on or locks it.
+  private async handleREMOVE_TIMER(connection: EventConnection): Promise<MessageResult | void> {
+    const item = this.promptItem(connection);
 
-    const activeItem = connection.activeItem;
-
-    if (activeItem?.type === 'question' && activeItem.phase === 'prompt') {
-      activeItem.startTime = null;
-      activeItem.remainingSeconds = activeItem.seconds;
-      activeItem.isTimeUp = false;
-      await this.saveActiveItem(connection, activeItem);
-      this.broadcastActiveItemToAll(connection);
+    if (!item) {
+      return refused('The timer only runs while a question is open for answers.');
     }
+
+    this.clearTimer(connection);
+    item.endsAt = null;
+    item.pausedMs = null;
+    item.isTimeUp = false;
+    await this.saveActiveItem(connection, item);
+    this.broadcastActiveItemToAll(connection);
   }
 
   private async handleSET_QUESTION_GRADED(

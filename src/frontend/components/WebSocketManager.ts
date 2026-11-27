@@ -1,3 +1,4 @@
+import { setServerClock, type ClockSample } from '@/frontend/utils/serverClock';
 import { SESSION_ENDED_CLOSE_CODE } from '@/types';
 
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -11,6 +12,12 @@ export type WebSocketMessage = { type: string } & Record<string, any>;
 // arrived. `error` is a sentence to show the person.
 export type MessageResult = { ok: true } | { ok: false; error: string };
 
+// The server's answer to a message: its result, plus the server's clock when it answered (#47).
+type Ack = { result: MessageResult; serverTime?: number };
+
+const CLOCK_SAMPLES = 5;
+const CLOCK_SYNC_MS = 60_000;
+
 export const NOT_CONNECTED: MessageResult = {
   ok: false,
   error: 'Not connected to the event. Check your connection and try again.'
@@ -23,7 +30,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   private reconnectTimer: number | null = null;
   private reconnectAttempts: number = 0;
   private offlineTimer: number | null = null;
-  private pendingACKs: Map<string, { resolve: (value: MessageResult) => void; timerId: number }> = new Map();
+  private pendingACKs: Map<string, { resolve: (ack: Ack) => void; timerId: number }> = new Map();
+  private clockSyncTimer: number | null = null;
   private wsURL: string;
   private onStatusChange?: (status: WebSocketStatus) => void;
   private onMessage?: (message: TMessage) => void;
@@ -76,6 +84,36 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.reconnectAttempts = 0;
 
     this.changeStatus('connected');
+
+    void this.syncClock();
+    this.clearClockSyncTimer();
+    this.clockSyncTimer = window.setInterval(this.syncClock, CLOCK_SYNC_MS);
+  };
+
+  // Measures this page's offset from the server clock with a few pings, one at a time (see serverClock.ts).
+  private syncClock = async () => {
+    const samples: ClockSample[] = [];
+
+    for (let i = 0; i < CLOCK_SAMPLES; i++) {
+      const sent = Date.now();
+      const { result, serverTime } = await this.request({ type: 'PING' });
+      const received = Date.now();
+
+      if (!result.ok || serverTime === undefined) {
+        break;
+      }
+
+      samples.push({ sent, received, serverTime });
+    }
+
+    setServerClock(samples);
+  };
+
+  private clearClockSyncTimer = () => {
+    if (this.clockSyncTimer) {
+      clearInterval(this.clockSyncTimer);
+      this.clockSyncTimer = null;
+    }
   };
 
   private handleWSClose = (event: CloseEvent) => {
@@ -107,7 +145,10 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
       if (pending) {
         clearTimeout(pending.timerId);
-        pending.resolve(message.ok === false ? { ok: false, error: String(message.error) } : { ok: true });
+        pending.resolve({
+          result: message.ok === false ? { ok: false, error: String(message.error) } : { ok: true },
+          serverTime: typeof message.serverTime === 'number' ? message.serverTime : undefined
+        });
         this.pendingACKs.delete(message.id);
       }
 
@@ -126,7 +167,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.clearOfflineTimer();
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      await this.sendPing();
+      await this.syncClock();
       this.changeStatus('connected');
     } else {
       this.connect();
@@ -136,7 +177,8 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   private handleVisibilityChange = async () => {
     if (document.visibilityState === 'visible') {
       await this.requestWakeLock();
-      await this.sendPing();
+      // Timers may have drifted while the tab was hidden (and the computer asleep).
+      await this.syncClock();
     }
   };
 
@@ -165,8 +207,6 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.offlineTimer = null;
     }
   };
-
-  private sendPing = async () => await this.sendMessage({ type: 'PING' });
 
   private changeStatus = (status: WebSocketStatus) => {
     if (this.onStatusChange) {
@@ -197,10 +237,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   reset = () => {
     this.clearReconnectTimer();
     this.clearOfflineTimer();
+    this.clearClockSyncTimer();
 
     this.pendingACKs.forEach((pending) => {
       clearTimeout(pending.timerId);
-      pending.resolve(NOT_CONNECTED);
+      pending.resolve({ result: NOT_CONNECTED });
     });
 
     this.pendingACKs.clear();
@@ -217,8 +258,10 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.removeEventListeners();
   };
 
-  sendMessage = (message: WebSocketMessage) => {
-    const { promise, resolve } = Promise.withResolvers<MessageResult>();
+  sendMessage = async (message: WebSocketMessage): Promise<MessageResult> => (await this.request(message)).result;
+
+  private request = (message: WebSocketMessage) => {
+    const { promise, resolve } = Promise.withResolvers<Ack>();
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const ackId = crypto.randomUUID();
@@ -236,7 +279,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.ws.send(JSON.stringify(message));
     } else {
       console.warn('WebSocket is not open. Unable to send message:', message);
-      resolve(NOT_CONNECTED);
+      resolve({ result: NOT_CONNECTED });
     }
 
     return promise;

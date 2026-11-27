@@ -13,12 +13,7 @@ export const TeamQuestionReading = () => {
 
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10 leading-loose'>
-      <QuestionTimer
-        active={false}
-        seconds={activeItem.seconds}
-        hasStartTime={activeItem.startTime !== null}
-        remainingSeconds={activeItem.remainingSeconds}
-      />
+      <QuestionTimer active={false} seconds={activeItem.seconds} />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />
         <h1 className='text-5xl uppercase text-center font-serif'>Question #{activeItem.number}</h1>

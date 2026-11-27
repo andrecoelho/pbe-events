@@ -453,41 +453,16 @@ This allows teams to reconnect and resume their work without losing progress.
 
 ## Timing & Deadlines
 
-### Question Timer Flow
+### Question Timer (#47)
 
-1. Host sends `START_QUESTION` with `hasTimer: true`
-2. Server records `active_start_time` in database
-3. Teams receive `QUESTION_STARTED` with:
-   - `startTime`: When question started (ms timestamp)
-   - `seconds`: Time limit (e.g., 30 seconds)
-   - `gracePeriod`: Extra time allowed (e.g., 2 seconds)
-4. **Deadline**: `startTime + (seconds * 1000) + (gracePeriod * 1000)`
+The server keeps one deadline per open question and broadcasts it only when it changes; every page counts down on its own.
 
-### Answer Submission Validation
-
-When a team submits an answer:
-
-```typescript
-const deadline = activeStartTime + seconds * 1000 + gracePeriod * 1000;
-const now = Date.now();
-
-if (now > deadline) {
-  return { type: 'ERROR', code: 'DEADLINE_EXCEEDED', message: '...' };
-}
-```
-
-### Grace Period Updates
-
-Grace period can be updated via REST API:
-
-```bash
-PATCH /api/runs/:runId
-{ "action": "updateGracePeriod", "gracePeriod": 5 }
-```
-
-This sends `GRACE_PERIOD_UPDATED` to the host and updates the cached run state.
-
----
+1. **Clock sync.** Every ACK carries `serverTime`. On connect, `WebSocketManager` sends 5 `PING`s one at a time and keeps the offset from the fastest round trip: `offset = serverTime − (sent + received) / 2` (`src/frontend/utils/serverClock.ts`). It re-syncs every minute, when the tab is shown again and when the network comes back.
+2. **Deadline.** Opening a question for answers (`SET_ACTIVE_ITEM` with phase `prompt`, not locked) or `START_TIMER` sets the prompt item's `endsAt` (server time, ms) to now + `seconds`. Pages show `ceil((endsAt − (Date.now() + offset)) / 1000)`, re-rendered every 250 ms. `REMOVE_TIMER` clears it (no time limit: `∞`).
+3. **Time up.** A server timeout at `endsAt` + grace period sets `isTimeUp` and broadcasts it. Team pages close their inputs at that same instant on their own, and the server refuses answers after it (it checks the deadline itself too). Changing the grace period moves the time-up.
+4. **Pause.** Pausing the run stores the time left in `pausedMs` (and clears `endsAt`); resuming sets a new `endsAt` = now + `pausedMs`, so every page resumes together (#25).
+5. **Safety net.** While a timer runs, the server re-sends the active item every 5 s.
+6. **Writes.** The run's `active_item` is saved when the timer starts, pauses, resumes or times up, not every second. After a server restart an open question keeps its deadline; one saved before #47 (with `startTime`) loads as having no timer.
 
 ## Error Handling
 

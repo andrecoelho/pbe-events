@@ -3,6 +3,7 @@ import { toast } from '@/frontend/components/Toast';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import { debounce } from '@/frontend/utils/debounce';
+import { useServerNow } from '@/frontend/utils/serverClock';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logo from '@/assets/PBE-logo_600px.png';
 import { useSnapshot, type Snapshot } from 'valtio';
@@ -29,14 +30,23 @@ function parsePromptWithBlanks(prompt: string): Array<{ type: 'text' | 'blank'; 
   return parts;
 }
 
+// Whether the open question takes answers no more: locked by the host, or its time and grace period are up.
+// The page works the deadline out itself (#47), so inputs close at the same instant the server stops taking
+// answers, without waiting for its message.
+function useAnswersClosed() {
+  const snap = useSnapshot(useTeamValt().store);
+  const item = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
+  const closesAt = item.endsAt === null ? null : item.endsAt + snap.gracePeriod * 1000;
+  const now = useServerNow(closesAt !== null && !item.isTimeUp && !item.locked);
+
+  return item.isTimeUp || item.locked || (closesAt !== null && now >= closesAt);
+}
+
 export const GeneralAnswer = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store, { sync: true });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
-
-  const disabled = activeItem.isTimeUp || activeItem.locked;
+  const disabled = useAnswersClosed();
 
   // Focus the answer box when it opens and again when the host unlocks the question.
   useEffect(() => {
@@ -101,8 +111,7 @@ export const TrueFalseAnswer = () => {
     }
   };
 
-  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
-  const disabled = activeItem.isTimeUp || activeItem.locked;
+  const disabled = useAnswersClosed();
 
   return (
     <div className='text-center'>
@@ -189,12 +198,11 @@ export const FillInTheBlankAnswer = ({
     saveAnswer(Array.from(inputs, (input) => input.value || '__').join(' | '));
   };
 
+  const disabled = useAnswersClosed();
+
   if (!translation) {
     return null;
   }
-
-  const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
-  const disabled = activeItem.isTimeUp || activeItem.locked;
 
   return (
     <div className='text-2xl font-serif leading-loose'>
@@ -237,9 +245,8 @@ export const TeamQuestionPrompt = () => {
         active
         locked={activeItem.locked}
         seconds={activeItem.seconds}
-        hasStartTime={activeItem.startTime !== null}
-        remainingSeconds={activeItem.remainingSeconds}
-        gracePeriod={snap.gracePeriod}
+        endsAt={activeItem.endsAt}
+        pausedMs={activeItem.pausedMs}
       />
       <div className='flex items-center gap-10 mt-10'>
         <img src={logo} className='h-28' />

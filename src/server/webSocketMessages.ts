@@ -49,8 +49,9 @@ export const ActiveItemSchema = z.union([
     seconds: z.number(),
     locked: z.boolean(),
     graded: z.boolean(),
-    startTime: z.number().nullable(),
-    remainingSeconds: z.number(),
+    // The server sets the timer itself when the question opens (#47).
+    endsAt: z.number().nullable().default(null),
+    pausedMs: z.number().nullable().default(null),
     isTimeUp: z.boolean(),
     translations: z.array(z.object({ languageCode: z.string(), prompt: z.string() })),
     answers: z.record(z.string(), ActiveAnswer)
