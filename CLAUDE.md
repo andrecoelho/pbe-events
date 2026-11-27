@@ -50,7 +50,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests. Ru
 
 - To change the schema, add the next file in `migrations/` (e.g. `0002_add_team_color.sql`). Never edit a migration that has already run. Each file runs in a transaction and is recorded in `schema_migrations`.
 - Railway runs `bun run migrate` before every deploy; a failing migration stops the deploy.
-- `db:reset` and `db:seed` refuse anything but a local database, including the Railway tunnels (staging on localhost:15432, production on localhost:15433). `mise run db:seed:staging` seeds staging; it keeps the demo user's existing password (`SEED_DEMO_PASSWORD` is only needed to create it).
+- `db:reset` and `db:seed` refuse anything but a local database, including the Railway tunnels (staging on localhost:15432, production on localhost:15433). `mise run db:seed:staging` seeds staging, reading the demo password from 1Password (`op read`); never print it.
 
 ## Environments and deploys
 

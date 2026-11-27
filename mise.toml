@@ -34,5 +34,20 @@ description = "Start the dev server against the staging database (opens and clos
 run = ["bun install", "scripts/with-staging-db.sh bun dev"]
 
 [tasks."db:seed:staging"]
-description = "Add (or refresh) the demo user and event on the STAGING database; password from SEED_DEMO_PASSWORD"
-run = "scripts/with-staging-db.sh bun scripts/seed.ts --staging"
+description = "Add (or refresh) the demo user and event on the STAGING database; demo password from 1Password"
+# The 1Password CLI is only needed here, so it isn't in [tools] (Railway's build reads those).
+tools = { op = "2.42.0" }
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+# The demo password lives in 1Password. Override the item with SEED_DEMO_PASSWORD_REF in .env if yours differs.
+ref="${SEED_DEMO_PASSWORD_REF:-op://PBE/PBE staging demo/password}"
+if [ -z "${SEED_DEMO_PASSWORD:-}" ]; then
+  if SEED_DEMO_PASSWORD=$(op read "$ref" 2>/dev/null); then
+    export SEED_DEMO_PASSWORD
+  else
+    echo "Couldn't read $ref from 1Password; keeping the demo user's current password." >&2
+  fi
+fi
+scripts/with-staging-db.sh bun scripts/seed.ts --staging
+'''
