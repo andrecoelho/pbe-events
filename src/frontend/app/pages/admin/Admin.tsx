@@ -10,10 +10,11 @@ const TABS: { id: string; href: string; label: string; superAdminOnly?: boolean 
   { id: 'events', href: '/admin/events', label: 'Events', superAdminOnly: true },
   { id: 'users', href: '/admin/users', label: 'Users', superAdminOnly: true },
   { id: 'health', href: '/admin/health', label: 'Health', superAdminOnly: true },
+  { id: 'announcement', href: '/admin/announcement', label: 'Announcement', superAdminOnly: true },
   { id: 'audit-log', href: '/admin/audit-log', label: 'Audit log', superAdminOnly: true }
 ];
 
-export type AdminTab = 'connections' | 'events' | 'users' | 'health' | 'audit-log';
+export type AdminTab = 'connections' | 'events' | 'users' | 'health' | 'announcement' | 'audit-log';
 
 const init = () => new AdminValt();
 

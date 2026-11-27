@@ -215,7 +215,9 @@ export type AuditAction =
   | 'user.reset_link'
   | 'user.sign_out'
   | 'user.disable'
-  | 'user.enable';
+  | 'user.enable'
+  | 'announcement.update'
+  | 'announcement.clear';
 
 // One entry of the admin audit log (#61).
 export type AuditLogEntry = {
@@ -300,4 +302,13 @@ export type HealthResponse = {
     totals: { error: number; warn: number };
     recent: { time: number; level: 'error' | 'warn'; message: string }[];
   };
+};
+
+// The announcement banner (#62). `updatedAt` tells a changed message apart, so a dismissed one comes back when edited.
+export type Announcement = {
+  message: string;
+  level: 'info' | 'warning';
+  // ISO time after which it's hidden; null: until cleared.
+  endsAt: string | null;
+  updatedAt: string;
 };

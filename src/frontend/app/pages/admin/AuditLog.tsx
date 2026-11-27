@@ -14,7 +14,9 @@ const ACTION_LABELS: Record<AuditLogEntry['action'], string> = {
   'user.reset_link': 'Created a password reset link',
   'user.sign_out': 'Signed a user out everywhere',
   'user.disable': 'Disabled a user',
-  'user.enable': 'Enabled a user'
+  'user.enable': 'Enabled a user',
+  'announcement.update': 'Set the announcement',
+  'announcement.clear': 'Cleared the announcement'
 };
 
 const formatTime = (iso: string) =>
@@ -22,7 +24,8 @@ const formatTime = (iso: string) =>
 
 // What the action was done to, beyond the event.
 function describeDetails(entry: AuditLogEntry) {
-  const { teamNumber, teamName, targetEmail, previousOwnerEmail, changes } = entry.details as {
+  const { teamNumber, teamName, targetEmail, previousOwnerEmail, changes, message } = entry.details as {
+    message?: string;
     teamNumber?: number;
     teamName?: string;
     targetEmail?: string;
@@ -32,6 +35,10 @@ function describeDetails(entry: AuditLogEntry) {
 
   if (teamNumber !== undefined) {
     return `Team ${teamNumber} · ${teamName ?? ''}`;
+  }
+
+  if (message !== undefined) {
+    return `“${message}”`;
   }
 
   if (entry.action === 'event.transfer') {

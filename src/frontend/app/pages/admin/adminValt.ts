@@ -4,6 +4,7 @@ import type {
   AdminEventsResponse,
   AdminUserResponse,
   AdminUsersResponse,
+  Announcement,
   AuditLogEntry,
   AuditLogResponse,
   HealthResponse,
@@ -28,6 +29,8 @@ export type AdminStore = {
   connections: Polled<LiveConnectionsResponse>;
   event: Polled<AdminEventResponse>;
   health: Polled<HealthResponse>;
+  // The announcement as saved (#62); `data` is null when there's none.
+  announcement: { loaded: boolean; error: string | null; data: Announcement | null; showing: boolean };
   auditLog: {
     loaded: boolean;
     loading: boolean;
@@ -57,6 +60,7 @@ export class AdminValt {
       connections: empty(),
       event: empty(),
       health: empty(),
+      announcement: { loaded: false, error: null, data: null, showing: false },
       auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null },
       users: { query: '', loaded: false, error: null, data: null },
       events: { query: '', loaded: false, error: null, data: null },
@@ -81,6 +85,50 @@ export class AdminValt {
   }
 
   loadConnections = () => this.load('connections', '/api/admin/connections');
+
+  async loadAnnouncement() {
+    const store = this.store.announcement;
+    const result = await api<{ announcement: Announcement | null; showing: boolean }>('/api/admin/announcement');
+
+    if (result.ok) {
+      store.data = result.data.announcement;
+      store.showing = result.data.showing;
+      store.error = null;
+    } else {
+      store.error = result.error;
+    }
+
+    store.loaded = true;
+  }
+
+  async saveAnnouncement(announcement: Pick<Announcement, 'message' | 'level' | 'endsAt'>): Promise<Outcome> {
+    const result = await api<{ announcement: Announcement }>('/api/admin/announcement', {
+      method: 'PUT',
+      json: announcement
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    this.store.announcement.data = result.data.announcement;
+    this.store.announcement.showing = true;
+
+    return { ok: true };
+  }
+
+  async clearAnnouncement(): Promise<Outcome> {
+    const result = await api('/api/admin/announcement', { method: 'DELETE' });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    this.store.announcement.data = null;
+    this.store.announcement.showing = false;
+
+    return { ok: true };
+  }
 
   loadHealth = () => this.load('health', '/api/admin/health');
 

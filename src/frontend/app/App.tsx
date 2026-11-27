@@ -2,6 +2,7 @@ import '../base.css';
 
 import { AdminEvent } from '@/frontend/app/pages/admin/AdminEvent';
 import { AdminUser } from '@/frontend/app/pages/admin/AdminUser';
+import { AnnouncementPage } from '@/frontend/app/pages/admin/AnnouncementPage';
 import { AuditLog } from '@/frontend/app/pages/admin/AuditLog';
 import { Events as AdminEvents } from '@/frontend/app/pages/admin/Events';
 import { Health } from '@/frontend/app/pages/admin/Health';
@@ -19,6 +20,7 @@ import { Run } from '@/frontend/app/pages/runs/Run';
 import { Settings } from '@/frontend/app/pages/settings/Settings';
 import { Slides } from '@/frontend/app/pages/slides/Slides';
 import { Teams } from '@/frontend/app/pages/teams/Teams';
+import { AnnouncementBanner } from '@/frontend/components/AnnouncementBanner';
 import { Loading } from '@/frontend/components/Loading';
 import { useRouter, type Routes } from '@/frontend/utils/useRouter';
 import { useMemo, type ElementType } from 'react';
@@ -38,6 +40,7 @@ const routes: Routes = new Map([
   [/^\/admin\/events\/?$/, AdminEvents],
   [/^\/admin\/audit-log/, AuditLog],
   [/^\/admin\/health/, Health],
+  [/^\/admin\/announcement/, AnnouncementPage],
   [/^\/admin\/users\/[^/]+/, AdminUser],
   [/^\/admin\/users\/?$/, Users],
   [/^\/admin\/?$/, LiveConnections],
@@ -65,6 +68,7 @@ export function App() {
     <AppValtContext.Provider value={appValt}>
       <div className='absolute inset-0 flex flex-col'>
         <NavBar />
+        <AnnouncementBanner />
         <Page />
       </div>
     </AppValtContext.Provider>
