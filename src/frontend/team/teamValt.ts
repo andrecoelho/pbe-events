@@ -139,8 +139,19 @@ export class TeamValt {
     }
   };
 
+  // Answers wait and are resent if the connection drops (#50); only the latest is kept. They name their
+  // question, so one sent late can't land on the next question.
   submitAnswer = async (answer: string | boolean): Promise<MessageResult> => {
-    return (await this.ws?.sendMessage({ type: 'SUBMIT_ANSWER', answer })) ?? NOT_CONNECTED;
+    const activeItem = this.store.activeItem;
+
+    if (!this.ws || activeItem?.type !== 'question') {
+      return NOT_CONNECTED;
+    }
+
+    return await this.ws.sendMessage(
+      { type: 'SUBMIT_ANSWER', questionId: activeItem.id, answer },
+      { queueKey: `answer:${activeItem.id}` }
+    );
   };
 
   submitChallenge = async (challenged: boolean): Promise<MessageResult> => {

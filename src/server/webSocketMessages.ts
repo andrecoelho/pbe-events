@@ -76,6 +76,8 @@ export const TeamMessage = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('SUBMIT_ANSWER'),
     answer: z.union([z.string().max(2000), z.boolean().transform(String)]),
+    // The question it answers (#50): an answer resent after a reconnect may arrive once the host moved on.
+    questionId: id.optional(),
     __ACK__: ack
   }),
   z.object({ type: z.literal('SUBMIT_CHALLENGE'), questionId: id, challenged: z.boolean(), __ACK__: ack })

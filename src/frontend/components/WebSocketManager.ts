@@ -1,8 +1,9 @@
 import { setServerClock, type ClockSample } from '@/frontend/utils/serverClock';
-import { SESSION_ENDED_CLOSE_CODE } from '@/types';
+import { SESSION_ENDED_CLOSE_CODE, TEAM_REPLACED_CLOSE_CODE } from '@/types';
 
-const MAX_RECONNECT_ATTEMPTS = 3;
-const MAX_RECONNECT_DELAY_MS = 10000;
+// Reconnecting never gives up (#49): 1 s, 2 s, 4 s … up to 30 s between attempts, each randomly shortened by up
+// to half so a room of devices doesn't reconnect all at once after a deploy.
+const MAX_RECONNECT_DELAY_MS = 30_000;
 const ACK_TIMEOUT_MS = 2000;
 const SERVER_TIMEOUT_MS = 10000;
 
@@ -22,7 +23,11 @@ export const NOT_CONNECTED: MessageResult = {
   ok: false,
   error: 'Not connected to the event. Check your connection and try again.'
 };
-export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
+// 'replaced': another tab or window of this device took over the team (#30); nothing reconnects until connect().
+export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error' | 'replaced';
+
+// A message waiting to be sent, kept across reconnects (#50); see sendMessage's `queueKey`.
+type Queued = { message: WebSocketMessage; resolvers: ((result: MessageResult) => void)[]; sending: boolean };
 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
   private ws: WebSocket | null = null;
@@ -32,6 +37,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   private offlineTimer: number | null = null;
   private pendingACKs: Map<string, { resolve: (ack: Ack) => void; timerId: number }> = new Map();
   private clockSyncTimer: number | null = null;
+  private outbox = new Map<string, Queued>();
   private wsURL: string;
   private onStatusChange?: (status: WebSocketStatus) => void;
   private onMessage?: (message: TMessage) => void;
@@ -65,19 +71,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   private reconnect = () => {
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS) * (0.5 + Math.random() / 2);
+
     this.reconnectAttempts++;
     this.changeStatus('connecting');
-
-    if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
-
-      this.reconnectTimer = window.setTimeout(this.connect, delay);
-    } else {
-      this.reconnectAttempts = 0;
-
-      this.changeStatus('error');
-      this.reset();
-    }
+    this.reconnectTimer = window.setTimeout(this.connect, delay);
   };
 
   private handleWSOpen = () => {
@@ -85,6 +83,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
     this.changeStatus('connected');
 
+    this.flushOutbox();
     void this.syncClock();
     this.clearClockSyncTimer();
     this.clockSyncTimer = window.setInterval(this.syncClock, CLOCK_SYNC_MS);
@@ -125,6 +124,11 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     if (event.code === SESSION_ENDED_CLOSE_CODE) {
       this.removeEventListeners();
       window.location.reload();
+      return;
+    }
+
+    if (event.code === TEAM_REPLACED_CLOSE_CODE) {
+      this.changeStatus('replaced');
       return;
     }
 
@@ -258,7 +262,66 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.removeEventListeners();
   };
 
-  sendMessage = async (message: WebSocketMessage): Promise<MessageResult> => (await this.request(message)).result;
+  // Sends a message and resolves with the server's answer. With a `queueKey` (e.g. a team's answer), a message
+  // that can't be sent now waits and is resent after reconnecting until the server answers (#50); a newer
+  // message with the same key replaces it, and every caller gets the newest one's result.
+  sendMessage = async (message: WebSocketMessage, options?: { queueKey?: string }): Promise<MessageResult> => {
+    const key = options?.queueKey;
+
+    if (!key) {
+      return (await this.request(message)).result;
+    }
+
+    const { promise, resolve } = Promise.withResolvers<MessageResult>();
+    const queued = this.outbox.get(key);
+
+    if (queued) {
+      queued.message = message;
+      queued.resolvers.push(resolve);
+    } else {
+      this.outbox.set(key, { message, resolvers: [resolve], sending: false });
+    }
+
+    this.flushOutbox();
+
+    return promise;
+  };
+
+  // Whether messages are waiting to be sent (for "your answer will be sent" notices).
+  hasQueuedMessages = () => this.outbox.size > 0;
+
+  private flushOutbox = () => {
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    for (const [key, queued] of this.outbox) {
+      if (queued.sending) {
+        continue;
+      }
+
+      const sent = queued.message;
+      queued.sending = true;
+
+      void this.request({ ...sent }).then(({ result }) => {
+        queued.sending = false;
+
+        // Lost on the way (the connection dropped): it stays queued for the next connection.
+        if (result === NOT_CONNECTED) {
+          return;
+        }
+
+        // Replaced while it was on its way: send the newer one.
+        if (queued.message !== sent) {
+          this.flushOutbox();
+          return;
+        }
+
+        this.outbox.delete(key);
+        queued.resolvers.forEach((resolveResult) => resolveResult(result));
+      });
+    }
+  };
 
   private request = (message: WebSocketMessage) => {
     const { promise, resolve } = Promise.withResolvers<Ack>();

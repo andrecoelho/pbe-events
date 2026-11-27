@@ -42,6 +42,26 @@ export const Team = () => {
     };
   }, [valt]);
 
+  // Another tab or window on this device took over the team (#30).
+  if (snap.connectionState === 'replaced') {
+    return (
+      <div className='fixed inset-0 flex justify-center items-center bg-primary p-4'>
+        <div className='card bg-base-100 shadow-xl w-full max-w-md'>
+          <div className='card-body items-center text-center gap-4'>
+            <img src={logo} className='h-24' alt='Pathfinder Bible Experience' />
+            <h1 className='card-title text-2xl'>This team is open in another tab</h1>
+            <p className='text-base-content/70'>
+              Only one tab or window can be connected for the team. Close the other one, or use this one instead.
+            </p>
+            <button className='btn btn-primary btn-lg w-full' onClick={handleReconnect}>
+              Use this tab
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (snap.connectionState === 'connected' && snap.errorMessage) {
     return (
       <div className='absolute bottom-2 left-2'>
@@ -89,7 +109,7 @@ export const Team = () => {
               {snap.connectionState === 'connecting' && (
                 <span className='alert alert-info w-lg'>
                   <Icon name='information-circle' className='size-5' />
-                  Connecting to event &hellip;
+                  Reconnecting&hellip; Your answers will be sent as soon as the connection is back.
                 </span>
               )}
 
@@ -107,7 +127,7 @@ export const Team = () => {
               {snap.connectionState === 'offline' && (
                 <span className='alert alert-warning w-lg'>
                   <Icon name='exclamation-triangle' className='size-5' />
-                  Your internet is down.
+                  Your internet is down. Your answers will be sent as soon as it’s back.
                 </span>
               )}
             </div>

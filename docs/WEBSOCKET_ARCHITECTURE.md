@@ -535,13 +535,11 @@ These endpoints use the same database tables as the WebSocket handlers, ensuring
 13. Teams receive `RUN_COMPLETED` with scores
 14. Connections close
 
-### Team Reconnection Flow
+### Reconnection (#49, #50, #30)
 
-1. Team's connection drops during active question
-2. Team reconnects with same session
-3. Server validates team and event
-4. If question still active, server sends `YOUR_ANSWER` with existing answer
-5. Team can continue editing and resubmit
+1. A dropped connection (a deploy, a Wi-Fi drop) is retried forever: 1 s, 2 s, 4 s … up to 30 s between attempts, each shortened at random by up to half so a room of devices doesn't reconnect at once. Pages show "Reconnecting…"; the team page adds that answers will be sent once the connection is back.
+2. A team's answers go through an outbox (`sendMessage(message, { queueKey })`): one that can't be sent, or whose ACK never comes, waits and is resent after reconnecting until the server answers. Only the latest answer per question is kept. Answers carry their `questionId`, and the server refuses one for a question that is no longer open ("That question has closed"), so a late resend can't land on the next question.
+3. The same device (same `teamToken` cookie) opening the team in a second tab replaces the first tab's socket, which the server closes with code 4003 (`TEAM_REPLACED_CLOSE_CODE`). That tab stops reconnecting and shows "This team is open in another tab" with a **Use this tab** button, instead of the two tabs taking the team from each other forever.
 
 ### Grace Period Update Flow
 

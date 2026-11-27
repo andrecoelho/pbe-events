@@ -71,3 +71,7 @@ export type ActiveItem =
 
 // WebSocket close code for a host, judge or presenter socket whose session logged out or expired.
 export const SESSION_ENDED_CLOSE_CODE = 4001;
+
+// WebSocket close code for a team socket replaced by a newer one from the same device (another tab or window,
+// #30). The replaced page stops reconnecting, so two tabs don't keep taking the team from each other.
+export const TEAM_REPLACED_CLOSE_CODE = 4003;

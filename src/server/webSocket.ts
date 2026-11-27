@@ -18,7 +18,7 @@ import {
 } from '@/server/services/teams';
 import { getCookie } from '@/server/utils/cookies';
 import { getLiveSessionIds, onSessionEnded } from '@/server/session';
-import { SESSION_ENDED_CLOSE_CODE } from '@/types';
+import { SESSION_ENDED_CLOSE_CODE, TEAM_REPLACED_CLOSE_CODE } from '@/types';
 import {
   HostMessage,
   JudgeMessage,
@@ -291,7 +291,10 @@ export class WebSocketServer {
     } else if (team) {
       // Only the device holding the token gets here, so an open socket for the team is this device's own
       // (a reload or a dropped connection): the new one replaces it.
-      this.eventConnections.get(eventId)?.teams.get(team.id)?.close();
+      this.eventConnections
+        .get(eventId)
+        ?.teams.get(team.id)
+        ?.close(TEAM_REPLACED_CLOSE_CODE, 'The team was opened in another tab');
 
       if (
         this.server?.upgrade(req, {
@@ -510,7 +513,7 @@ export class WebSocketServer {
     if (this.isTeamWebSocket(ws)) {
       switch (msg.type) {
         case 'SUBMIT_ANSWER':
-          return await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+          return await this.handleSUBMIT_ANSWER(ws, connection, msg.answer, msg.questionId);
         case 'SUBMIT_CHALLENGE':
           return await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
       }
@@ -826,13 +829,18 @@ export class WebSocketServer {
   private async handleSUBMIT_ANSWER(
     ws: ServerWebSocket<TeamWebsocketData>,
     connection: EventConnection,
-    answerText: string
+    answerText: string,
+    questionId: string | undefined
   ): Promise<MessageResult | void> {
     const { id, languageId } = ws.data;
     const activeItem = connection.activeItem;
 
     if (activeItem?.type !== 'question' || activeItem.phase !== 'prompt') {
       return refused('The question isn’t open for answers right now.');
+    }
+
+    if (questionId !== undefined && questionId !== activeItem.id) {
+      return refused('That question has closed: your answer wasn’t saved.');
     }
 
     if (
