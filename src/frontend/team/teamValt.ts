@@ -1,4 +1,10 @@
-import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
+import {
+  NOT_CONNECTED,
+  WebSocketManager,
+  type MessageResult,
+  type WebSocketMessage,
+  type WebSocketStatus
+} from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
@@ -133,15 +139,15 @@ export class TeamValt {
     }
   };
 
-  submitAnswer = async (answer: string | boolean) => {
-    return !this.ws ? false : await this.ws.sendMessage({ type: 'SUBMIT_ANSWER', answer });
+  submitAnswer = async (answer: string | boolean): Promise<MessageResult> => {
+    return (await this.ws?.sendMessage({ type: 'SUBMIT_ANSWER', answer })) ?? NOT_CONNECTED;
   };
 
-  submitChallenge = async (challenged: boolean) => {
+  submitChallenge = async (challenged: boolean): Promise<MessageResult> => {
     const activeItem = this.store.activeItem;
 
     if (!this.ws || activeItem?.type !== 'question') {
-      return false;
+      return NOT_CONNECTED;
     }
 
     return await this.ws.sendMessage({

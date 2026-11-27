@@ -48,8 +48,8 @@ export const GeneralAnswer = () => {
   const handleAnswerChange = debounce(async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const result = await valt.submitAnswer(e.target.value);
 
-    if (!result) {
-      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    if (!result.ok) {
+      toast.show({ type: 'error', message: result.error });
     }
   }, 1000);
 
@@ -86,8 +86,8 @@ export const TrueFalseAnswer = () => {
 
     const result = await valt.submitAnswer(true);
 
-    if (!result) {
-      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    if (!result.ok) {
+      toast.show({ type: 'error', message: result.error });
     }
   };
 
@@ -96,8 +96,8 @@ export const TrueFalseAnswer = () => {
 
     const result = await valt.submitAnswer(false);
 
-    if (!result) {
-      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+    if (!result.ok) {
+      toast.show({ type: 'error', message: result.error });
     }
   };
 
@@ -175,8 +175,8 @@ export const FillInTheBlankAnswer = ({
       debounce(async (answerText: string) => {
         const result = await valt.submitAnswer(answerText);
 
-        if (!result) {
-          toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+        if (!result.ok) {
+          toast.show({ type: 'error', message: result.error });
         }
       }, 500),
     [valt]

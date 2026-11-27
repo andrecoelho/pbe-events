@@ -60,6 +60,8 @@ Authentication requirements differ between host and team connections:
 
 All messages are JSON strings with a `type` field and associated payload.
 
+**Order and acknowledgements (#53).** A client message carries an `__ACK__` id. The server handles an event's messages one at a time, in the order they arrive (the timer's ticks go through the same queue), and answers each one, after its database writes, with `{ type: 'ACK', id, ok: true }` or `{ type: 'ACK', id, ok: false, error }`, where `error` is a sentence for the person (e.g. "Time is up: your answer wasn't saved."). The client's `WebSocketManager.sendMessage` resolves with `{ ok, error }`; with no ACK within 2 seconds it reconnects and resolves `ok: false`.
+
 ### Messages FROM Teams TO Server
 
 #### `SELECT_LANGUAGE`
@@ -498,7 +500,7 @@ This sends `GRACE_PERIOD_UPDATED` to the host and updates the cached run state.
 
 ### Message Errors
 
-All validation errors are sent back to the client as `ERROR` messages with specific error codes. The connection remains open for retry.
+A message the server refuses (no open question, a locked question, an id from another event) gets `ok: false` and the reason in its ACK, and changes nothing. A malformed message also gets an `ERROR` message with code `INVALID_MESSAGE`. The connection stays open.
 
 ### Disconnection Handling
 
@@ -515,7 +517,7 @@ All validation errors are sent back to the client as `ERROR` messages with speci
 3. **Team Isolation**: Teams can only submit answers for their own team
 4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event
 5. **SQL Injection Prevention**: All queries use parameterized statements via Bun SQL
-6. **Message Validation**: Every frame is parsed with its role's Zod schema in `src/server/webSocketMessages.ts`. A frame that isn't JSON or doesn't match gets `{ type: 'ERROR', code: 'INVALID_MESSAGE', message }` (plus its `ACK` when it had an `__ACK__` id) and changes nothing. Frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009. A handler that throws sends `{ type: 'ERROR', code: 'SERVER_ERROR' }` and is logged instead of taking the server down
+6. **Message Validation**: Every frame is parsed with its role's Zod schema in `src/server/webSocketMessages.ts`. A frame that isn't JSON or doesn't match gets `{ type: 'ERROR', code: 'INVALID_MESSAGE', message }` (plus its `ACK` when it had an `__ACK__` id) and changes nothing. Frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009. A handler that throws is logged and its ACK says `ok: false` instead of taking the server down
 
 ---
 

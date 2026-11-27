@@ -46,8 +46,9 @@ export function TeamMenu({ team, children }: Props) {
       `Release ${label}’s device? It will be disconnected, and the team can join again on any device with its code.`
     );
 
-    if (confirmed && !(await valt.releaseTeamDevice(team.id))) {
-      toast.show({ type: 'error', message: `Could not release ${label}’s device.` });
+    if (confirmed) {
+      // A refusal shows its own toast (runValt.send).
+      await valt.releaseTeamDevice(team.id);
     }
   };
 
@@ -58,8 +59,8 @@ export function TeamMenu({ team, children }: Props) {
       `Make a new code for ${label}? The old code and link will stop working. A device that already joined stays connected.`
     );
 
-    if (confirmed && !(await valt.renewJoinCode(team.id))) {
-      toast.show({ type: 'error', message: `Could not make a new code for ${label}.` });
+    if (confirmed) {
+      await valt.renewJoinCode(team.id);
     }
   };
 

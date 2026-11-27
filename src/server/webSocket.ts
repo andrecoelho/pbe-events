@@ -78,8 +78,15 @@ export type WebsocketData =
   | JudgeWebsocketData
   | ErrorWebsocketData;
 
+// What a message's ACK carries: whether it worked, and if not, why (shown to the person).
+export type MessageResult = { ok: true } | { ok: false; error: string };
+
+const refused = (error: string): MessageResult => ({ ok: false, error });
+
 export interface EventConnection {
   eventId: string;
+  // The event's messages, handled one at a time (see handleMessage).
+  queue: Promise<void>;
   eventName: string;
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run;
@@ -447,10 +454,10 @@ export class WebSocketServer {
   };
 
   // Called when a WebSocket message is received
-  private handleMessage = async (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
-    const { role } = ws.data;
-
-    if (role === 'error') {
+  // Called when a WebSocket message is received. An event's messages are handled one at a time, in the order
+  // they arrive, so back-to-back messages (e.g. a run status then a grace period) can't overtake each other.
+  private handleMessage = (ws: ServerWebSocket<WebsocketData>, message: string | Buffer) => {
+    if (ws.data.role === 'error') {
       return;
     }
 
@@ -460,92 +467,84 @@ export class WebSocketServer {
       return;
     }
 
-    try {
-      if (this.isTeamWebSocket(ws)) {
-        const msg = this.parse(ws, TeamMessage, message);
-
-        if (!msg) {
-          return;
-        }
-
-        this.sendAck(ws, msg['__ACK__']);
-
-        switch (msg.type) {
-          case 'SUBMIT_ANSWER':
-            await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
-            break;
-          case 'SUBMIT_CHALLENGE':
-            await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
-            break;
-        }
-      } else if (this.isHostWebSocket(ws)) {
-        const msg = this.parse(ws, HostMessage, message);
-
-        if (!msg) {
-          return;
-        }
-
-        switch (msg.type) {
-          case 'UPDATE_RUN_STATUS':
-            await this.handleUPDATE_RUN_STATUS(connection, msg.status);
-            break;
-          case 'UPDATE_GRACE_PERIOD':
-            await this.handleUPDATE_GRACE_PERIOD(connection, msg.gracePeriod);
-            break;
-          case 'SET_ACTIVE_ITEM':
-            await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
-            break;
-          case 'SET_QUESTION_LOCKED':
-            await this.handleSET_QUESTION_LOCKED(connection, msg.questionId, msg.locked);
-            break;
-          case 'START_TIMER':
-            this.handleSTART_TIMER(connection);
-            break;
-          case 'REMOVE_TIMER':
-            this.handleREMOVE_TIMER(connection);
-            break;
-          case 'RELEASE_TEAM_DEVICE':
-            await this.handleRELEASE_TEAM_DEVICE(connection, msg.teamId);
-            break;
-          case 'RENEW_JOIN_CODE':
-            await this.handleRENEW_JOIN_CODE(connection, msg.teamId);
-            break;
-        }
-
-        this.sendAck(ws, msg['__ACK__']);
-      } else if (this.isPresenterWebSocket(ws)) {
-        const msg = this.parse(ws, PresenterMessage, message);
-
-        if (msg) {
-          this.sendAck(ws, msg['__ACK__']);
-        }
-      } else if (this.isJudgeWebSocket(ws)) {
-        const msg = this.parse(ws, JudgeMessage, message);
-
-        if (!msg) {
-          return;
-        }
-
-        this.sendAck(ws, msg['__ACK__']);
-
-        switch (msg.type) {
-          case 'UPDATE_POINTS':
-            await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
-            break;
-          case 'SET_QUESTION_GRADED':
-            await this.handleSET_QUESTION_GRADED(connection, msg.questionId, msg.graded);
-            break;
-        }
-      }
-    } catch (error) {
-      console.error(`WebSocket ${role} message failed for event`, ws.data.eventId, error);
-      ws.send(JSON.stringify({ type: 'ERROR', code: 'SERVER_ERROR', message: 'Something went wrong' }));
-    }
+    connection.queue = connection.queue.then(() => this.processMessage(ws, connection, message));
   };
 
-  private sendAck(ws: ServerWebSocket<WebsocketData>, ackId: string | undefined) {
+  // Handles one message, then ACKs it with the result: { ok: true } once its writes are done, or { ok: false,
+  // error } saying why nothing changed.
+  private async processMessage(ws: ServerWebSocket<WebsocketData>, connection: EventConnection, raw: string | Buffer) {
+    const msg = this.isTeamWebSocket(ws)
+      ? this.parse(ws, TeamMessage, raw)
+      : this.isHostWebSocket(ws)
+        ? this.parse(ws, HostMessage, raw)
+        : this.isJudgeWebSocket(ws)
+          ? this.parse(ws, JudgeMessage, raw)
+          : this.parse(ws, PresenterMessage, raw);
+
+    if (!msg) {
+      return;
+    }
+
+    let result: MessageResult | void;
+
+    try {
+      result = await this.dispatch(ws, connection, msg);
+    } catch (error) {
+      console.error(`WebSocket ${ws.data.role} ${msg.type} failed for event`, connection.eventId, error);
+      result = refused('Something went wrong on the server. Try again.');
+    }
+
+    this.sendAck(ws, msg['__ACK__'], result ?? { ok: true });
+  }
+
+  private async dispatch(
+    ws: ServerWebSocket<WebsocketData>,
+    connection: EventConnection,
+    msg: z.infer<typeof TeamMessage | typeof HostMessage | typeof JudgeMessage | typeof PresenterMessage>
+  ): Promise<MessageResult | void> {
+    if (msg.type === 'PING') {
+      return;
+    }
+
+    if (this.isTeamWebSocket(ws)) {
+      switch (msg.type) {
+        case 'SUBMIT_ANSWER':
+          return await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+        case 'SUBMIT_CHALLENGE':
+          return await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
+      }
+    } else if (this.isHostWebSocket(ws)) {
+      switch (msg.type) {
+        case 'UPDATE_RUN_STATUS':
+          return await this.handleUPDATE_RUN_STATUS(connection, msg.status);
+        case 'UPDATE_GRACE_PERIOD':
+          return await this.handleUPDATE_GRACE_PERIOD(connection, msg.gracePeriod);
+        case 'SET_ACTIVE_ITEM':
+          return await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
+        case 'SET_QUESTION_LOCKED':
+          return await this.handleSET_QUESTION_LOCKED(connection, msg.questionId, msg.locked);
+        case 'START_TIMER':
+          return await this.handleSTART_TIMER(connection);
+        case 'REMOVE_TIMER':
+          return await this.handleREMOVE_TIMER(connection);
+        case 'RELEASE_TEAM_DEVICE':
+          return await this.handleRELEASE_TEAM_DEVICE(connection, msg.teamId);
+        case 'RENEW_JOIN_CODE':
+          return await this.handleRENEW_JOIN_CODE(connection, msg.teamId);
+      }
+    } else if (this.isJudgeWebSocket(ws)) {
+      switch (msg.type) {
+        case 'UPDATE_POINTS':
+          return await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
+        case 'SET_QUESTION_GRADED':
+          return await this.handleSET_QUESTION_GRADED(connection, msg.questionId, msg.graded);
+      }
+    }
+  }
+
+  private sendAck(ws: ServerWebSocket<WebsocketData>, ackId: string | undefined, result: MessageResult) {
     if (ackId !== undefined) {
-      ws.send(JSON.stringify({ type: 'ACK', id: ackId }));
+      ws.send(JSON.stringify({ type: 'ACK', id: ackId, ...result }));
     }
   }
 
@@ -560,12 +559,12 @@ export class WebSocketServer {
 
     console.warn(`Invalid WebSocket message from ${ws.data.role}:`, result.error);
     ws.send(JSON.stringify({ type: 'ERROR', code: 'INVALID_MESSAGE', message: result.error }));
-    this.sendAck(ws, result.ack);
+    this.sendAck(ws, result.ack, refused(result.error));
 
     return null;
   }
 
-  private async cleanUpEventConnection(eventId: string): Promise<void> {
+  private cleanUpEventConnection(eventId: string): void {
     const connection = this.eventConnections.get(eventId);
     const hostCount = this.server?.subscriberCount(`${eventId}:hosts`);
     const presenterCount = this.server?.subscriberCount(`${eventId}:presenters`);
@@ -590,6 +589,7 @@ export class WebSocketServer {
 
         this.eventConnections.set(eventId, {
           eventId,
+          queue: Promise.resolve(),
           eventName: run.event_name,
           teams: new Map(),
           run: {
@@ -704,7 +704,12 @@ export class WebSocketServer {
   private scheduleTick(connection: EventConnection): void {
     this.clearTickTimer(connection);
 
-    connection.tickTimer = setTimeout(() => this.tick(connection), 1000);
+    // Through the event's queue, so a tick can't interleave with a message changing the active item.
+    connection.tickTimer = setTimeout(() => {
+      connection.queue = connection.queue.then(() =>
+        this.tick(connection).catch((error) => console.error('Timer tick failed for event', connection.eventId, error))
+      );
+    }, 1000);
   }
 
   private async tick(connection: EventConnection): Promise<void> {
@@ -740,95 +745,41 @@ export class WebSocketServer {
     ws: ServerWebSocket<TeamWebsocketData>,
     connection: EventConnection,
     answerText: string
-  ): Promise<void> {
-    if (ws.data.role !== 'team') {
-      return;
-    }
-
+  ): Promise<MessageResult | void> {
     const { id, languageId } = ws.data;
+    const activeItem = connection.activeItem;
 
-    // Validate active question
-    if (!connection.activeItem || connection.activeItem.type !== 'question') {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'NO_ACTIVE_QUESTION',
-          message: 'No active question'
-        })
-      );
-
-      return;
+    if (activeItem?.type !== 'question' || activeItem.phase !== 'prompt') {
+      return refused('The question isn’t open for answers right now.');
     }
 
-    // Validate question is in prompt phase
-    if (connection.activeItem?.phase !== 'prompt') {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'INVALID_PHASE',
-          message: 'Question is not open for answers'
-        })
-      );
-
-      return;
+    if (activeItem.isTimeUp) {
+      return refused('Time is up: your answer wasn’t saved.');
     }
 
-    // Validate deadline if timer enabled
-    if (connection.activeItem.isTimeUp) {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'TIME_EXCEEDED',
-          message: 'Answer submitted after time limit'
-        })
-      );
-
-      return;
+    if (activeItem.locked) {
+      return refused('The host locked the question: your answer wasn’t saved.');
     }
 
-    if (connection.activeItem.locked) {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'QUESTION_LOCKED',
-          message: 'Question is locked for answers'
-        })
-      );
-
-      return;
-    }
-
-    // Get translation ID
-    const translation = await getTranslation(connection.activeItem.id, languageId);
+    const translation = await getTranslation(activeItem.id, languageId);
 
     if (!translation) {
-      ws.send(
-        JSON.stringify({
-          type: 'ERROR',
-          code: 'TRANSLATION_NOT_FOUND',
-          message: 'Translation not found'
-        })
-      );
-
-      return;
+      return refused('This question has no translation in your team’s language. Tell the host.');
     }
 
-    const languageCode = translation.language_code;
-    const teamNumber = ws.data.number;
-    const finalAnswerId = await saveAnswer({
-      questionId: connection.activeItem.id,
+    const answerId = await saveAnswer({
+      questionId: activeItem.id,
       teamId: id,
       translationId: translation.id,
       text: answerText
     });
-    const activeItem = connection.activeItem;
 
     activeItem.answers[id] = {
-      answerId: finalAnswerId,
+      answerId,
       teamId: id,
-      teamNumber,
-      languageCode,
-      answerText: String(answerText),
+      teamNumber: ws.data.number,
+      languageCode: translation.language_code,
+      answerText,
       points: null,
       autoPoints: null,
       challenged: false
@@ -843,28 +794,32 @@ export class WebSocketServer {
     connection: EventConnection,
     questionId: string,
     challenged: boolean
-  ): Promise<void> {
+  ): Promise<MessageResult | void> {
     const activeItem = connection.activeItem;
 
-    if (activeItem?.type === 'question' && activeItem.phase === 'answer' && activeItem.id === questionId) {
-      const answer = activeItem.answers[ws.data.id];
-
-      if (answer?.answerId) {
-        await setAnswerChallenged(connection.eventId, answer.answerId, challenged);
-
-        answer.challenged = challenged;
-
-        this.saveActiveItem(connection, activeItem);
-        this.broadcastActiveItemToManagers(connection);
-        this.sendActiveItem(ws, connection);
-      }
+    if (activeItem?.type !== 'question' || activeItem.phase !== 'answer' || activeItem.id !== questionId) {
+      return refused('Challenges are only open while the question’s answer is shown.');
     }
+
+    const answer = activeItem.answers[ws.data.id];
+
+    if (!answer?.answerId) {
+      return refused('Your team didn’t answer this question, so there’s nothing to challenge.');
+    }
+
+    await setAnswerChallenged(connection.eventId, answer.answerId, challenged);
+
+    answer.challenged = challenged;
+
+    await this.saveActiveItem(connection, activeItem);
+    this.broadcastActiveItemToManagers(connection);
+    this.sendActiveItem(ws, connection);
   }
 
   // Frees the team for another device (#44): the device that held it is told and disconnected.
-  private async handleRELEASE_TEAM_DEVICE(connection: EventConnection, teamId: string): Promise<void> {
+  private async handleRELEASE_TEAM_DEVICE(connection: EventConnection, teamId: string): Promise<MessageResult | void> {
     if (!(await releaseTeamDevice(connection.eventId, teamId))) {
-      return;
+      return refused('That team isn’t in this event.');
     }
 
     const teamWs = connection.teams.get(teamId);
@@ -887,21 +842,23 @@ export class WebSocketServer {
   }
 
   // A new join code for the team (#44): the old code and link stop working; its device stays connected.
-  private async handleRENEW_JOIN_CODE(connection: EventConnection, teamId: string): Promise<void> {
+  private async handleRENEW_JOIN_CODE(connection: EventConnection, teamId: string): Promise<MessageResult | void> {
     const joinCode = await renewJoinCode(connection.eventId, teamId);
 
-    if (joinCode) {
-      this.server?.publish(
-        `${connection.eventId}:hosts`,
-        JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, joinCode }] })
-      );
+    if (!joinCode) {
+      return refused('That team isn’t in this event.');
     }
+
+    this.server?.publish(
+      `${connection.eventId}:hosts`,
+      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, joinCode }] })
+    );
   }
 
   private async handleUPDATE_RUN_STATUS(connection: EventConnection, status: RunStatus): Promise<void> {
-    connection.run.status = status;
-
     await setRunStatus(connection.eventId, status);
+
+    connection.run.status = status;
 
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
@@ -909,9 +866,9 @@ export class WebSocketServer {
   }
 
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
-    connection.run.gracePeriod = gracePeriod;
-
     await setGracePeriod(connection.eventId, gracePeriod);
+
+    connection.run.gracePeriod = gracePeriod;
 
     const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
@@ -940,7 +897,7 @@ export class WebSocketServer {
     connection.activeItem = nextActiveItem;
 
     if (nextActiveItem?.type === 'question' && nextActiveItem.phase === 'prompt' && !nextActiveItem.locked) {
-      this.tick(connection);
+      await this.tick(connection);
     } else {
       this.broadcastActiveItemToAll(connection);
     }
@@ -950,11 +907,11 @@ export class WebSocketServer {
     connection: EventConnection,
     questionId: string,
     locked: boolean
-  ): Promise<void> {
+  ): Promise<MessageResult | void> {
     const activeItem = connection.activeItem;
 
     if (!(await setQuestionLocked(connection.eventId, questionId, locked))) {
-      return;
+      return refused('That question isn’t in this event.');
     }
 
     const message = JSON.stringify({
@@ -968,6 +925,7 @@ export class WebSocketServer {
     if (activeItem?.type === 'question' && activeItem.phase !== 'reading' && activeItem.id === questionId) {
       activeItem.locked = locked;
 
+      await this.saveActiveItem(connection, activeItem);
       this.broadcastActiveItemToAll(connection);
     }
   }
@@ -980,7 +938,7 @@ export class WebSocketServer {
       activeItem.remainingSeconds = activeItem.seconds;
       activeItem.isTimeUp = false;
       await this.saveActiveItem(connection, activeItem);
-      this.tick(connection);
+      await this.tick(connection);
     }
   }
 
@@ -1002,11 +960,11 @@ export class WebSocketServer {
     connection: EventConnection,
     questionId: string,
     graded: boolean
-  ): Promise<void> {
+  ): Promise<MessageResult | void> {
     const activeItem = connection.activeItem;
 
     if (!(await setQuestionGraded(connection.eventId, questionId, graded))) {
-      return;
+      return refused('That question isn’t in this event.');
     }
 
     const message = JSON.stringify({
@@ -1028,11 +986,11 @@ export class WebSocketServer {
     connection: EventConnection,
     answerId: string,
     points: number | null
-  ): Promise<void> {
+  ): Promise<MessageResult | void> {
     const answer = await setAnswerPoints(connection.eventId, answerId, points);
 
     if (!answer) {
-      return;
+      return refused('That answer isn’t in this event.');
     }
 
     const message = JSON.stringify({

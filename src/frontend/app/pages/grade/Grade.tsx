@@ -39,8 +39,8 @@ const init = () => {
     if (teamId && questionId) {
       const result = await gradeValt.updatePoints(questionId, teamId, value === '' ? null : parseInt(value));
 
-      if (!result) {
-        toast.show({ type: 'error', message: 'Failed to update points.' });
+      if (!result.ok) {
+        toast.show({ type: 'error', message: result.error });
       }
     }
   };
@@ -52,8 +52,8 @@ const init = () => {
     if (teamId && questionId) {
       const result = await gradeValt.giveMaxPoints(questionId, teamId);
 
-      if (!result) {
-        toast.show({ type: 'error', message: 'Failed to update points.' });
+      if (!result.ok) {
+        toast.show({ type: 'error', message: result.error });
       }
     }
   };
@@ -65,8 +65,8 @@ const init = () => {
     if (teamId && questionId) {
       const result = await gradeValt.giveZeroPoints(questionId, teamId);
 
-      if (!result) {
-        toast.show({ type: 'error', message: 'Failed to update points.' });
+      if (!result.ok) {
+        toast.show({ type: 'error', message: result.error });
       }
     }
   };
@@ -78,23 +78,25 @@ const init = () => {
     if (teamId && questionId) {
       const result = await gradeValt.updatePoints(questionId, teamId, null);
 
-      if (!result) {
-        toast.show({ type: 'error', message: 'Failed to update points.' });
+      if (!result.ok) {
+        toast.show({ type: 'error', message: result.error });
       }
     }
   };
 
-  const handleMarkQuestionAsGraded = async () => {
+  const markGraded = async (graded: boolean) => {
     if (gradeValt.store.selectedQuestion) {
-      gradeValt.setQuestionGraded(gradeValt.store.selectedQuestion.id, true);
+      const result = await gradeValt.setQuestionGraded(gradeValt.store.selectedQuestion.id, graded);
+
+      if (!result.ok) {
+        toast.show({ type: 'error', message: result.error });
+      }
     }
   };
 
-  const handleMarkQuestionAsNotGraded = async () => {
-    if (gradeValt.store.selectedQuestion) {
-      gradeValt.setQuestionGraded(gradeValt.store.selectedQuestion.id, false);
-    }
-  };
+  const handleMarkQuestionAsGraded = () => markGraded(true);
+
+  const handleMarkQuestionAsNotGraded = () => markGraded(false);
 
   const handleReconnect = () => {
     gradeValt.connect();

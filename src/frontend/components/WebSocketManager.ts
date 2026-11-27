@@ -6,6 +6,15 @@ const ACK_TIMEOUT_MS = 2000;
 const SERVER_TIMEOUT_MS = 10000;
 
 export type WebSocketMessage = { type: string } & Record<string, any>;
+
+// What sendMessage resolves with: the server's answer once it handled the message (#53), or why it never
+// arrived. `error` is a sentence to show the person.
+export type MessageResult = { ok: true } | { ok: false; error: string };
+
+export const NOT_CONNECTED: MessageResult = {
+  ok: false,
+  error: 'Not connected to the event. Check your connection and try again.'
+};
 export type WebSocketStatus = 'init' | 'connected' | 'connecting' | 'offline' | 'error';
 
 export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessage> {
@@ -14,7 +23,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   private reconnectTimer: number | null = null;
   private reconnectAttempts: number = 0;
   private offlineTimer: number | null = null;
-  private pendingACKs: Map<string, { resolve: (value: boolean) => void; timerId: number }> = new Map();
+  private pendingACKs: Map<string, { resolve: (value: MessageResult) => void; timerId: number }> = new Map();
   private wsURL: string;
   private onStatusChange?: (status: WebSocketStatus) => void;
   private onMessage?: (message: TMessage) => void;
@@ -98,7 +107,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
       if (pending) {
         clearTimeout(pending.timerId);
-        pending.resolve(true);
+        pending.resolve(message.ok === false ? { ok: false, error: String(message.error) } : { ok: true });
         this.pendingACKs.delete(message.id);
       }
 
@@ -191,7 +200,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
     this.pendingACKs.forEach((pending) => {
       clearTimeout(pending.timerId);
-      pending.resolve(false);
+      pending.resolve(NOT_CONNECTED);
     });
 
     this.pendingACKs.clear();
@@ -209,7 +218,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
   };
 
   sendMessage = (message: WebSocketMessage) => {
-    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const { promise, resolve } = Promise.withResolvers<MessageResult>();
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const ackId = crypto.randomUUID();
@@ -227,7 +236,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
       this.ws.send(JSON.stringify(message));
     } else {
       console.warn('WebSocket is not open. Unable to send message:', message);
-      resolve(false);
+      resolve(NOT_CONNECTED);
     }
 
     return promise;

@@ -1,4 +1,9 @@
-import { WebSocketManager, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
+import {
+  NOT_CONNECTED,
+  WebSocketManager,
+  type MessageResult,
+  type WebSocketStatus
+} from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
 import { proxy } from 'valtio';
 
@@ -49,6 +54,8 @@ type WebSocketGradeMessage =
   | { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null }
   | { type: 'QUESTION_GRADED'; questionId: string; graded: boolean }
   | { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean };
+
+const NO_ANSWER: MessageResult = { ok: false, error: 'That team has no answer to grade.' };
 
 export class GradeValt {
   private ws: WebSocketManager<WebSocketGradeMessage> | null = null;
@@ -156,20 +163,24 @@ export class GradeValt {
     }
   };
 
-  updatePoints = async (questionId: string, teamId: string, points: number | null) => {
+  updatePoints = async (questionId: string, teamId: string, points: number | null): Promise<MessageResult> => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
-    if (answer && answer.answerId && (points === null || (points >= 0 && points <= question.maxPoints))) {
-      answer.points = points;
-
-      return await this.notifyPointsUpdated(questionId, answer.answerId, points);
+    if (!answer?.answerId) {
+      return NO_ANSWER;
     }
 
-    return false;
+    if (points !== null && (Number.isNaN(points) || points < 0 || points > question!.maxPoints)) {
+      return { ok: false, error: `Points must be a whole number from 0 to ${question!.maxPoints}.` };
+    }
+
+    answer.points = points;
+
+    return await this.notifyPointsUpdated(questionId, answer.answerId, points);
   };
 
-  giveMaxPoints = async (questionId: string, teamId: string) => {
+  giveMaxPoints = async (questionId: string, teamId: string): Promise<MessageResult> => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
@@ -179,10 +190,10 @@ export class GradeValt {
       return await this.notifyPointsUpdated(question.id, answer.answerId, question.maxPoints);
     }
 
-    return false;
+    return NO_ANSWER;
   };
 
-  giveZeroPoints = async (questionId: string, teamId: string) => {
+  giveZeroPoints = async (questionId: string, teamId: string): Promise<MessageResult> => {
     const question = this.store.questions.find((q) => q.id === questionId);
     const answer = question?.answers[teamId];
 
@@ -192,19 +203,15 @@ export class GradeValt {
       return await this.notifyPointsUpdated(question.id, answer.answerId, 0);
     }
 
-    return false;
+    return NO_ANSWER;
   };
 
   notifyPointsUpdated = async (questionId: string, answerId: string, points: number | null) => {
-    return await this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points });
+    return (await this.ws?.sendMessage({ type: 'UPDATE_POINTS', questionId, answerId, points })) ?? NOT_CONNECTED;
   };
 
-  setQuestionGraded = async (questionId: string, graded: boolean) => {
-    const question = this.store.questions.find((q) => q.id === questionId);
-
-    if (question) {
-      await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADED', questionId, graded });
-    }
+  setQuestionGraded = async (questionId: string, graded: boolean): Promise<MessageResult> => {
+    return (await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADED', questionId, graded })) ?? NOT_CONNECTED;
   };
 
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {

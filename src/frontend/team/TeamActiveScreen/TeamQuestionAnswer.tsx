@@ -1,4 +1,5 @@
 import { Icon } from '@/frontend/components/Icon';
+import { toast } from '@/frontend/components/Toast';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import logo from '@/assets/PBE-logo_600px.png';
@@ -12,13 +13,17 @@ export const TeamQuestionAnswer = () => {
   const translation = activeItem.translations.find((t) => t.languageCode === snap.team?.languageCode);
   const answer = activeItem.answers[snap.team!.id];
 
-  const handleChallengeClick = () => {
-    valt.submitChallenge(true);
+  const challenge = async (challenged: boolean) => {
+    const result = await valt.submitChallenge(challenged);
+
+    if (!result.ok) {
+      toast.show({ type: 'error', message: result.error });
+    }
   };
 
-  const handleClearChallengeClick = () => {
-    valt.submitChallenge(false);
-  };
+  const handleChallengeClick = () => challenge(true);
+
+  const handleClearChallengeClick = () => challenge(false);
 
   return (
     <div className='absolute inset-0 flex flex-col text-base-100 gap-8 px-10'>

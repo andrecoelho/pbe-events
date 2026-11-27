@@ -1,4 +1,11 @@
-import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
+import { toast } from '@/frontend/components/Toast';
+import {
+  NOT_CONNECTED,
+  WebSocketManager,
+  type MessageResult,
+  type WebSocketMessage,
+  type WebSocketStatus
+} from '@/frontend/components/WebSocketManager';
 import type { ActiveItem } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
@@ -293,7 +300,7 @@ export class RunValt {
   updateRunStatus = async (status: 'not_started' | 'in_progress' | 'paused' | 'completed') => {
     const currentStatus = this.store.run.status;
 
-    await this.ws?.sendMessage({ type: 'UPDATE_RUN_STATUS', status });
+    await this.send({ type: 'UPDATE_RUN_STATUS', status });
 
     if (status === 'not_started') {
       await this.loadEventData(this.store.eventId);
@@ -306,7 +313,7 @@ export class RunValt {
       const activeItem = this.store.items[0];
 
       if (activeItem) {
-        await this.ws?.sendMessage({
+        await this.send({
           type: 'SET_ACTIVE_ITEM',
           activeItem
         });
@@ -318,7 +325,7 @@ export class RunValt {
         await this.lockQuestion(activeItem.id, true);
       }
 
-      await this.ws?.sendMessage({
+      await this.send({
         type: 'SET_ACTIVE_ITEM',
         activeItem: null
       });
@@ -328,7 +335,7 @@ export class RunValt {
   };
 
   updateGracePeriod = async (gracePeriod: number) => {
-    await this.ws?.sendMessage({
+    await this.send({
       type: 'UPDATE_GRACE_PERIOD',
       gracePeriod
     });
@@ -344,7 +351,7 @@ export class RunValt {
 
       const nextItem = { ...this.store.items[this.store.currentIndex]! };
 
-      await this.ws?.sendMessage({
+      await this.send({
         type: 'SET_ACTIVE_ITEM',
         activeItem: nextItem
       });
@@ -357,7 +364,7 @@ export class RunValt {
 
       const prevItem = { ...this.store.items[this.store.currentIndex]! };
 
-      this.ws?.sendMessage({
+      this.send({
         type: 'SET_ACTIVE_ITEM',
         activeItem: prevItem
       });
@@ -365,25 +372,36 @@ export class RunValt {
   };
 
   removeTimer = async () => {
-    await this.ws?.sendMessage({ type: 'REMOVE_TIMER' });
+    await this.send({ type: 'REMOVE_TIMER' });
   };
 
   startTimer = async () => {
-    await this.ws?.sendMessage({ type: 'START_TIMER' });
+    await this.send({ type: 'START_TIMER' });
+  };
+
+  // Sends a host action; when the server refuses it (or the connection is down), says why in a toast.
+  private send = async (message: WebSocketMessage): Promise<MessageResult> => {
+    const result = (await this.ws?.sendMessage(message)) ?? NOT_CONNECTED;
+
+    if (!result.ok) {
+      toast.show({ type: 'error', message: result.error });
+    }
+
+    return result;
   };
 
   // Frees the team for another device; the device that held it is disconnected (#44).
   releaseTeamDevice = async (teamId: string) => {
-    return (await this.ws?.sendMessage({ type: 'RELEASE_TEAM_DEVICE', teamId })) ?? false;
+    return await this.send({ type: 'RELEASE_TEAM_DEVICE', teamId });
   };
 
   // Gives the team a new join code; the old code and link stop working (#44).
   renewJoinCode = async (teamId: string) => {
-    return (await this.ws?.sendMessage({ type: 'RENEW_JOIN_CODE', teamId })) ?? false;
+    return await this.send({ type: 'RENEW_JOIN_CODE', teamId });
   };
 
   lockQuestion = async (questionId: string, locked: boolean) => {
-    await this.ws?.sendMessage({ type: 'SET_QUESTION_LOCKED', questionId, locked });
+    await this.send({ type: 'SET_QUESTION_LOCKED', questionId, locked });
   };
 
   private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
