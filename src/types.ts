@@ -207,6 +207,9 @@ export type AdminTeam = {
 // What the admin audit log records (#61).
 export type AuditAction =
   | 'event.reset'
+  | 'event.transfer'
+  | 'event.join'
+  | 'event.leave'
   | 'team.release_device'
   | 'user.update'
   | 'user.reset_link'
@@ -252,9 +255,29 @@ export type AdminUserResponse = { user: AdminUser; events: { id: string; name: s
 // A one-time password reset link (#58): the page's path, to put after the site's address.
 export type ResetLinkResponse = { path: string; expiresAt: string };
 
+// A row of the admin page's Events section (#59).
+export type AdminEventListItem = {
+  id: string;
+  name: string;
+  createdAt: string;
+  owner: { email: string; name: string } | null;
+  peopleCount: number;
+  teamCount: number;
+  questionCount: number;
+  runStatus: RunStatus | null;
+  // Open in the server's memory right now.
+  live: boolean;
+};
+
+export type AdminEventsResponse = { events: AdminEventListItem[]; more: boolean };
+
 export type AdminEventResponse = {
   serverTime: number;
   event: { id: string; name: string };
+  // Everyone with a role on the event, owner first.
+  people: { userId: string; name: string; email: string; role: 'owner' | 'admin' | 'judge' }[];
+  // The viewer's own role on the event; null for a super admin who isn't in it.
+  myRole: 'owner' | 'admin' | 'judge' | null;
   // Null when the event isn't open in the server's memory.
   live: { runStatus: RunStatus; activeItem: string | null; connections: LiveConnection[] } | null;
   teams: AdminTeam[];

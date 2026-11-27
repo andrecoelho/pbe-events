@@ -6,6 +6,9 @@ import { useSnapshot } from 'valtio';
 
 const ACTION_LABELS: Record<AuditLogEntry['action'], string> = {
   'event.reset': 'Reset the event in memory',
+  'event.transfer': 'Transferred ownership',
+  'event.join': 'Joined the event as admin',
+  'event.leave': 'Left the event',
   'team.release_device': 'Released a team’s device',
   'user.update': 'Edited a user',
   'user.reset_link': 'Created a password reset link',
@@ -19,15 +22,20 @@ const formatTime = (iso: string) =>
 
 // What the action was done to, beyond the event.
 function describeDetails(entry: AuditLogEntry) {
-  const { teamNumber, teamName, targetEmail, changes } = entry.details as {
+  const { teamNumber, teamName, targetEmail, previousOwnerEmail, changes } = entry.details as {
     teamNumber?: number;
     teamName?: string;
     targetEmail?: string;
+    previousOwnerEmail?: string | null;
     changes?: Record<string, { from: string; to: string }>;
   };
 
   if (teamNumber !== undefined) {
     return `Team ${teamNumber} · ${teamName ?? ''}`;
+  }
+
+  if (entry.action === 'event.transfer') {
+    return `To ${targetEmail ?? '?'}${previousOwnerEmail ? ` (from ${previousOwnerEmail})` : ''}`;
   }
 
   const changed = Object.entries(changes ?? {}).map(([field, { from, to }]) => `${field}: ${from} → ${to}`);

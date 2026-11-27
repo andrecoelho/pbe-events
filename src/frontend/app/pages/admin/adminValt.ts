@@ -1,6 +1,7 @@
 import { api, type Outcome } from '@/frontend/utils/api';
 import type {
   AdminEventResponse,
+  AdminEventsResponse,
   AdminUserResponse,
   AdminUsersResponse,
   AuditLogEntry,
@@ -34,6 +35,7 @@ export type AdminStore = {
     nextBefore: string | null;
   };
   users: { query: string; loaded: boolean; error: string | null; data: AdminUsersResponse | null };
+  events: { query: string; loaded: boolean; error: string | null; data: AdminEventsResponse | null };
   user: {
     loaded: boolean;
     error: string | null;
@@ -54,6 +56,7 @@ export class AdminValt {
       event: empty(),
       auditLog: { loaded: false, loading: false, error: null, entries: [], nextBefore: null },
       users: { query: '', loaded: false, error: null, data: null },
+      events: { query: '', loaded: false, error: null, data: null },
       user: { loaded: false, error: null, data: null, resetLink: null }
     });
   }
@@ -77,6 +80,40 @@ export class AdminValt {
   loadConnections = () => this.load('connections', '/api/admin/connections');
 
   loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
+
+  // Events matching the search (#59). Only the latest search's answer is kept.
+  async searchEvents(query: string) {
+    const events = this.store.events;
+
+    events.query = query;
+
+    const result = await api<AdminEventsResponse>(`/api/admin/events?q=${encodeURIComponent(query)}`);
+
+    if (events.query !== query) {
+      return;
+    }
+
+    if (result.ok) {
+      events.data = result.data;
+      events.error = null;
+    } else {
+      events.error = result.error;
+    }
+
+    events.loaded = true;
+  }
+
+  // Join or leave the event as a super admin, or transfer its ownership (#59); then the event again.
+  async manageEvent(eventId: string, action: 'join' | 'leave' | 'transfer', email?: string): Promise<Outcome> {
+    const result = await api(`/api/admin/events/${eventId}/${action}`, {
+      method: 'POST',
+      json: action === 'transfer' ? { email } : undefined
+    });
+
+    await this.loadEvent(eventId);
+
+    return result.ok ? { ok: true } : result;
+  }
 
   // Users matching the search (#58). Only the latest search's answer is kept.
   async searchUsers(query: string) {
