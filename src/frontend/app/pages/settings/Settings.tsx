@@ -2,7 +2,7 @@ import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useAppValt } from '@/frontend/app/appValt';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { SettingsValt, SettingsValtContext } from './settingsValt';
 import './Settings.css';
@@ -33,19 +33,16 @@ export const Settings = memo(() => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (email === '' && snap.user?.email) {
-      setEmail(snap.user.email);
-    }
+  // Fill the profile fields once, when the user has loaded (adjusting state during render rather than in
+  // an effect, so the form doesn't render empty first).
+  const [profileFilled, setProfileFilled] = useState(false);
 
-    if (firstName === '' && snap.user?.firstName) {
-      setFirstName(snap.user.firstName);
-    }
-
-    if (lastName === '' && snap.user?.lastName) {
-      setLastName(snap.user.lastName);
-    }
-  }, [snap.user?.email, snap.user?.firstName, snap.user?.lastName]);
+  if (!profileFilled && snap.user) {
+    setProfileFilled(true);
+    setEmail(snap.user.email);
+    setFirstName(snap.user.firstName);
+    setLastName(snap.user.lastName);
+  }
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

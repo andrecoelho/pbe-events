@@ -2,7 +2,7 @@ import { Avatar } from '@/frontend/components/Avatar';
 import { Icon } from '@/frontend/components/Icon';
 import { modal } from '@/frontend/components/Modal';
 import { roleBadgeColors } from '@/frontend/utils/roleColors';
-import { useMemo, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { proxy, useSnapshot } from 'valtio';
 import type { PermissionsValt } from './permissionsValt';
 
@@ -124,17 +124,20 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
 };
 
 function PermissionsModal(props: Props) {
-  const {
-    store,
-    popoverId,
-    anchorName,
-    handleCancel,
-    handleChange,
-    handleSearch,
-    handleRemoveUser,
-    handleChooseRole,
-    handleSave
-  } = useMemo(() => init(props.permissionsValt, props.user), [props.permissionsValt]);
+  // Built once from the props the modal opens with; edits live in its own store.
+  const [
+    {
+      store,
+      popoverId,
+      anchorName,
+      handleCancel,
+      handleChange,
+      handleSearch,
+      handleRemoveUser,
+      handleChooseRole,
+      handleSave
+    }
+  ] = useState(() => init(props.permissionsValt, props.user));
 
   const snap = useSnapshot(store, { sync: true });
   const isValid = snap.user?.roleId !== undefined;

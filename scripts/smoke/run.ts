@@ -74,8 +74,10 @@ const wsBase = base.replace('http', 'ws') + '/event-run/ws';
 function open(query: string, withCookie: boolean) {
   const ws = new WebSocket(`${wsBase}?${query}`, withCookie ? ({ headers: { Cookie: cookie } } as any) : undefined);
   const messages: any[] = [];
-  ws.onmessage = (e) => messages.push(JSON.parse(String(e.data)));
-  return new Promise<{ ws: WebSocket; messages: any[] }>((resolve) => (ws.onopen = () => resolve({ ws, messages })));
+  ws.addEventListener('message', (e) => messages.push(JSON.parse(String(e.data))));
+  return new Promise<{ ws: WebSocket; messages: any[] }>((resolve) =>
+    ws.addEventListener('open', () => resolve({ ws, messages }))
+  );
 }
 const sleep = (ms: number) => Bun.sleep(ms);
 const dump = (label: string, messages: any[]) => {

@@ -50,9 +50,9 @@ export function CreateAccountModal() {
 
     // Create preview
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setAvatarPreview(event.target?.result as string);
-    };
+    reader.addEventListener('load', () => {
+      setAvatarPreview(reader.result as string);
+    });
     reader.readAsDataURL(file);
 
     // Reset input so the same file can be selected again

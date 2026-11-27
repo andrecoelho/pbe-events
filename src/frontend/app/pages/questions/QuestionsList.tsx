@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { QuestionListItem } from './QuestionListItem';
 import { useQuestionsValt } from './questionsValt';
@@ -11,7 +11,7 @@ export const QuestionsList = memo(() => {
   const [showBottomShadow, setShowBottomShadow] = useState(false);
   const [showTopShadow, setShowTopShadow] = useState(false);
 
-  const checkScrollShadow = () => {
+  const checkScrollShadow = useCallback(() => {
     const element = questionsListRef.current;
 
     if (!element) {
@@ -24,11 +24,14 @@ export const QuestionsList = memo(() => {
 
     setShowBottomShadow(hasScroll && !isAtBottom);
     setShowTopShadow(isScrolled);
-  };
+  }, []);
 
+  const questionCount = Object.keys(snap.questions).length;
+
+  // Adding or removing questions changes whether the list scrolls.
   useEffect(() => {
     checkScrollShadow();
-  }, [Object.keys(snap.questions).length]);
+  }, [checkScrollShadow, questionCount]);
 
   // Sort questions by number
   const sortedQuestions = Object.values(snap.questions).sort((a, b) => a.number - b.number);

@@ -1,5 +1,5 @@
 import { debounce } from '@/frontend/utils/debounce';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useQuestionsValt, type IQuestionTranslation, type Question } from './questionsValt';
 import { useSnapshot } from 'valtio';
 
@@ -20,18 +20,19 @@ export const QuestionTranslation = memo(({ languageCode }: Props) => {
   const question = snap.selectedQuestion;
   const translation = question?.translations[languageCode];
 
-  const handleTranslationChange = useCallback(
-    debounce(
-      async (
-        question: Question,
-        translation: IQuestionTranslation,
-        field: 'prompt' | 'answer' | 'clarification',
-        value: string
-      ) => {
-        await questionsValt.upsertTranslation(question, translation, { [field]: value });
-      },
-      500
-    ),
+  const handleTranslationChange = useMemo(
+    () =>
+      debounce(
+        async (
+          changedQuestion: Question,
+          changedTranslation: IQuestionTranslation,
+          field: 'prompt' | 'answer' | 'clarification',
+          value: string
+        ) => {
+          await questionsValt.upsertTranslation(changedQuestion, changedTranslation, { [field]: value });
+        },
+        500
+      ),
     [questionsValt]
   );
 

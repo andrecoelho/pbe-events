@@ -44,7 +44,7 @@ export const Team = () => {
       window.removeEventListener('resize', calculateScale);
       valt.cleanup();
     };
-  }, []);
+  }, [valt]);
 
   if (snap.connectionState === 'connected' && snap.errorMessage) {
     return (

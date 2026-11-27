@@ -3,7 +3,7 @@ import { toast } from '@/frontend/components/Toast';
 import { useTeamValt } from '@/frontend/team/teamValt';
 import type { ActiveItem } from '@/types';
 import { debounce } from '@/frontend/utils/debounce';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import logo from '@/assets/PBE-logo_600px.png';
 import { useSnapshot, type Snapshot } from 'valtio';
 
@@ -36,9 +36,14 @@ export const GeneralAnswer = () => {
 
   const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
 
+  const disabled = activeItem.isTimeUp || activeItem.locked;
+
+  // Focus the answer box when it opens and again when the host unlocks the question.
   useEffect(() => {
-    textareaRef.current?.focus();
-  }, [activeItem]);
+    if (!disabled) {
+      textareaRef.current?.focus();
+    }
+  }, [disabled]);
 
   const handleAnswerChange = debounce(async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const result = await valt.submitAnswer(e.target.value);
@@ -47,8 +52,6 @@ export const GeneralAnswer = () => {
       toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
     }
   }, 1000);
-
-  const disabled = activeItem.isTimeUp || activeItem.locked;
 
   return (
     <div className={`card bg-base-100 text-base-content ${disabled ? 'opacity-50' : ''}`}>
@@ -69,15 +72,10 @@ GeneralAnswer.displayName = 'GeneralAnswer';
 export const TrueFalseAnswer = () => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store, { sync: true });
-  const [answer, setAnswer] = useState<boolean | null>(null);
+  // The team's pick on this device, else the answer the server has (after a reload or reconnect).
+  const [picked, setAnswer] = useState<boolean | null>(null);
+  const answer: boolean | null = picked ?? (snap.answer ? JSON.parse(snap.answer as string) : null);
   const trueButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    // Don't overwrite local state if already set
-    if (answer === null) {
-      setAnswer(snap.answer ? JSON.parse(snap.answer as string) : null);
-    }
-  }, [snap.answer]);
 
   useEffect(() => {
     trueButtonRef.current?.focus();
@@ -146,25 +144,21 @@ export const FillInTheBlankAnswer = ({
 }) => {
   const valt = useTeamValt();
   const snap = useSnapshot(valt.store, { sync: true });
-  const [savedAnswers, setSavedAnswers] = useState<Record<number, string>>({});
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => {
+  // The blanks the server has saved ('__' marks an empty one), shown after a reload or reconnect.
+  const savedAnswers = useMemo(() => {
+    const parsed: Record<number, string> = {};
+
     if (typeof snap.answer === 'string' && snap.answer) {
-      const answerParts = snap.answer.split(' | ');
-
-      const parsed = answerParts.reduce(
-        (acc, val, idx) => {
-          if (val && val !== '__') {
-            acc[idx] = val;
-          }
-          return acc;
-        },
-        {} as Record<number, string>
-      );
-
-      setSavedAnswers(parsed);
+      snap.answer.split(' | ').forEach((val, idx) => {
+        if (val && val !== '__') {
+          parsed[idx] = val;
+        }
+      });
     }
+
+    return parsed;
   }, [snap.answer]);
 
   useEffect(() => {
@@ -172,27 +166,32 @@ export const FillInTheBlankAnswer = ({
   }, []);
 
   const translation = translations.find((t) => t.languageCode === languageCode);
+  const parts = translation ? parsePromptWithBlanks(translation.prompt) : [];
+
+  // One debounced save for the component's life, so re-renders (the timer ticks every second) don't
+  // start a new debounce.
+  const saveAnswer = useMemo(
+    () =>
+      debounce(async (answerText: string) => {
+        const result = await valt.submitAnswer(answerText);
+
+        if (!result) {
+          toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
+        }
+      }, 500),
+    [valt]
+  );
+
+  // Every blank's value in order, read from the inputs next to the one that changed; '__' marks an empty one.
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputs = e.currentTarget.parentElement?.querySelectorAll('input') ?? [];
+
+    saveAnswer(Array.from(inputs, (input) => input.value || '__').join(' | '));
+  };
 
   if (!translation) {
     return null;
   }
-
-  const parts = parsePromptWithBlanks(translation.prompt);
-  const totalBlanks = parts.filter((p) => p.type === 'blank').length;
-
-  const handleInputChange = debounce(async () => {
-    // Read values directly from DOM
-    const answerArray = Array.from({ length: totalBlanks }, (_, idx) => {
-      const value = inputRefs.current[idx]?.value || '';
-      return value || '__';
-    });
-
-    const result = await valt.submitAnswer(answerArray.join(' | '));
-
-    if (!result) {
-      toast.show({ type: 'error', message: 'Failed to save answer. Please try again.' });
-    }
-  }, 500);
 
   const activeItem = snap.activeItem as Snapshot<Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>>;
   const disabled = activeItem.isTimeUp || activeItem.locked;

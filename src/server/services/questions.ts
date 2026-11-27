@@ -128,24 +128,24 @@ export async function createQuestion(
   const id = Bun.randomUUIDv7();
 
   const number = await sql.begin(async (tx) => {
-    let number: number;
+    let newNumber: number;
 
     if (question.insertBefore !== undefined) {
-      number = question.insertBefore;
-      await shiftNumbers(tx, eventId, number, Number.MAX_SAFE_INTEGER, 1);
+      newNumber = question.insertBefore;
+      await shiftNumbers(tx, eventId, newNumber, Number.MAX_SAFE_INTEGER, 1);
     } else {
       const rows: { max_number: number | null }[] = await tx`
         SELECT MAX(number) AS max_number FROM questions WHERE event_id = ${eventId}
       `;
-      number = (rows[0]?.max_number ?? 0) + 1;
+      newNumber = (rows[0]?.max_number ?? 0) + 1;
     }
 
     await tx`
       INSERT INTO questions (id, number, type, max_points, seconds, event_id)
-      VALUES (${id}, ${number}, ${question.type}, ${question.maxPoints}, ${question.seconds}, ${eventId})
+      VALUES (${id}, ${newNumber}, ${question.type}, ${question.maxPoints}, ${question.seconds}, ${eventId})
     `;
 
-    return number;
+    return newNumber;
   });
 
   return { id, number, type: question.type, maxPoints: question.maxPoints, seconds: question.seconds };
