@@ -25,6 +25,10 @@ run = ["bun install", "bun run migrate", "bun dev"]
 description = "Open a tunnel to the staging Postgres on localhost:15432 for DB tools (Ctrl+C to close)"
 run = "railway connect postgres --environment staging --tunnel-only --port 15432"
 
+[tasks."db:tunnel:prod"]
+description = "Open a tunnel to the PRODUCTION Postgres on localhost:15433 for DB tools (Ctrl+C to close)"
+run = "railway connect postgres --environment production --tunnel-only --port 15433"
+
 [tasks."dev:staging"]
 description = "Start the dev server against the staging database (opens and closes the tunnel itself)"
 run = '''

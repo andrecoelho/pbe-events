@@ -30,10 +30,12 @@ The staging Postgres has no public address. With the [Railway CLI](https://docs.
 
 ```bash
 mise run dev:staging   # dev server against staging (opens and closes an SSH tunnel itself)
-mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like TablePlus
+mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like Beekeeper
 ```
 
-These only ever connect to **staging**, never production.
+These only ever connect to **staging**, never production. Each tunnel stays open until you stop it (Ctrl+C) or close its terminal.
+
+For production, `mise run db:tunnel:prod` opens a tunnel on localhost:15433, a different port so a saved connection can't point at the wrong database. It's for looking at data in a DB tool; nothing in the app or its scripts uses it.
 
 `dev:staging` doesn't apply migrations, so a branch's unmerged migration never reaches staging's database; staging gets them when it deploys.
 
