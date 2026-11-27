@@ -32,7 +32,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests. Ru
 - `src/server/webSocket.ts`: running an event live (host, presenter, team and judge connections). See `docs/WEBSOCKET_ARCHITECTURE.md`.
 - `src/server/http/`: `route()` and its middlewares (`auth()`, `superAdmin()`, `eventRole(...)`, `json(schema)`, `rateLimit()`). New and converted routes use it.
 - `src/server/utils/responses.ts`: response helpers. `apiData(obj)` returns JSON with keys converted to camelCase; errors use `apiBadRequest`, `apiUnauthorized`, `apiForbidden`, `apiNotFound`, `apiServerError`, which return `{ error: message }`.
-- `src/server/queries.ts`: shared permission-checked queries such as `querySelectEvent(eventId, userId)`.
+- `src/server/services/*.ts`: the SQL, as functions shared by REST routes, the WebSocket and (later) the admin page. `services/permissions.ts` holds every permission check (`getEventRole`, `getEventForRoles(eventId, userId, MANAGER_ROLES)`). Services don't check permissions themselves; callers do. Some route files still hold their own SQL, which moves into services as each is converted to `route()` (#42).
 - `src/frontend/{app,login,team,presenter}/`: one HTML entry point each. The organizer app routes with `useRouter` (a `Map` of path regex to page) in `src/frontend/app/App.tsx`; pages live in `src/frontend/app/pages/<feature>/`.
 - `src/types.ts`: types shared by server and frontend, such as `ActiveItem`.
 - `migrations/`: the schema. `scripts/`: dev database scripts. `.railway/railway.ts`: Railway infrastructure.

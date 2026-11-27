@@ -1,6 +1,7 @@
 import { sql } from 'bun';
 
-export const getQuestionsWithAnswers = async (eventId: string) => {
+// Every question with its translations and an entry per team (answerText null when the team has not answered).
+export async function getQuestionsWithAnswers(eventId: string) {
   // Query all questions with their translations
   const questionsData: {
     id: string;
@@ -152,4 +153,33 @@ export const getQuestionsWithAnswers = async (eventId: string) => {
   const questions = Array.from(questionsMap.values()).sort((a, b) => a.number - b.number);
 
   return questions;
-};
+}
+
+export async function saveAnswer(answer: { questionId: string; teamId: string; translationId: string; text: string }) {
+  // A new answer replaces the team's earlier one and clears its grading and challenge.
+  const rows: { id: string }[] = await sql`
+    INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
+    VALUES (${Bun.randomUUIDv7()}, ${answer.text}, ${answer.questionId}, ${answer.teamId}, ${answer.translationId},
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT (question_id, team_id)
+    DO UPDATE SET answer = EXCLUDED.answer, points_awarded = NULL, auto_points_awarded = NULL, challenged = false,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING id
+  `;
+
+  return rows[0]!.id;
+}
+
+export async function setAnswerChallenged(answerId: string, challenged: boolean) {
+  await sql`UPDATE answers SET challenged = ${challenged} WHERE id = ${answerId}`;
+}
+
+// Returns the answer's question and team, or null when there's no such answer.
+export async function setAnswerPoints(answerId: string, points: number | null) {
+  const rows: { question_id: string; team_id: string }[] = await sql`
+    UPDATE answers SET points_awarded = ${points} WHERE id = ${answerId}
+    RETURNING question_id, team_id
+  `;
+
+  return rows[0] ?? null;
+}

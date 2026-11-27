@@ -17,8 +17,8 @@ mock.module('@/server/session', () => ({
   }
 }));
 
-mock.module('@/server/queries', () => ({
-  querySelectEventRole: async (eventId: string, userId: string) => {
+mock.module('@/server/services/permissions', () => ({
+  getEventRole: async (eventId: string, userId: string) => {
     const role = roles[`${eventId}:${userId}`];
     return role ? { id: eventId, name: `Event ${eventId}`, title_remarks: null, role_id: role } : null;
   }

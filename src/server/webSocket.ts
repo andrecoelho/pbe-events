@@ -1,7 +1,14 @@
 import type { Session } from '@/server/types';
 import { textServerError } from '@/server/utils/responses';
 import type { ActiveItem } from '@/types';
-import { sql, type ServerWebSocket } from 'bun';
+import { saveAnswer, setAnswerChallenged, setAnswerPoints } from '@/server/services/answers';
+import { eventExists } from '@/server/services/events';
+import { getLanguagesByCode, type Language } from '@/server/services/languages';
+import { ALL_ROLES, getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
+import { getTranslation, setQuestionGraded, setQuestionLocked } from '@/server/services/questions';
+import { getRun, saveActiveItem, setGracePeriod, setRunStatus, type RunStatus } from '@/server/services/runs';
+import { getTeam, listTeams } from '@/server/services/teams';
+import type { ServerWebSocket } from 'bun';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -51,12 +58,12 @@ export interface EventConnection {
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run;
   activeItem: ActiveItem | null;
-  languages?: Record<string, { id: string; code: string; name: string }>;
+  languages?: Record<string, Language>;
   tickTimer?: NodeJS.Timeout;
 }
 
 export interface Run {
-  status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+  status: RunStatus;
   gracePeriod: number;
 }
 
@@ -119,9 +126,7 @@ export class WebSocketServer {
     }
 
     // Check if event exists
-    const events: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
-
-    if (events.length === 0) {
+    if (!(await eventExists(eventId))) {
       this.server?.upgrade(req, { data: { role: 'error', message: 'Event not found' } });
       return;
     }
@@ -144,13 +149,7 @@ export class WebSocketServer {
         return;
       }
 
-      const permissions: { role_id: string }[] = await sql`
-          SELECT role_id
-          FROM permissions
-          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
-
-      if (permissions.length === 0) {
+      if (!(await getEventForRoles(eventId, session.user_id, MANAGER_ROLES))) {
         this.server?.upgrade(req, { data: { role: 'error', message: 'Host permission denied' } });
         return;
       }
@@ -164,13 +163,7 @@ export class WebSocketServer {
         return;
       }
 
-      const permissions: { role_id: string }[] = await sql`
-          SELECT role_id
-          FROM permissions
-          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('judge', 'admin', 'owner')
-        `;
-
-      if (permissions.length === 0) {
+      if (!(await getEventForRoles(eventId, session.user_id, ALL_ROLES))) {
         this.server?.upgrade(req, { data: { role: 'error', message: 'Judge permission denied' } });
         return;
       }
@@ -184,14 +177,7 @@ export class WebSocketServer {
         return;
       }
 
-      // Validate session and permissions for host
-      const permissions: { role_id: string }[] = await sql`
-          SELECT role_id
-          FROM permissions
-          WHERE user_id = ${session!.user_id} AND event_id = ${eventId} AND role_id IN ('owner', 'admin')
-        `;
-
-      if (permissions.length === 0) {
+      if (!(await getEventForRoles(eventId, session.user_id, MANAGER_ROLES))) {
         this.server?.upgrade(req, { data: { role: 'error', message: 'Presenter permission denied' } });
         return;
       }
@@ -233,20 +219,7 @@ export class WebSocketServer {
       }
 
       // Validate team exists for team role
-      const teams: {
-        id: string;
-        name: string;
-        number: number;
-        languageId: string;
-        languageCode: string;
-      }[] = await sql`
-          SELECT t.id, t.name, t.number, t.language_id, l.code as language_code
-          FROM teams t
-          LEFT JOIN languages l ON l.id = t.language_id
-          WHERE t.id = ${teamId} AND t.event_id = ${eventId}
-        `;
-
-      const team = teams[0];
+      const team = await getTeam(eventId, teamId);
 
       if (!team) {
         this.cleanUpEventConnection(eventId);
@@ -262,8 +235,8 @@ export class WebSocketServer {
             id: team.id,
             name: team.name,
             number: team.number,
-            languageId: team.languageId,
-            languageCode: team.languageCode,
+            languageId: team.language_id,
+            languageCode: team.language_code ?? '',
             hash
           }
         })
@@ -325,32 +298,20 @@ export class WebSocketServer {
       const { id } = ws.data;
 
       // Get team details including language
-      const teams: {
-        language_id: string;
-        code: string;
-        name: string;
-        number: number;
-      }[] = await sql`
-          SELECT t.language_id, l.code, t.name, t.number
-          FROM teams t
-          LEFT JOIN languages l ON l.id = t.language_id
-          WHERE t.id = ${id}
-        `;
+      const team = await getTeam(eventId, id);
 
-      if (teams.length > 0) {
+      if (team) {
         connection.teams.set(id, ws);
 
-        const team = teams[0]!;
-
         ws.data.languageId = team.language_id;
-        ws.data.languageCode = team.code;
+        ws.data.languageCode = team.language_code ?? '';
 
         ws.send(JSON.stringify({ type: 'EVENT_INFO', event: { id: eventId, name: connection.eventName } }));
 
         ws.send(
           JSON.stringify({
             type: 'TEAM_INFO',
-            team: { id, name: team.name, languageId: ws.data.languageId, languageCode: team.code }
+            team: { id, name: team.name, languageId: ws.data.languageId, languageCode: team.language_code }
           })
         );
 
@@ -373,7 +334,7 @@ export class WebSocketServer {
                 status: 'connected',
                 name: team.name,
                 number: team.number,
-                languageCode: team.code
+                languageCode: team.language_code
               }
             ]
           })
@@ -474,7 +435,7 @@ export class WebSocketServer {
       const msg = JSON.parse(message as string) as
         | {
             type: 'UPDATE_RUN_STATUS';
-            status: 'not_started' | 'in_progress' | 'paused' | 'completed';
+            status: RunStatus;
             __ACK__: string;
           }
         | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
@@ -551,40 +512,24 @@ export class WebSocketServer {
   }
 
   private async initializeEventConnection(eventId: string): Promise<void> {
-    const [run]: {
-      event_id: string;
-      name: string;
-      status: string;
-      grace_period: number;
-      active_item: ActiveItem | null;
-    }[] = await sql`
-      SELECT event_id, name, status, grace_period, active_item
-      FROM runs
-      JOIN events ON runs.event_id = events.id
-      WHERE event_id = ${eventId}
-    `;
+    const run = await getRun(eventId);
 
     if (run) {
-      // Fetch languages for the event
-      const languages: { id: string; code: string; name: string }[] = await sql`
-        SELECT id, code, name
-        FROM languages
-        WHERE event_id = ${eventId}
-      `;
+      const languages = await getLanguagesByCode(eventId);
 
-      if (languages.length > 0) {
+      if (Object.keys(languages).length > 0) {
         console.log('Initializing event connection for eventId', eventId);
 
         this.eventConnections.set(eventId, {
           eventId,
-          eventName: run.name,
+          eventName: run.event_name,
           teams: new Map(),
           run: {
-            status: run.status as 'not_started' | 'in_progress' | 'paused' | 'completed',
+            status: run.status,
             gracePeriod: run.grace_period
           },
           activeItem: run.active_item,
-          languages: Object.fromEntries(languages.map((lang) => [lang.code, lang]))
+          languages
         });
       }
     }
@@ -617,8 +562,7 @@ export class WebSocketServer {
   }
 
   async sendTeamStatuses(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): Promise<void> {
-    const teams: { id: string; number: number }[] =
-      await sql`SELECT id, number FROM teams WHERE event_id = ${connection.eventId}`;
+    const teams = await listTeams(connection.eventId);
 
     const teamStatuses = teams.map((team) => {
       const teamWs = connection.teams.get(team.id);
@@ -676,7 +620,7 @@ export class WebSocketServer {
   }
 
   async saveActiveItem(connection: EventConnection, activeItem: ActiveItem | null): Promise<void> {
-    await sql`UPDATE runs SET active_item = ${activeItem}::jsonb WHERE event_id = ${connection.eventId}`;
+    await saveActiveItem(connection.eventId, activeItem);
   }
 
   private clearTickTimer(connection: EventConnection): void {
@@ -784,15 +728,9 @@ export class WebSocketServer {
     }
 
     // Get translation ID
-    const translations: { id: string; language_code: string }[] = await sql`
-        SELECT tr.id, l.code as language_code
-        FROM translations tr
-        JOIN languages l ON tr.language_id = l.id
-        WHERE tr.question_id = ${connection.activeItem.id}
-          AND tr.language_id = ${languageId}
-      `;
+    const translation = await getTranslation(connection.activeItem.id, languageId);
 
-    if (translations.length === 0) {
+    if (!translation) {
       ws.send(
         JSON.stringify({
           type: 'ERROR',
@@ -804,21 +742,14 @@ export class WebSocketServer {
       return;
     }
 
-    const translationId = translations[0]!.id;
-    const languageCode = translations[0]!.language_code;
+    const languageCode = translation.language_code;
     const teamNumber = ws.data.number;
-    const answerId = Bun.randomUUIDv7();
-
-    // Upsert answer
-    const result: { id: string }[] = await sql`
-        INSERT INTO answers (id, answer, question_id, team_id, translation_id, created_at, updated_at)
-        VALUES (${answerId}, ${answerText}, ${connection.activeItem.id}, ${id}, ${translationId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (question_id, team_id)
-        DO UPDATE SET answer = EXCLUDED.answer, points_awarded = NULL, auto_points_awarded = NULL, challenged = false, updated_at = CURRENT_TIMESTAMP
-        RETURNING id
-      `;
-
-    const finalAnswerId = result[0]!.id;
+    const finalAnswerId = await saveAnswer({
+      questionId: connection.activeItem.id,
+      teamId: id,
+      translationId: translation.id,
+      text: answerText
+    });
     const activeItem = connection.activeItem;
 
     activeItem.answers[id] = {
@@ -848,7 +779,7 @@ export class WebSocketServer {
       const answer = activeItem.answers[ws.data.id];
 
       if (answer?.answerId) {
-        await sql`UPDATE answers SET challenged = ${challenged} WHERE id = ${answer.answerId}`;
+        await setAnswerChallenged(answer.answerId, challenged);
 
         answer.challenged = challenged;
 
@@ -859,22 +790,10 @@ export class WebSocketServer {
     }
   }
 
-  private async handleUPDATE_RUN_STATUS(
-    connection: EventConnection,
-    status: 'not_started' | 'in_progress' | 'paused' | 'completed'
-  ): Promise<void> {
+  private async handleUPDATE_RUN_STATUS(connection: EventConnection, status: RunStatus): Promise<void> {
     connection.run.status = status;
 
-    if (status === 'not_started') {
-      await sql`DELETE FROM answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ${connection.eventId})`;
-      await sql`UPDATE questions SET locked = false, graded = false WHERE event_id = ${connection.eventId}`;
-    }
-
-    await sql`
-        UPDATE runs
-        SET status = ${status}
-        WHERE event_id = ${connection.eventId}
-      `;
+    await setRunStatus(connection.eventId, status);
 
     const message = JSON.stringify({ type: 'RUN_STATUS', status });
 
@@ -884,11 +803,7 @@ export class WebSocketServer {
   private async handleUPDATE_GRACE_PERIOD(connection: EventConnection, gracePeriod: number): Promise<void> {
     connection.run.gracePeriod = gracePeriod;
 
-    await sql`
-        UPDATE runs
-        SET grace_period = ${gracePeriod}
-        WHERE event_id = ${connection.eventId}
-      `;
+    await setGracePeriod(connection.eventId, gracePeriod);
 
     const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
 
@@ -930,7 +845,7 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    await sql`UPDATE questions SET locked = ${locked} WHERE id = ${questionId}`;
+    await setQuestionLocked(questionId, locked);
 
     const message = JSON.stringify({
       type: 'QUESTION_LOCKED',
@@ -980,7 +895,7 @@ export class WebSocketServer {
   ): Promise<void> {
     const activeItem = connection.activeItem;
 
-    await sql`UPDATE questions SET graded = ${graded} WHERE id = ${questionId}`;
+    await setQuestionGraded(questionId, graded);
 
     const message = JSON.stringify({
       type: 'QUESTION_GRADED',
@@ -1002,14 +917,7 @@ export class WebSocketServer {
     answerId: string,
     points: number | null
   ): Promise<void> {
-    const result: { question_id: string; team_id: string }[] = await sql`
-      UPDATE answers
-      SET points_awarded = ${points}
-      WHERE id = ${answerId}
-      RETURNING question_id, team_id
-    `;
-
-    const answer = result[0];
+    const answer = await setAnswerPoints(answerId, points);
 
     if (!answer) {
       return;

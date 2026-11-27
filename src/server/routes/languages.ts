@@ -1,4 +1,4 @@
-import { querySelectEvent } from '@/server/queries';
+import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
 import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
@@ -23,7 +23,7 @@ export const languagesRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -47,7 +47,7 @@ export const languagesRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -88,7 +88,7 @@ export const languagesRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -127,7 +127,7 @@ export const languagesRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();

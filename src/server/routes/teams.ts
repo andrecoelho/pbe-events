@@ -1,9 +1,11 @@
-import { querySelectEvent } from '@/server/queries';
+import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
 import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
 import type { BunRequest } from 'bun';
 import { sql } from 'bun';
+import { listLanguages } from '@/server/services/languages';
+import { listTeams } from '@/server/services/teams';
 
 interface Team {
   id: string;
@@ -13,12 +15,6 @@ interface Team {
   language_id: string;
   language_name: string;
   created_at: number;
-}
-
-interface Language {
-  id: string;
-  code: string;
-  name: string;
 }
 
 export const teamsRoutes: Routes = {
@@ -31,33 +27,13 @@ export const teamsRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const teams: Team[] = await sql`
-        SELECT
-          t.id,
-          t.name,
-          t.number,
-          t.event_id,
-          t.language_id,
-          l.name as language_name,
-          t.created_at
-        FROM teams t
-        LEFT JOIN languages l ON l.id = t.language_id
-        WHERE t.event_id = ${eventId}
-        ORDER BY t.number
-      `;
-
-      const languages: Language[] = await sql`
-        SELECT id, code, name
-        FROM languages
-        WHERE event_id = ${eventId}
-        ORDER BY code
-      `;
+      const [teams, languages] = await Promise.all([listTeams(eventId), listLanguages(eventId)]);
 
       return apiData({ eventName: event.name, teams, languages });
     },
@@ -70,7 +46,7 @@ export const teamsRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -132,7 +108,7 @@ export const teamsRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -180,7 +156,7 @@ export const teamsRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();

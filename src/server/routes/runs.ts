@@ -1,12 +1,13 @@
-import { querySelectEvent } from '@/server/queries';
+import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import { getQuestionsWithAnswers } from '@/server/utils/getQuestionsWithAnswers';
+import { getQuestionsWithAnswers } from '@/server/services/answers';
+import { getLanguagesByCode } from '@/server/services/languages';
+import { getRun } from '@/server/services/runs';
+import { listSlides } from '@/server/services/slides';
 import { apiData, apiForbidden, apiNotFound, apiServerError, apiUnauthorized } from '@/server/utils/responses';
 import type { WebSocketServer } from '@/server/webSocket';
-import type { ActiveItem } from '@/types';
 import type { BunRequest } from 'bun';
-import { sql } from 'bun';
 
 export function createRunsRoutes(_wsServer: WebSocketServer): Routes {
   return {
@@ -19,53 +20,24 @@ export function createRunsRoutes(_wsServer: WebSocketServer): Routes {
         }
 
         const { eventId } = req.params;
-        const event = await querySelectEvent(eventId, session.user_id);
+        const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
         if (!event) {
           return apiForbidden();
         }
 
         try {
-          // Get run with active_item JSONB
-          const runs: {
-            status: string;
-            grace_period: number;
-            active_item: ActiveItem | null;
-          }[] = await sql`
-            SELECT status, grace_period, active_item
-            FROM runs
-            WHERE event_id = ${eventId}
-          `;
+          const run = await getRun(eventId);
 
-          if (runs.length === 0) {
+          if (!run) {
             return apiNotFound();
           }
 
-          const run = runs[0]!;
-          const questions = await getQuestionsWithAnswers(eventId);
-
-          // Get slides
-          const slides: {
-            id: string;
-            number: number;
-            content: string;
-          }[] = await sql`
-            SELECT id, number, content
-            FROM slides
-            WHERE event_id = ${eventId}
-            ORDER BY number
-          `;
-
-          // Get languages
-          const languages: {
-            id: string;
-            code: string;
-            name: string;
-          }[] = await sql`
-            SELECT id, code, name
-            FROM languages
-            WHERE event_id = ${eventId}
-          `;
+          const [questions, slides, languages] = await Promise.all([
+            getQuestionsWithAnswers(eventId),
+            listSlides(eventId),
+            getLanguagesByCode(eventId)
+          ]);
 
           return apiData({
             eventName: event.name,
@@ -76,12 +48,8 @@ export function createRunsRoutes(_wsServer: WebSocketServer): Routes {
               activeItem: run.active_item
             },
             questions,
-            slides: slides.map((s) => ({
-              id: s.id,
-              number: s.number,
-              content: s.content
-            })),
-            languages: Object.fromEntries(languages.map((l) => [l.code, { id: l.id, code: l.code, name: l.name }]))
+            slides,
+            languages
           });
         } catch (error) {
           console.log('Error fetching run data:', error);

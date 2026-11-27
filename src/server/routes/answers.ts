@@ -1,8 +1,9 @@
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import { getQuestionsWithAnswers } from '@/server/utils/getQuestionsWithAnswers';
+import { getQuestionsWithAnswers } from '@/server/services/answers';
+import { ALL_ROLES, getEventForRoles } from '@/server/services/permissions';
 import { apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import { sql, type BunRequest } from 'bun';
+import type { BunRequest } from 'bun';
 
 export const answersRoutes: Routes = {
   '/api/events/:id/answers': {
@@ -15,14 +16,7 @@ export const answersRoutes: Routes = {
 
       const eventId = req.params.id;
 
-      const result: { id: string; name: string }[] = await sql`
-          SELECT events.id, events.name
-          FROM events
-          JOIN permissions ON events.id = permissions.event_id
-          WHERE permissions.user_id = ${session.user_id} AND events.id = ${eventId} AND permissions.role_id IN ('owner', 'admin', 'judge')
-        `;
-
-      const event = result[0] || null;
+      const event = await getEventForRoles(eventId, session.user_id, ALL_ROLES);
 
       if (!event) {
         return apiForbidden();

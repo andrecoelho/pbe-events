@@ -1,16 +1,16 @@
-import { querySelectEvent } from '@/server/queries';
+import {
+  addPermission,
+  getEventForRoles,
+  listEventPermissions,
+  MANAGER_ROLES,
+  removePermission,
+  type Role,
+  updatePermission
+} from '@/server/services/permissions';
 import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
 import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import { type BunRequest, sql } from 'bun';
-
-interface UserPermission {
-  user_id: string;
-  role_id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-}
+import type { BunRequest } from 'bun';
 
 export const permissionRoutes: Routes = {
   '/api/events/:id/permissions': {
@@ -22,18 +22,13 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const permissions: UserPermission[] = await sql`
-        SELECT permissions.user_id, permissions.role_id, users.email, users.first_name, users.last_name, users.avatar_url
-        FROM permissions
-        JOIN users ON permissions.user_id = users.id
-        WHERE permissions.event_id = ${eventId}
-      `;
+      const permissions = await listEventPermissions(eventId);
 
       return apiData({ eventName: event.name, permissions });
     },
@@ -45,19 +40,19 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: Role };
 
       if (!userId || !roleId) {
         return apiBadRequest('userId and roleId are required');
       }
 
-      await sql`INSERT INTO permissions (user_id, event_id, role_id) VALUES (${userId}, ${eventId}, ${roleId})`;
+      await addPermission(eventId, userId, roleId);
 
       return apiData();
     },
@@ -70,13 +65,13 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
       }
 
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: string };
+      const { userId, roleId } = (await req.json()) as { userId: string; roleId: Role };
 
       if (!userId || !roleId) {
         return apiBadRequest('userId and roleId are required');
@@ -86,7 +81,7 @@ export const permissionRoutes: Routes = {
         return apiBadRequest('Cannot assign owner role');
       }
 
-      await sql`UPDATE permissions SET role_id = ${roleId} WHERE user_id = ${userId} AND event_id = ${eventId}`;
+      await updatePermission(eventId, userId, roleId);
 
       return apiData();
     },
@@ -99,7 +94,7 @@ export const permissionRoutes: Routes = {
       }
 
       const eventId = req.params.id;
-      const event = await querySelectEvent(eventId, session.user_id);
+      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
 
       if (!event) {
         return apiForbidden();
@@ -111,7 +106,7 @@ export const permissionRoutes: Routes = {
         return apiBadRequest('userId is required');
       }
 
-      await sql`DELETE FROM permissions WHERE user_id = ${userId} AND event_id = ${eventId}`;
+      await removePermission(eventId, userId);
 
       return apiData();
     }

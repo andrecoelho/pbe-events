@@ -1,11 +1,10 @@
 import { badRequest, forbidden, middleware, notFound, tooManyRequests, unauthorized } from '@/server/http/route';
 import type { BaseCtx } from '@/server/http/route';
-import { querySelectEventRole, type EventWithRole } from '@/server/queries';
+import { getEventRole, type EventWithRole, type Role } from '@/server/services/permissions';
 import { getSessionUser, type SessionUser } from '@/server/session';
 import type { Session } from '@/server/types';
 import { z } from 'zod';
 
-type Role = EventWithRole['role_id'];
 type AuthCtx = BaseCtx & { session?: Session; user?: SessionUser };
 
 // Loads the session and user once per request, whichever middleware asks first.
@@ -63,7 +62,7 @@ export function eventRole(...args: [...Role[]] | [...Role[], EventRoleOptions]) 
       throw notFound('Event not found');
     }
 
-    const event = await querySelectEventRole(eventId, user.id);
+    const event = await getEventRole(eventId, user.id);
 
     // Same answer whether the event is missing or not theirs, so ids can't be probed.
     if (!event || !roles.includes(event.role_id)) {
