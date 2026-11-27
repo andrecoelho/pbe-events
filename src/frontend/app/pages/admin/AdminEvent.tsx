@@ -1,3 +1,4 @@
+import { eventUrl } from '@/eventUrls';
 import { useAppValt } from '@/frontend/app/appValt';
 import { AdminLayout } from '@/frontend/app/pages/admin/Admin';
 import {
@@ -206,7 +207,7 @@ function EventPage() {
             </button>
           )}
           {canRun && (
-            <a className='btn btn-sm' href={`/run/${event.id}`}>
+            <a className='btn btn-sm' href={eventUrl(event.id, 'run')}>
               Open the Run screen
             </a>
           )}

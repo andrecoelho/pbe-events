@@ -1,3 +1,4 @@
+import { eventUrl } from '@/eventUrls';
 import './EventCard.css';
 
 import { Icon } from '@/frontend/components/Icon';
@@ -84,7 +85,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Permissions'
-              href={`/permissions/${props.event.id}`}
+              href={eventUrl(props.event.id, 'permissions')}
               aria-label={`Permissions for event ${props.event.name}`}
             >
               <Icon name='key' className='text-stone-500 hover:brightness-0' />
@@ -92,7 +93,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Intro Slides'
-              href={`/slides/${props.event.id}`}
+              href={eventUrl(props.event.id, 'slides')}
               aria-label={`Intro slides for event ${props.event.name}`}
             >
               <Icon name='chat-bubble-bottom-center-text' className='text-emerald-600 hover:brightness-75' />
@@ -100,7 +101,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Languages'
-              href={`/languages/${props.event.id}`}
+              href={eventUrl(props.event.id, 'languages')}
               aria-label={`Languages for event ${props.event.name}`}
             >
               <Icon name='language' className='text-lime-500 hover:brightness-75' />
@@ -108,7 +109,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Questions'
-              href={`/questions/${props.event.id}`}
+              href={eventUrl(props.event.id, 'questions')}
               aria-label={`Questions for event ${props.event.name}`}
             >
               <Icon name='light-bulb' className='text-yellow-500 hover:brightness-75' />
@@ -116,7 +117,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Teams'
-              href={`/teams/${props.event.id}`}
+              href={eventUrl(props.event.id, 'teams')}
               aria-label={`Teams for event ${props.event.name}`}
             >
               <Icon name='user-group' className='text-purple-500 hover:brightness-75' />
@@ -152,7 +153,7 @@ export const EventCard = memo((props: Props) => {
             <a
               className='tooltip tooltip-neutral'
               data-tip='Run Event'
-              href={`/run/${props.event.id}`}
+              href={eventUrl(props.event.id, 'run')}
               aria-label={`Run event ${props.event.name}`}
             >
               <Icon name='play-circle' className='text-lime-600 hover:brightness-75' />
@@ -173,7 +174,7 @@ export const EventCard = memo((props: Props) => {
               className='tooltip tooltip-neutral'
               data-tip='Grade'
               aria-label={`Grade event ${props.event.name}`}
-              href={`/grade/${props.event.id}`}
+              href={eventUrl(props.event.id, 'grade')}
             >
               <Icon name='scale' className='text-amber-600 hover:brightness-75' />
             </a>
@@ -193,7 +194,7 @@ export const EventCard = memo((props: Props) => {
               className='tooltip tooltip-neutral'
               data-tip='Results'
               aria-label={`Results for event ${props.event.name}`}
-              href={`/results/${props.event.id}`}
+              href={eventUrl(props.event.id, 'results')}
             >
               <Icon name='chart-bar' className='text-cyan-600 hover:brightness-75' />
             </a>

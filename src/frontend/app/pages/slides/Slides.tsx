@@ -1,3 +1,4 @@
+import { eventIdFromPath } from '@/eventUrls';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
@@ -10,8 +11,7 @@ import { SlidesValt } from './slidesValt';
 const init = () => {
   const valt = new SlidesValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/slides\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     valt.init(eventId).then((result) => {

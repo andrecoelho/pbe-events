@@ -1,3 +1,4 @@
+import { eventIdFromPath, eventUrl } from '@/eventUrls';
 import { GradeValt } from '@/frontend/app/pages/grade/gradeValt';
 import { Icon } from '@/frontend/components/Icon';
 import { useEffect, useMemo } from 'react';
@@ -7,8 +8,7 @@ import { toast } from '@/frontend/components/Toast';
 
 const init = () => {
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/grade\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
   const gradeValt = new GradeValt();
 
   if (eventId) {
@@ -199,7 +199,7 @@ export const Grade = () => {
                 <p className='text-neutral-500 text-lg mb-4'>
                   There are no questions in this event. Please add questions before grading.
                 </p>
-                <a href={`/questions/${snap.eventId}`} className='btn btn-primary'>
+                <a href={eventUrl(snap.eventId, 'questions')} className='btn btn-primary'>
                   <Icon name='light-bulb' className='size-4' />
                   Configure Questions
                 </a>

@@ -16,6 +16,13 @@ export const eventsRoutes: Routes = {
   },
 
   '/api/events/:id': {
+    // The event's name and the user's role on it, for the event workspace's menu (#15).
+    GET: route(eventRole('owner', 'admin', 'judge'), async ({ event }) => ({
+      id: event.id,
+      name: event.name,
+      roleId: event.role_id
+    })),
+
     PATCH: route(eventRole('owner', 'admin'), json(EventName), async ({ event, body }) => {
       await renameEvent(event.id, body.name);
       return { id: event.id, name: body.name };

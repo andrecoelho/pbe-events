@@ -1,3 +1,4 @@
+import { eventIdFromPath } from '@/eventUrls';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import { ResultsValt, ResultsValtContext, useResultsValt } from './resultsValt';
@@ -14,8 +15,7 @@ const ResultsContent = () => {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    const match = url.pathname.match(/^\/results\/([^/]+)$/);
-    const eventId = match ? match[1] : undefined;
+    const eventId = eventIdFromPath(url.pathname);
 
     if (eventId && !snap.initialized) {
       valt.init(eventId).then((result) => {

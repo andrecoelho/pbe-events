@@ -1,5 +1,6 @@
 import './validate-app-data';
 
+import { movedEventUrl } from '@/eventUrls';
 import app from '@/frontend/app/app.html';
 import login from '@/frontend/login/login.html';
 import presenter from '@/frontend/presenter/presenter.html';
@@ -80,6 +81,13 @@ const server = Bun.serve({
     // The team screen, and the pages where a team joins with its code (/join, /join/K7P4QX).
     if (url.pathname === '/event-run/team' || url.pathname === '/join' || url.pathname.startsWith('/join/')) {
       return await fetch(`${server.url}${teamNounce}`);
+    }
+
+    // Event pages moved under /events/:id/<section> (#15); old links and bookmarks still work.
+    const movedTo = movedEventUrl(url.pathname);
+
+    if (movedTo) {
+      return Response.redirect(`${movedTo}${url.search}`, 302);
     }
 
     // Setting a new password with a reset link (#58) works signed in or not.

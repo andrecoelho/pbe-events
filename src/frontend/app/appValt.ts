@@ -14,16 +14,30 @@ interface User {
   isEventAdmin: boolean;
 }
 
+export type EventRoleId = 'owner' | 'admin' | 'judge';
+
+// The event whose workspace is open (#15), kept across its sections so the menu doesn't flicker.
+export interface CurrentEvent {
+  id: string;
+  name: string;
+  roleId: EventRoleId;
+}
+
 interface AppStore {
   init: boolean;
   user: User;
+  currentEvent: CurrentEvent | null;
+  // Why an event couldn't be loaded (no access, or no connection).
+  currentEventError: { eventId: string; message: string } | null;
 }
 
 export class AppValt {
   store: AppStore;
+  // The event loadEvent() was last asked for, so an older answer can't replace a newer one.
+  private requestedEventId: string | null = null;
 
   constructor() {
-    this.store = proxy({ init: false } as AppStore);
+    this.store = proxy({ init: false, currentEvent: null, currentEventError: null } as unknown as AppStore);
   }
 
   async init() {
@@ -32,6 +46,32 @@ export class AppValt {
     if (result.ok) {
       this.store.user = result.data.user;
       this.store.init = true;
+    }
+  }
+
+  // Loads the event's name and the user's role on it. Keeps showing the event already loaded while it refreshes.
+  async loadEvent(eventId: string) {
+    if (this.store.currentEvent?.id !== eventId) {
+      this.store.currentEvent = null;
+    }
+
+    this.store.currentEventError = null;
+    this.requestedEventId = eventId;
+
+    const result = await api<CurrentEvent>(`/api/events/${eventId}`);
+
+    if (this.requestedEventId !== eventId) {
+      return;
+    }
+
+    if (result.ok) {
+      this.store.currentEvent = result.data;
+    } else {
+      this.store.currentEvent = null;
+      this.store.currentEventError = {
+        eventId,
+        message: result.status === 403 ? 'You don’t have access to this event.' : result.error
+      };
     }
   }
 

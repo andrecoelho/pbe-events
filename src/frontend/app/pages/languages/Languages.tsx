@@ -1,3 +1,4 @@
+import { eventIdFromPath } from '@/eventUrls';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { useMemo, useState } from 'react';
@@ -9,8 +10,7 @@ import { LanguagesValt } from './languagesValt';
 const init = () => {
   const valt = new LanguagesValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/languages\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     valt.init(eventId).then((result) => {

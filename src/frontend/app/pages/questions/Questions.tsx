@@ -1,3 +1,4 @@
+import { eventIdFromPath, eventUrl } from '@/eventUrls';
 import { reportFailure } from '@/frontend/utils/api';
 import { alertModal } from '@/frontend/components/AlertModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
@@ -14,8 +15,7 @@ import { QuestionsValt, QuestionsValtContext, type ImportOptions } from './quest
 const init = () => {
   const valt = new QuestionsValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/questions\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     valt.init(eventId).then((result) => {
@@ -100,7 +100,7 @@ export const Questions = memo(() => {
                 <p className='text-neutral-500 text-lg mb-4'>
                   No languages configured for this event. Please add languages before creating questions.
                 </p>
-                <a href={`/languages/${snap.eventId}`} className='btn btn-primary'>
+                <a href={eventUrl(snap.eventId, 'languages')} className='btn btn-primary'>
                   <Icon name='language' className='size-4' />
                   Configure Languages
                 </a>

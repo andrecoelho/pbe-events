@@ -1,3 +1,4 @@
+import { eventIdFromPath, eventUrl } from '@/eventUrls';
 import type { TeamStatus } from '@/frontend/app/pages/runs/runValt';
 import { RunValt, RunValtContext } from '@/frontend/app/pages/runs/runValt';
 import { TeamMenu } from '@/frontend/app/pages/runs/TeamMenu';
@@ -21,8 +22,7 @@ const formatTeamNumber = (value: number) => value.toString().padStart(2, '0');
 const init = () => {
   const valt = new RunValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/run\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     valt.init(eventId).then((result) => {
@@ -190,7 +190,7 @@ export const Run = () => {
               {Object.keys(snap.languages).length === 0 ? (
                 <span>
                   This event has no languages or questions yet, so there’s nothing to run. Start by{' '}
-                  <a className='link' href={`/languages/${snap.eventId}`}>
+                  <a className='link' href={eventUrl(snap.eventId, 'languages')}>
                     adding a language
                   </a>
                   .
@@ -198,7 +198,7 @@ export const Run = () => {
               ) : (
                 <span>
                   This event has no questions yet, so there’s nothing to run.{' '}
-                  <a className='link' href={`/questions/${snap.eventId}`}>
+                  <a className='link' href={eventUrl(snap.eventId, 'questions')}>
                     Add questions
                   </a>{' '}
                   first.

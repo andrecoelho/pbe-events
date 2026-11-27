@@ -1,3 +1,4 @@
+import { eventIdFromPath } from '@/eventUrls';
 import { Avatar } from '@/frontend/components/Avatar';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
@@ -12,8 +13,7 @@ import { PermissionsValt } from './permissionsValt';
 const init = () => {
   const permissionsValt = new PermissionsValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/permissions\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     permissionsValt.init(eventId).then((result) => {

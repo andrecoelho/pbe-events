@@ -1,3 +1,4 @@
+import { eventIdFromPath, eventUrl } from '@/eventUrls';
 import { formatJoinCode } from '@/joinCode';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
@@ -11,8 +12,7 @@ import { TeamsValt, type Team } from './teamsValt';
 const init = () => {
   const valt = new TeamsValt();
   const url = new URL(window.location.href);
-  const match = url.pathname.match(/^\/teams\/([^/]+)$/);
-  const eventId = match ? match[1] : undefined;
+  const eventId = eventIdFromPath(url.pathname);
 
   if (eventId) {
     valt.init(eventId).then((result) => {
@@ -77,7 +77,7 @@ export function Teams() {
               <p className='text-neutral-500 text-lg mb-4'>
                 No languages configured for this event. Please add languages before adding teams.
               </p>
-              <a href={`/languages/${snap.eventId}`} className='btn btn-primary'>
+              <a href={eventUrl(snap.eventId, 'languages')} className='btn btn-primary'>
                 <Icon name='language' className='size-4' />
                 Configure Languages
               </a>

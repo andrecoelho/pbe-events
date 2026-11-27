@@ -10,6 +10,8 @@ import { Users } from '@/frontend/app/pages/admin/Users';
 import { LiveConnections } from '@/frontend/app/pages/admin/LiveConnections';
 import { AppValt, AppValtContext } from '@/frontend/app/appValt';
 import { NavBar } from '@/frontend/app/NavBar';
+import { EventHome } from '@/frontend/app/pages/event/EventHome';
+import { inEventLayout } from '@/frontend/app/pages/event/EventLayout';
 import { Events } from '@/frontend/app/pages/events/Events';
 import { Grade } from '@/frontend/app/pages/grade/Grade';
 import { Languages } from '@/frontend/app/pages/languages/Languages';
@@ -27,15 +29,17 @@ import { useMemo, type ElementType } from 'react';
 import { useSnapshot } from 'valtio';
 
 const routes: Routes = new Map([
-  [/^\/permissions/, Permissions],
-  [/^\/teams/, Teams],
-  [/^\/languages/, Languages],
-  [/^\/questions/, Questions],
-  [/^\/slides/, Slides],
-  [/^\/run/, Run],
+  // The event workspace (#15): each section has its own route, so moving between them re-renders.
+  [/^\/events\/[^/]+\/languages\/?$/, inEventLayout('languages', Languages)],
+  [/^\/events\/[^/]+\/questions\/?$/, inEventLayout('questions', Questions)],
+  [/^\/events\/[^/]+\/teams\/?$/, inEventLayout('teams', Teams)],
+  [/^\/events\/[^/]+\/slides\/?$/, inEventLayout('slides', Slides)],
+  [/^\/events\/[^/]+\/permissions\/?$/, inEventLayout('permissions', Permissions)],
+  [/^\/events\/[^/]+\/run\/?$/, inEventLayout('run', Run)],
+  [/^\/events\/[^/]+\/grade\/?$/, inEventLayout('grade', Grade)],
+  [/^\/events\/[^/]+\/results\/?$/, inEventLayout('results', Results)],
+  [/^\/events\/[^/]+\/?$/, EventHome],
   [/^\/settings/, Settings],
-  [/^\/grade/, Grade],
-  [/^\/results/, Results],
   [/^\/admin\/events\/[^/]+/, AdminEvent],
   [/^\/admin\/events\/?$/, AdminEvents],
   [/^\/admin\/audit-log/, AuditLog],
