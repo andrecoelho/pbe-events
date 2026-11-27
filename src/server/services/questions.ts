@@ -318,10 +318,11 @@ export async function replaceQuestions(
   });
 }
 
-// The event's languages and questions in the YAML file's shape.
+// The event's languages and questions in the YAML file's shape. Languages, and each question's translations,
+// are in language code order, so exporting the same event gives the same file.
 export async function getQuestionsForExport(eventId: string) {
   const languages: { id: string; code: string; name: string }[] = await sql`
-    SELECT id, code, name FROM languages WHERE event_id = ${eventId}
+    SELECT id, code, name FROM languages WHERE event_id = ${eventId} ORDER BY code
   `;
   const questions: Question[] = await sql`
     SELECT id, number, type, max_points, seconds, event_id FROM questions WHERE event_id = ${eventId} ORDER BY number
@@ -330,8 +331,9 @@ export async function getQuestionsForExport(eventId: string) {
     SELECT t.id, t.prompt, t.answer, t.clarification, t.language_id, t.question_id
     FROM translations t
     JOIN questions q ON q.id = t.question_id
+    JOIN languages l ON l.id = t.language_id
     WHERE q.event_id = ${eventId}
-    ORDER BY t.language_id ASC
+    ORDER BY l.code
   `;
 
   const codes = new Map(languages.map((language) => [language.id, language.code]));

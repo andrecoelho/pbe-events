@@ -2,7 +2,7 @@
 // (`mise run db`); CI has none, so it skips there. Each test builds its own throwaway event.
 import { HttpError } from '@/server/http/route';
 import type { LanguageDefinition, QuestionImport } from '@/server/questionsFile';
-import { replaceQuestions } from '@/server/services/questions';
+import { getQuestionsForExport, replaceQuestions } from '@/server/services/questions';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'bun';
 
@@ -187,5 +187,20 @@ describe.skipIf(!isLocalDatabase())('replaceQuestions with teams', () => {
     const error = await rejection(replaceQuestions(eventId, [english], questionsIn([english])));
 
     expect(error.details).toMatchObject({ missingLanguages: [{ code: 'es', teamCount: 1 }], answerCount: 1 });
+  });
+});
+
+describe.skipIf(!isLocalDatabase())('getQuestionsForExport', () => {
+  test('lists languages and translations in language code order, whatever order they were added in', async () => {
+    const eventId = `test-export-${Bun.randomUUIDv7()}`;
+    events.push(eventId);
+
+    await sql`INSERT INTO events (id, name) VALUES (${eventId}, 'Export test')`;
+    await replaceQuestions(eventId, [spanish, english], questionsIn([spanish, english]));
+
+    const exported = await getQuestionsForExport(eventId);
+
+    expect(exported.languages.map((language) => language.code)).toEqual(['en', 'es']);
+    expect(exported.questions[0]!.translations.map((translation) => translation.lang)).toEqual(['en', 'es']);
   });
 });
