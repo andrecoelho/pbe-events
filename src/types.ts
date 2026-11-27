@@ -76,6 +76,10 @@ export const SESSION_ENDED_CLOSE_CODE = 4001;
 // #30). The replaced page stops reconnecting, so two tabs don't keep taking the team from each other.
 export const TEAM_REPLACED_CLOSE_CODE = 4003;
 
+// WebSocket close code for every socket of an event an admin reset in memory (#57). Pages reconnect as after
+// a deploy, and the event's state is read again from the database.
+export const EVENT_RESET_CLOSE_CODE = 4004;
+
 // ---------------------------------------------------------------------------------------------------------
 // Live run WebSocket messages (#55), shared so the server and the pages can't drift apart.
 // docs/WEBSOCKET_ARCHITECTURE.md describes when each is sent.

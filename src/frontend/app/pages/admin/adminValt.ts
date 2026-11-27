@@ -1,4 +1,4 @@
-import { api } from '@/frontend/utils/api';
+import { api, type Outcome } from '@/frontend/utils/api';
 import type { AdminEventResponse, LiveConnectionsResponse } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
@@ -45,6 +45,24 @@ export class AdminValt {
   loadConnections = () => this.load('connections', '/api/admin/connections');
 
   loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
+
+  // Drops the event's in-memory state; its pages reconnect and reload it (#57).
+  async resetEvent(eventId: string): Promise<Outcome> {
+    const result = await api(`/api/admin/events/${eventId}/reset`, { method: 'POST' });
+
+    await this.loadEvent(eventId);
+
+    return result.ok ? { ok: true } : result;
+  }
+
+  // Frees the team for another device (#57).
+  async releaseDevice(eventId: string, teamId: string): Promise<Outcome> {
+    const result = await api(`/api/admin/events/${eventId}/teams/${teamId}/release`, { method: 'POST' });
+
+    await this.loadEvent(eventId);
+
+    return result.ok ? { ok: true } : result;
+  }
 
   // Calls `load` now and every few seconds while the tab is visible. Returns the cleanup, for useEffect.
   poll(load: () => Promise<void>) {

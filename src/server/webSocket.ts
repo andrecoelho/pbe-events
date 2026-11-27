@@ -18,7 +18,7 @@ import {
 } from '@/server/services/teams';
 import { getCookie } from '@/server/utils/cookies';
 import { getLiveSessionIds, onSessionEnded } from '@/server/session';
-import { SESSION_ENDED_CLOSE_CODE, TEAM_REPLACED_CLOSE_CODE } from '@/types';
+import { EVENT_RESET_CLOSE_CODE, SESSION_ENDED_CLOSE_CODE, TEAM_REPLACED_CLOSE_CODE } from '@/types';
 import {
   HostMessage,
   JudgeMessage,
@@ -511,7 +511,7 @@ export class WebSocketServer {
         this.sendGracePeriod(ws, connection);
 
         this.markTeamSeen(eventId, id);
-        clearTimeout(this.teamOfflineTimers.get(`${eventId}:${id}`));
+        this.clearOfflineTimer(`${eventId}:${id}`);
 
         this.server?.publish(
           `${eventId}:hosts`,
@@ -558,41 +558,59 @@ export class WebSocketServer {
       return;
     }
 
-    if (role === 'team') {
-      const { id, number } = ws.data;
-
-      // A socket the same device replaced (a reload) closes after its replacement took over: leave that alone.
-      if (connection.teams.get(id) === ws) {
-        connection.teams.delete(id);
-        this.markTeamSeen(eventId, id);
-
-        // A released device won't come back; any other is retrying, so it's reconnecting for a while.
-        const status: TeamConnectionStatus = ws.data.released ? 'offline' : 'reconnecting';
-
-        this.publishTeamConnection(eventId, id, number, status);
-
-        if (status === 'reconnecting') {
-          const key = `${eventId}:${id}`;
-
-          clearTimeout(this.teamOfflineTimers.get(key));
-          this.teamOfflineTimers.set(
-            key,
-            setTimeout(() => {
-              this.teamOfflineTimers.delete(key);
-
-              if (!this.eventConnections.get(eventId)?.teams.has(id)) {
-                this.publishTeamConnection(eventId, id, number, 'offline');
-              }
-            }, RECONNECTING_MS)
-          );
-        }
-
-        console.log(`Team ${number} disconnected for event`, eventId, id);
+    // A socket the same device replaced (a reload) closes after its replacement took over: leave that alone.
+    if (this.isTeamWebSocket(ws)) {
+      if (connection.teams.get(ws.data.id) === ws) {
+        this.teamDisconnected(connection, ws);
       }
     }
 
     this.cleanUpEventConnection(eventId);
   };
+
+  // Stops a team's reconnecting → offline timer. Its key must go too: a key left behind makes the team look
+  // reconnecting (teamConnection). True when there was one.
+  private clearOfflineTimer(key: string) {
+    const timer = this.teamOfflineTimers.get(key);
+
+    clearTimeout(timer);
+    this.teamOfflineTimers.delete(key);
+
+    return timer !== undefined;
+  }
+
+  // The team's socket is going away: it's reconnecting for a while (its page keeps retrying), or offline when
+  // its device was released.
+  private teamDisconnected(connection: EventConnection, ws: ServerWebSocket<TeamWebsocketData>) {
+    const { eventId } = connection;
+    const { id, number } = ws.data;
+
+    connection.teams.delete(id);
+    this.markTeamSeen(eventId, id);
+
+    const status: TeamConnectionStatus = ws.data.released ? 'offline' : 'reconnecting';
+
+    this.publishTeamConnection(eventId, id, number, status);
+
+    const key = `${eventId}:${id}`;
+
+    this.clearOfflineTimer(key);
+
+    if (status === 'reconnecting') {
+      this.teamOfflineTimers.set(
+        key,
+        setTimeout(() => {
+          this.teamOfflineTimers.delete(key);
+
+          if (!this.eventConnections.get(eventId)?.teams.has(id)) {
+            this.publishTeamConnection(eventId, id, number, 'offline');
+          }
+        }, RECONNECTING_MS)
+      );
+    }
+
+    console.log(`Team ${number} disconnected for event`, eventId, id);
+  }
 
   // Called when a WebSocket message is received
   // Called when a WebSocket message is received. An event's messages are handled one at a time, in the order
@@ -1098,42 +1116,72 @@ export class WebSocketServer {
 
   // Frees the team for another device (#44): the device that held it is told and disconnected.
   private async handleRELEASE_TEAM_DEVICE(connection: EventConnection, teamId: string): Promise<MessageResult | void> {
-    if (!(await releaseTeamDevice(connection.eventId, teamId))) {
+    if (!(await this.releaseDevice(connection.eventId, teamId))) {
       return refused('That team isn’t in this event.');
     }
+  }
 
-    const teamWs = connection.teams.get(teamId);
+  // Frees the team for another device: its device's token stops working and its socket, if any, closes (#44).
+  // Also used by the admin page (#57), so the event needn't be open. False when the event has no such team.
+  async releaseDevice(eventId: string, teamId: string): Promise<boolean> {
+    if (!(await releaseTeamDevice(eventId, teamId))) {
+      return false;
+    }
+
+    const teamWs = this.eventConnections.get(eventId)?.teams.get(teamId);
 
     if (teamWs) {
       teamWs.send(
         encode({
           type: 'CONNECTION_ERROR',
           code: 'RELEASED',
-          message: 'The host released this device from the team. To join again, use your team’s code.'
+          message: 'This device was released from the team. To join again, use your team’s code.'
         })
       );
       teamWs.data.released = true;
       teamWs.close();
     } else {
       // Already disconnected: it won't be back on that device, so it's offline now rather than reconnecting.
-      const key = `${connection.eventId}:${teamId}`;
+      const key = `${eventId}:${teamId}`;
 
-      if (this.teamOfflineTimers.has(key)) {
-        clearTimeout(this.teamOfflineTimers.get(key));
-        this.teamOfflineTimers.delete(key);
-
-        const team = await getTeam(connection.eventId, teamId);
+      if (this.clearOfflineTimer(key)) {
+        const team = await getTeam(eventId, teamId);
 
         if (team) {
-          this.publishTeamConnection(connection.eventId, teamId, team.number, 'offline');
+          this.publishTeamConnection(eventId, teamId, team.number, 'offline');
         }
       }
     }
 
     this.server?.publish(
-      `${connection.eventId}:hosts`,
+      `${eventId}:hosts`,
       encode({ type: 'TEAM_STATUS', teams: [{ id: teamId, hasDevice: false }] })
     );
+
+    return true;
+  }
+
+  // Drops the event's state from memory and closes its sockets (#57). The pages reconnect, which sets the event
+  // up again from the database, as after a restart. False when the event isn't open.
+  resetEvent(eventId: string): boolean {
+    const connection = this.eventConnections.get(eventId);
+
+    if (!connection) {
+      return false;
+    }
+
+    console.log('Resetting event connection:', eventId);
+    this.clearTimer(connection);
+    // Their sockets close after the event is gone, so mark the teams as reconnecting here.
+    [...connection.teams.values()].forEach((ws) => this.teamDisconnected(connection, ws));
+    this.eventConnections.delete(eventId);
+
+    const sockets = [...(this.eventSockets.get(eventId) ?? [])];
+
+    this.eventSockets.delete(eventId);
+    sockets.forEach((ws) => ws.close(EVENT_RESET_CLOSE_CODE, 'The event was reset'));
+
+    return true;
   }
 
   // A new join code for the team (#44): the old code and link stop working; its device stays connected.

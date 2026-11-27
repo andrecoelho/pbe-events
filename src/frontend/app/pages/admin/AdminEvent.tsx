@@ -8,6 +8,8 @@ import {
   TEAM_STATUS
 } from '@/frontend/app/pages/admin/adminFormat';
 import { useAdminValt } from '@/frontend/app/pages/admin/adminValt';
+import { confirmModal } from '@/frontend/components/ConfirmModal';
+import { toast } from '@/frontend/components/Toast';
 import { useEffect } from 'react';
 import { useSnapshot } from 'valtio';
 
@@ -39,6 +41,42 @@ function EventPage() {
   }
 
   const { event, live, teams, serverTime } = snap.data;
+
+  const handleReset = async () => {
+    const confirmed = await confirmModal.open(
+      `Reset “${event.name}” in memory? Every open screen of this event (run, presenter, judges, results and ` +
+        'teams) disconnects for a moment and reconnects, and the event is read again from the database. ' +
+        'Answers and grades already saved are kept.'
+    );
+
+    if (confirmed) {
+      const result = await valt.resetEvent(event.id);
+
+      toast.show(
+        result.ok
+          ? { type: 'success', message: 'Event reset. Its screens are reconnecting.' }
+          : { type: 'error', message: `Couldn’t reset the event. ${result.error}` }
+      );
+    }
+  };
+
+  const handleRelease = async (team: { id: string; number: number; name: string; status: string }) => {
+    const confirmed = await confirmModal.open(
+      `Release team ${team.number} (${team.name}) from its device? ` +
+        (team.status === 'connected' ? 'That device disconnects right away. ' : '') +
+        'The team can join again on any device with its code.'
+    );
+
+    if (confirmed) {
+      const result = await valt.releaseDevice(event.id, team.id);
+
+      toast.show(
+        result.ok
+          ? { type: 'success', message: `Team ${team.number} released.` }
+          : { type: 'error', message: `Couldn’t release the team. ${result.error}` }
+      );
+    }
+  };
   const connectedTeams = teams.filter((team) => team.status === 'connected').length;
 
   return (
@@ -52,6 +90,15 @@ function EventPage() {
           {live && <span className={`badge ${RUN_STATUS[live.runStatus][1]}`}>{RUN_STATUS[live.runStatus][0]}</span>}
           {live?.activeItem && <span className='text-base-content/70'>{live.activeItem}</span>}
           <span className='flex-1' />
+          {live && (
+            <button
+              className='btn btn-sm btn-warning tooltip tooltip-bottom'
+              data-tip='Reconnects every screen and reloads the event from the database'
+              onClick={handleReset}
+            >
+              Reset in memory
+            </button>
+          )}
           <a className='btn btn-sm' href={`/run/${event.id}`}>
             Open the Run screen
           </a>
@@ -123,6 +170,7 @@ function EventPage() {
                   <th>Device</th>
                   <th>Connected for</th>
                   <th>Last message</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -144,6 +192,13 @@ function EventPage() {
                       <td>{team.hasDevice ? 'Joined' : <span className='text-base-content/60'>No device</span>}</td>
                       <td>{team.connectedAt === null ? '—' : formatDuration(serverTime - team.connectedAt)}</td>
                       <td>{team.status === 'connected' ? formatAgo(serverTime, team.lastMessageAt) : '—'}</td>
+                      <td className='text-right'>
+                        {team.hasDevice && (
+                          <button className='btn btn-xs' onClick={() => handleRelease(team)}>
+                            Release device
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

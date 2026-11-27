@@ -1,6 +1,6 @@
 // The admin page's API (Phase 3). Super admins only.
 import { superAdmin } from '@/server/http/middleware';
-import { notFound, route } from '@/server/http/route';
+import { badRequest, notFound, route } from '@/server/http/route';
 import { getEventName } from '@/server/services/events';
 import { countTeams, listTeams } from '@/server/services/teams';
 import { getUsersByIds } from '@/server/services/users';
@@ -138,6 +138,33 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
             };
           })
         };
+      })
+    },
+
+    // Drops the event's in-memory state and closes its sockets; the pages reconnect and reload it (#57).
+    '/api/admin/events/:id/reset': {
+      POST: route(superAdmin(), async ({ params: { id = '' }, user }) => {
+        if (!wsServer.resetEvent(id)) {
+          throw badRequest('This event isn’t open in the server’s memory, so there’s nothing to reset.');
+        }
+
+        // Until the audit log (#61).
+        console.log(`Admin ${user.email} reset event ${id} in memory`);
+
+        return {};
+      })
+    },
+
+    // Frees a team for another device, as the host's Release device does (#57).
+    '/api/admin/events/:id/teams/:teamId/release': {
+      POST: route(superAdmin(), async ({ params: { id = '', teamId = '' }, user }) => {
+        if (!(await wsServer.releaseDevice(id, teamId))) {
+          throw notFound('Team not found');
+        }
+
+        console.log(`Admin ${user.email} released the device of team ${teamId} in event ${id}`);
+
+        return {};
       })
     }
   };
