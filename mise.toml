@@ -31,25 +31,8 @@ run = "railway connect postgres --environment production --tunnel-only --port 15
 
 [tasks."dev:staging"]
 description = "Start the dev server against the staging database (opens and closes the tunnel itself)"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-port=15432
+run = ["bun install", "scripts/with-staging-db.sh bun dev"]
 
-if ! nc -z localhost "$port" 2>/dev/null; then
-  railway connect postgres --environment staging --tunnel-only --port "$port" >/dev/null 2>&1 &
-  tunnel=$!
-  # railway starts an ssh child; stop both when the dev server exits.
-  trap 'pkill -P "$tunnel" 2>/dev/null; kill "$tunnel" 2>/dev/null' EXIT
-  echo "Opening tunnel to staging Postgres on localhost:$port..."
-  for _ in $(seq 1 60); do nc -z localhost "$port" 2>/dev/null && break; sleep 0.5; done
-  nc -z localhost "$port" || { echo "Tunnel did not open; run 'mise run db:tunnel' to see the error." >&2; exit 1; }
-fi
-
-# Build the URL from staging's Postgres variables without printing it.
-url=$(railway variables --environment staging --service postgres --json \
-  | bun -e "const v = await Bun.stdin.json(); console.log('postgres://' + encodeURIComponent(v.PGUSER) + ':' + encodeURIComponent(v.PGPASSWORD) + '@localhost:$port/' + v.PGDATABASE)")
-
-bun install
-POSTGRES_URL="$url" bun dev
-'''
+[tasks."db:seed:staging"]
+description = "Add (or refresh) the demo user and event on the STAGING database; password from SEED_DEMO_PASSWORD"
+run = "scripts/with-staging-db.sh bun scripts/seed.ts --staging"

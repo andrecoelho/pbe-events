@@ -1,17 +1,26 @@
 // Adds a demo user and a demo event to the local database, for trying the app, doc screenshots and browser tests.
-// Run with `bun run db:seed` (after `bun run migrate` or `bun run db:reset`). Local databases only.
+// Run with `bun run db:seed` (after `bun run migrate` or `bun run db:reset`) on a local database,
+// or `mise run db:seed:staging` on staging. Never production.
 // Running it again replaces the demo user and event with fresh copies; nothing else is touched.
 //
-// Demo sign-in (test values for local development only):
+// Demo sign-in:
 //   email:    demo@example.com
-//   password: demo-password
+//   password: demo-password locally (a test value for local development only);
+//             on staging, SEED_DEMO_PASSWORD from your .env, so the password isn't public.
 import { sql } from 'bun';
-import { requireLocalDatabase } from './local-db';
+import { requireLocalDatabase, requireStagingTunnel } from './local-db';
 
 export const DEMO_EMAIL = 'demo@example.com';
 export const DEMO_PASSWORD = 'demo-password';
 
-const target = requireLocalDatabase('db:seed');
+const staging = process.argv.includes('--staging');
+const target = staging ? requireStagingTunnel('db:seed') : requireLocalDatabase('db:seed');
+const password = staging ? process.env.SEED_DEMO_PASSWORD : DEMO_PASSWORD;
+
+if (!password) {
+  console.error('Set SEED_DEMO_PASSWORD in your .env first: the staging demo password stays out of the repo.');
+  process.exit(1);
+}
 
 const userId = 'seed-user-demo';
 const eventId = 'seed-event-demo';
@@ -99,7 +108,15 @@ const slides = [
   '## Rules\n\n- Answer before the timer runs out\n- One answer per team'
 ];
 
-const passwordHash = await Bun.password.hash(DEMO_PASSWORD);
+const passwordHash = await Bun.password.hash(password);
+
+// Don't take over a real account that happens to use the demo email.
+const [existing] = await sql`SELECT id FROM users WHERE email = ${DEMO_EMAIL} AND id <> ${userId}`;
+
+if (existing && staging) {
+  console.error(`${DEMO_EMAIL} is already a real account on staging; not replacing it.`);
+  process.exit(1);
+}
 
 await sql.begin(async (tx) => {
   // Replace any earlier copy. Deleting the event cascades to everything in it.

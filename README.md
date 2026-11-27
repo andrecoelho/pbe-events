@@ -22,10 +22,10 @@ The schema lives in `migrations/`, applied in name order and recorded in the `sc
 ```bash
 bun run migrate     # apply pending migrations to the database in POSTGRES_URL
 bun run db:reset    # local only: delete everything and rebuild from migrations (asks first)
-bun run db:seed     # local only: add (or refresh) a demo user and event
+bun run db:seed     # add (or refresh) a demo user and event locally
 ```
 
-The demo event has English and Spanish, one question of each type, three teams and two slides. Sign in as `demo@example.com` / `demo-password` (local test values; see `scripts/seed.ts`). `db:reset` and `db:seed` refuse anything but a local database, including the staging and production tunnels.
+The demo event has English and Spanish, one question of each type, three teams and two slides. Sign in as `demo@example.com` / `demo-password` (local test values; see `scripts/seed.ts`). `db:reset` and `db:seed` refuse anything but a local database, including the staging and production tunnels; staging has its own task below, and production is never seeded.
 
 ### Using the staging database
 
@@ -34,11 +34,14 @@ The staging Postgres has no public address. With the [Railway CLI](https://docs.
 ```bash
 mise run dev:staging   # dev server against staging (opens and closes an SSH tunnel itself)
 mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like Beekeeper
+mise run db:seed:staging   # add (or refresh) the demo user and event on staging
 ```
 
 These only ever connect to **staging**, never production. Each tunnel stays open until you stop it (Ctrl+C) or close its terminal.
 
 For production, `mise run db:tunnel:prod` opens a tunnel on localhost:15433, a different port so a saved connection can't point at the wrong database. It's for looking at data in a DB tool; nothing in the app or its scripts uses it.
+
+On staging the demo password comes from `SEED_DEMO_PASSWORD` in your `.env` (see `.env.example`), not the repo, since the repo is public. The seed won't replace a real staging account that uses the demo email.
 
 `dev:staging` doesn't apply migrations, so a branch's unmerged migration never reaches staging's database; staging gets them when it deploys.
 

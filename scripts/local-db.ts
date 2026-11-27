@@ -16,3 +16,18 @@ export function requireLocalDatabase(script: string) {
 
   return target;
 }
+
+// For scripts that may also run on staging: exits unless POSTGRES_URL is the staging tunnel
+// (see scripts/with-staging-db.sh). Production stays out of reach.
+export function requireStagingTunnel(script: string) {
+  const url = new URL(process.env.POSTGRES_URL ?? '');
+  const target = `${url.hostname}:${url.port}${url.pathname}`;
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+
+  if (!local || TUNNEL_PORTS[url.port] !== 'staging' || process.env.NODE_ENV === 'production') {
+    console.error(`Refusing to run ${script} --staging on ${target}: it only runs through the staging tunnel.`);
+    process.exit(1);
+  }
+
+  return `staging (${target})`;
+}
