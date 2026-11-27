@@ -103,6 +103,13 @@ export async function getSessionUser(req: Request): Promise<{ session: Session; 
   return { session, user };
 }
 
+const sessionEndedListeners = new Set<(sessionId: string) => void>();
+
+// Calls the listener with the id of every session that logs out (the WebSocket server closes its sockets).
+export function onSessionEnded(listener: (sessionId: string) => void) {
+  sessionEndedListeners.add(listener);
+}
+
 export async function deleteSession(req: BunRequest) {
   const sessionId = getSessionIdFromCookies(req);
 
@@ -111,4 +118,19 @@ export async function deleteSession(req: BunRequest) {
   }
 
   await sql`DELETE FROM sessions WHERE id = ${sessionId}`;
+
+  sessionEndedListeners.forEach((listener) => listener(sessionId));
+}
+
+// The ids, out of sessionIds, of sessions that still exist and haven't expired.
+export async function getLiveSessionIds(sessionIds: string[]) {
+  if (sessionIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const rows: { id: string }[] = await sql`
+    SELECT id FROM sessions WHERE id IN ${sql(sessionIds)} AND expires_at > CURRENT_TIMESTAMP
+  `;
+
+  return new Set(rows.map((row) => row.id));
 }

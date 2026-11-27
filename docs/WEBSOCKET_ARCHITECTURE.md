@@ -510,7 +510,7 @@ All validation errors are sent back to the client as `ERROR` messages with speci
 
 ## Security Considerations
 
-1. **Session Validation**: Host connections validate the session cookie; team connections validate team ID only
+1. **Session Validation**: Host, judge and presenter connections validate the session cookie; team connections validate team ID only. When that session logs out the server closes its sockets at once with close code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted. Clients reload on 4001, which shows the login page
 2. **Permission Checks**: Host actions require `owner` or `admin` role
 3. **Team Isolation**: Teams can only submit answers for their own team
 4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event

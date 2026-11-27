@@ -8,6 +8,8 @@ import { ALL_ROLES, getEventForRoles, MANAGER_ROLES } from '@/server/services/pe
 import { getTranslation, setQuestionGraded, setQuestionLocked } from '@/server/services/questions';
 import { getRun, saveActiveItem, setGracePeriod, setRunStatus, type RunStatus } from '@/server/services/runs';
 import { getTeam, listTeams } from '@/server/services/teams';
+import { getLiveSessionIds, onSessionEnded } from '@/server/session';
+import { SESSION_ENDED_CLOSE_CODE } from '@/types';
 import type { ServerWebSocket } from 'bun';
 
 export type TeamWebsocketData = {
@@ -45,6 +47,11 @@ export type ErrorWebsocketData = {
   message: string;
 };
 
+type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterWebsocketData;
+
+// How often signed-in sockets are checked for sessions that expired or were deleted.
+const SESSION_CHECK_MS = 60_000;
+
 export type WebsocketData =
   | HostWebsocketData
   | PresenterWebsocketData
@@ -70,6 +77,8 @@ export interface Run {
 export class WebSocketServer {
   private eventConnections: Map<string, EventConnection>;
   private server: Bun.Server<WebsocketData> | null = null;
+  // Host, judge and presenter sockets by session id, so they can be closed when the session ends.
+  private sessionSockets = new Map<string, Set<ServerWebSocket<SignedInWebsocketData>>>();
 
   constructor() {
     this.eventConnections = new Map();
@@ -77,7 +86,60 @@ export class WebSocketServer {
 
   setServer(server: Bun.Server<WebsocketData>) {
     this.server = server;
+
+    onSessionEnded(this.closeSession);
+    setInterval(this.closeEndedSessions, SESSION_CHECK_MS).unref();
   }
+
+  private isSignedInWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<SignedInWebsocketData> {
+    return ws.data.role === 'host' || ws.data.role === 'judge' || ws.data.role === 'presenter';
+  }
+
+  private trackSession(ws: ServerWebSocket<SignedInWebsocketData>) {
+    const sessionId = ws.data.session.id;
+    const sockets = this.sessionSockets.get(sessionId) ?? new Set();
+
+    sockets.add(ws);
+    this.sessionSockets.set(sessionId, sockets);
+  }
+
+  private untrackSession(ws: ServerWebSocket<SignedInWebsocketData>) {
+    const sessionId = ws.data.session.id;
+    const sockets = this.sessionSockets.get(sessionId);
+
+    sockets?.delete(ws);
+
+    if (sockets?.size === 0) {
+      this.sessionSockets.delete(sessionId);
+    }
+  }
+
+  // Closes the session's sockets; clients take the close code as a sign-out and don't reconnect.
+  closeSession = (sessionId: string) => {
+    const sockets = this.sessionSockets.get(sessionId);
+
+    if (!sockets) {
+      return;
+    }
+
+    console.log('Closing sockets of ended session', sessionId);
+    this.sessionSockets.delete(sessionId);
+    sockets.forEach((ws) => ws.close(SESSION_ENDED_CLOSE_CODE, 'Session ended'));
+  };
+
+  private closeEndedSessions = async () => {
+    try {
+      const live = await getLiveSessionIds([...this.sessionSockets.keys()]);
+
+      for (const sessionId of this.sessionSockets.keys()) {
+        if (!live.has(sessionId)) {
+          this.closeSession(sessionId);
+        }
+      }
+    } catch (error) {
+      console.error('Checking WebSocket sessions failed', error);
+    }
+  };
 
   createHandlers() {
     return {
@@ -268,6 +330,10 @@ export class WebSocketServer {
       return;
     }
 
+    if (this.isSignedInWebSocket(ws)) {
+      this.trackSession(ws);
+    }
+
     if (this.isHostWebSocket(ws)) {
       ws.subscribe(`${eventId}:hosts`);
       this.sendTeamStatuses(ws, connection);
@@ -354,6 +420,10 @@ export class WebSocketServer {
 
     if (role === 'error') {
       return;
+    }
+
+    if (this.isSignedInWebSocket(ws)) {
+      this.untrackSession(ws);
     }
 
     const { eventId } = ws.data;

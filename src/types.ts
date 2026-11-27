@@ -64,3 +64,6 @@ export type ActiveItem =
         }
       >;
     };
+
+// WebSocket close code for a host, judge or presenter socket whose session logged out or expired.
+export const SESSION_ENDED_CLOSE_CODE = 4001;

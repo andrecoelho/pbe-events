@@ -1,3 +1,5 @@
+import { SESSION_ENDED_CLOSE_CODE } from '@/types';
+
 const MAX_RECONNECT_ATTEMPTS = 3;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const ACK_TIMEOUT_MS = 2000;
@@ -74,10 +76,17 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.changeStatus('connected');
   };
 
-  private handleWSClose = () => {
+  private handleWSClose = (event: CloseEvent) => {
     const wasConnected = !!this.ws;
 
     this.reset();
+
+    // Signed out or the session expired: reloading shows the login page.
+    if (event.code === SESSION_ENDED_CLOSE_CODE) {
+      this.removeEventListeners();
+      window.location.reload();
+      return;
+    }
 
     if (window.navigator.onLine) {
       if (wasConnected) {
