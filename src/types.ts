@@ -312,3 +312,23 @@ export type Announcement = {
   endsAt: string | null;
   updatedAt: string;
 };
+
+// An event's home page (#69): what's ready and what's missing, and whether it's live.
+export type EventOverviewResponse = {
+  counts: {
+    languages: number;
+    questions: number;
+    // Questions without a translation in at least one of the event's languages.
+    questionsMissingTranslations: number;
+    teams: number;
+    // Teams whose device joined with the join code.
+    teamsJoined: number;
+    slides: number;
+    judges: number;
+  };
+  runStatus: RunStatus;
+  // Teams connected right now (0 when the event isn't open in the server's memory).
+  teamsConnected: number;
+  // Every team's join code, for "Copy join codes".
+  teams: { number: number; name: string; joinCode: string }[];
+};

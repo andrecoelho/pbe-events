@@ -10,6 +10,7 @@ import { adminUserRoutes } from '@/server/routes/adminUsers';
 import { announcementRoutes } from '@/server/routes/announcement';
 import { answersRoutes } from '@/server/routes/answers';
 import { authRoutes } from '@/server/routes/auth';
+import { createEventOverviewRoutes } from '@/server/routes/eventOverview';
 import { eventsRoutes } from '@/server/routes/events';
 import { joinRoutes } from '@/server/routes/join';
 import { languagesRoutes } from '@/server/routes/languages';
@@ -57,6 +58,7 @@ const server = Bun.serve({
     ...answersRoutes,
     ...sessionRoutes,
     ...eventsRoutes,
+    ...createEventOverviewRoutes(wsServer),
     ...permissionRoutes,
     ...teamsRoutes,
     ...joinRoutes,

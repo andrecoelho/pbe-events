@@ -4,7 +4,7 @@ import { eventIdFromPath, eventUrl, type EventSection } from '@/eventUrls';
 import { memo, useEffect, type ElementType } from 'react';
 import { useSnapshot } from 'valtio';
 
-const MANAGERS: EventRoleId[] = ['owner', 'admin'];
+export const MANAGERS: EventRoleId[] = ['owner', 'admin'];
 const EVERYONE: EventRoleId[] = ['owner', 'admin', 'judge'];
 
 // The event menu, in the order an event is prepared and then run. `group` starts a new group after a divider.
@@ -22,7 +22,8 @@ const SECTIONS: { id: EventSection; label: string; roles: EventRoleId[]; group?:
 // The sections the role can open, for the menu and the event's landing page.
 export const sectionsFor = (roleId: EventRoleId) => SECTIONS.filter((s) => s.roles.includes(roleId));
 
-const openPresenter = (eventId: string) =>
+// Opens the presenter screen in its own window.
+export const openPresenter = (eventId: string) =>
   window.open(`/event-run/presenter?eventId=${eventId}`, '_blank', 'width=800,height=600,popup=yes');
 
 // The event workspace's frame (#15): the event's name, a menu of its sections and the section's page.
