@@ -36,7 +36,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests. Ru
 - `src/server/utils/responses.ts`: `apiData(obj, headers?)` returns JSON with keys converted to camelCase (route() uses it for returned objects). API errors are thrown as HttpErrors (`badRequest`, `unauthorized`, `forbidden`, `notFound` from `src/server/http/route.ts`) and sent as `{ error: message }`.
 - `src/server/services/*.ts`: the SQL, as functions shared by REST routes, the WebSocket and (later) the admin page. `services/permissions.ts` holds every permission check (`getEventRole`, `getEventForRoles(eventId, userId, MANAGER_ROLES)`). Services don't check permissions themselves; callers do.
 - `src/frontend/{app,login,team,presenter}/`: one HTML entry point each. The organizer app routes with `useRouter` (a `Map` of path regex to page) in `src/frontend/app/App.tsx`; pages live in `src/frontend/app/pages/<feature>/`.
-- `src/types.ts`: types shared by server and frontend, such as `ActiveItem`.
+- `src/types.ts`: types shared by server and frontend, such as `ActiveItem` and the live run's WebSocket messages (`ServerMessage`, `HostClientMessage`, …).
 - `migrations/`: the schema. `scripts/`: dev database scripts. `.railway/railway.ts`: Railway infrastructure.
 
 ## Conventions

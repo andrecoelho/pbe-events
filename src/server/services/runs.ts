@@ -3,7 +3,9 @@ import type { ActiveItem } from '@/types';
 import { withAnswers } from '@/server/services/answers';
 import { sql } from 'bun';
 
-export type RunStatus = 'not_started' | 'in_progress' | 'paused' | 'completed';
+import type { RunStatus } from '@/types';
+
+export type { RunStatus };
 
 export interface Run {
   event_id: string;

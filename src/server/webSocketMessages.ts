@@ -1,6 +1,12 @@
 // The messages each kind of live run socket may send, as Zod schemas (see docs/WEBSOCKET_ARCHITECTURE.md).
 // webSocket.ts parses every frame with parseMessage() before acting on it.
-import type { ActiveItem } from '@/types';
+import type {
+  ActiveItem,
+  HostClientMessage,
+  JudgeClientMessage,
+  PresenterClientMessage,
+  TeamClientMessage
+} from '@/types';
 import { z } from 'zod';
 
 // Largest frame the server accepts; Bun closes the socket (code 1009) on anything bigger.
@@ -142,6 +148,13 @@ export function parseMessage<T extends z.ZodType>(schema: T, raw: string | Buffe
   };
 }
 
-// The schema's active item must fit the shared ActiveItem type.
+// The schemas and the shared types in src/types.ts must agree (#55): what the server accepts fits the types
+// the server works with, and every message a page can send (typed by those types) passes its role's schema.
 type Assert<T extends true> = T;
 export type ActiveItemSchemaFitsType = Assert<z.infer<typeof ActiveItemSchema> extends ActiveItem ? true : false>;
+export type TeamMessagesFit = Assert<TeamClientMessage extends z.input<typeof TeamMessage> ? true : false>;
+export type HostMessagesFit = Assert<HostClientMessage extends z.input<typeof HostMessage> ? true : false>;
+export type JudgeMessagesFit = Assert<JudgeClientMessage extends z.input<typeof JudgeMessage> ? true : false>;
+export type PresenterMessagesFit = Assert<
+  PresenterClientMessage extends z.input<typeof PresenterMessage> ? true : false
+>;

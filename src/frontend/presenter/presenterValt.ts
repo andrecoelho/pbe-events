@@ -1,5 +1,5 @@
-import { WebSocketManager, type WebSocketMessage, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
-import type { ActiveItem } from '@/types';
+import { WebSocketManager, type WebSocketStatus } from '@/frontend/components/WebSocketManager';
+import type { ActiveItem, PresenterClientMessage, ServerMessage } from '@/types';
 import { proxy } from 'valtio';
 
 interface PresenterStore {
@@ -10,14 +10,9 @@ interface PresenterStore {
   connectionState: WebSocketStatus;
 }
 
-type WebSocketRunMessage =
-  | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
-  | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
-  | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> });
-
 export class PresenterValt {
   store: PresenterStore;
-  private ws: WebSocketManager<WebSocketRunMessage> | null = null;
+  private ws: WebSocketManager<PresenterClientMessage> | null = null;
 
   constructor() {
     this.store = proxy({
@@ -51,7 +46,7 @@ export class PresenterValt {
         eventId: this.store.eventId
       }).toString();
 
-      this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
+      this.ws = new WebSocketManager<PresenterClientMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
       this.ws.connect();
     }
@@ -61,7 +56,7 @@ export class PresenterValt {
     this.store.connectionState = status;
   };
 
-  onMessage = (message: WebSocketRunMessage) => {
+  onMessage = (message: ServerMessage) => {
     switch (message.type) {
       case 'RUN_STATUS':
         this.store.runStatus = message.status;

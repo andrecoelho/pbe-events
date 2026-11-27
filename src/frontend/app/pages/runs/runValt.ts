@@ -3,10 +3,9 @@ import {
   NOT_CONNECTED,
   WebSocketManager,
   type MessageResult,
-  type WebSocketMessage,
   type WebSocketStatus
 } from '@/frontend/components/WebSocketManager';
-import type { ActiveItem } from '@/types';
+import type { ActiveItem, HostClientMessage, ServerMessage } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -78,31 +77,9 @@ interface RunStore {
   teams: Record<string, TeamStatus>;
 }
 
-type AnswerReceivedMessage = WebSocketMessage & {
-  type: 'ANSWER_RECEIVED';
-  teamId: string;
-  teamNumber: number;
-  questionId: string;
-  translationId: string;
-  languageCode: string;
-  answerId: string;
-  answerText: string;
-  challenged: boolean;
-};
-
-type WebSocketRunMessage =
-  | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
-  | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
-  | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: (Partial<TeamStatus> & { id: string })[] })
-  | AnswerReceivedMessage
-  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean })
-  | (WebSocketMessage & { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null })
-  | (WebSocketMessage & { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean })
-  | (WebSocketMessage & { type: 'QUESTION_GRADED'; questionId: string; graded: boolean });
-
 export class RunValt {
   store: RunStore;
-  private ws: WebSocketManager<WebSocketRunMessage> | null = null;
+  private ws: WebSocketManager<HostClientMessage> | null = null;
   tickTimer: number | null = null;
 
   constructor() {
@@ -263,7 +240,7 @@ export class RunValt {
 
       wsUrl.search = new URLSearchParams({ role: 'host', eventId: this.store.eventId }).toString();
 
-      this.ws = new WebSocketManager<WebSocketRunMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
+      this.ws = new WebSocketManager<HostClientMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
       this.ws.connect();
     }
@@ -273,7 +250,7 @@ export class RunValt {
     this.store.connectionState = status;
   };
 
-  onMessage = (message: WebSocketRunMessage) => {
+  onMessage = (message: ServerMessage) => {
     switch (message.type) {
       case 'RUN_STATUS':
         this.store.run.status = message.status;
@@ -383,7 +360,7 @@ export class RunValt {
   };
 
   // Sends a host action; when the server refuses it (or the connection is down), says why in a toast.
-  private send = async (message: WebSocketMessage): Promise<MessageResult> => {
+  private send = async (message: HostClientMessage): Promise<MessageResult> => {
     const result = (await this.ws?.sendMessage(message)) ?? NOT_CONNECTED;
 
     if (!result.ok) {
@@ -407,7 +384,7 @@ export class RunValt {
     await this.send({ type: 'SET_QUESTION_LOCKED', questionId, locked });
   };
 
-  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
+  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem | null) => {
     this.store.run.activeItem = activeItem;
 
     if (activeItem) {

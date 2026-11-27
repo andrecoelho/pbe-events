@@ -1,12 +1,12 @@
 import type { Session } from '@/server/types';
 import { textServerError } from '@/server/utils/responses';
-import type { ActiveItem } from '@/types';
+import type { ActiveItem, AckMessage, RunStatus, ServerMessage, TeamConnectionStatus } from '@/types';
 import { saveAnswer, setAnswerChallenged, setAnswerPoints, withAnswers } from '@/server/services/answers';
 import { eventExists } from '@/server/services/events';
 import { getLanguagesByCode, type Language } from '@/server/services/languages';
 import { ALL_ROLES, getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { getTranslation, setQuestionGraded, setQuestionLocked } from '@/server/services/questions';
-import { getRun, saveActiveItem, setGracePeriod, setRunStatus, type RunStatus } from '@/server/services/runs';
+import { getRun, saveActiveItem, setGracePeriod, setRunStatus } from '@/server/services/runs';
 import {
   getTeam,
   getTeamByDeviceToken,
@@ -65,7 +65,7 @@ export type ErrorWebsocketData = {
   role: 'error';
   message: string;
   // NOT_JOINED: a team socket from a device that hasn't joined a team (or was released).
-  code?: string;
+  code?: 'NOT_JOINED';
 };
 
 type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterWebsocketData;
@@ -85,12 +85,13 @@ export type MessageResult = { ok: true } | { ok: false; error: string };
 
 const refused = (error: string): MessageResult => ({ ok: false, error });
 
+// Every message the server sends goes through here, so it must be one of the shared types (#55).
+const encode = (message: ServerMessage | AckMessage) => JSON.stringify(message);
+
 type PromptItem = Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>;
 
 // A team whose socket dropped shows as reconnecting this long (its page keeps retrying), then offline (#48).
 const RECONNECTING_MS = 2 * 60_000;
-
-export type TeamConnectionStatus = 'connected' | 'reconnecting' | 'offline';
 
 // While a question's timer runs, its state is re-sent this often, in case a page missed a message (#47).
 const RESEND_MS = 5000;
@@ -103,7 +104,7 @@ export interface EventConnection {
   teams: Map<string, ServerWebSocket<TeamWebsocketData>>;
   run: Run;
   activeItem: ActiveItem | null;
-  languages?: Record<string, Language>;
+  languages: Record<string, Language>;
   // The running question's timer (#47): fires once its time and grace period are up. While it runs, the state
   // is also re-sent every few seconds (resendTimer) as a safety net.
   timeUpTimer?: NodeJS.Timeout;
@@ -219,7 +220,7 @@ export class WebSocketServer {
     const role = url.searchParams.get('role');
 
     // An error socket only tells the client why (CONNECTION_ERROR) when it opens.
-    const refuse = (message: string, code?: string) => {
+    const refuse = (message: string, code?: 'NOT_JOINED') => {
       this.server?.upgrade(req, { data: { role: 'error', message, code } });
       return undefined;
     };
@@ -334,7 +335,7 @@ export class WebSocketServer {
     const { role } = ws.data;
 
     if (role === 'error') {
-      ws.send(JSON.stringify({ type: 'CONNECTION_ERROR', message: ws.data.message, code: ws.data.code }));
+      ws.send(encode({ type: 'CONNECTION_ERROR', message: ws.data.message, code: ws.data.code }));
       return;
     }
 
@@ -391,10 +392,10 @@ export class WebSocketServer {
         ws.data.languageId = team.language_id;
         ws.data.languageCode = team.language_code ?? '';
 
-        ws.send(JSON.stringify({ type: 'EVENT_INFO', event: { id: eventId, name: connection.eventName } }));
+        ws.send(encode({ type: 'EVENT_INFO', event: { id: eventId, name: connection.eventName } }));
 
         ws.send(
-          JSON.stringify({
+          encode({
             type: 'TEAM_INFO',
             team: { id, name: team.name, languageId: ws.data.languageId, languageCode: team.language_code }
           })
@@ -413,7 +414,7 @@ export class WebSocketServer {
 
         this.server?.publish(
           `${eventId}:hosts`,
-          JSON.stringify({ type: 'TEAM_STATUS', teams: [this.teamStatus(connection, team)] })
+          encode({ type: 'TEAM_STATUS', teams: [this.teamStatus(connection, team)] })
         );
 
         console.log(`Team ${team.number} connected for event`, eventId, id);
@@ -576,7 +577,7 @@ export class WebSocketServer {
   private sendAck(ws: ServerWebSocket<WebsocketData>, ackId: string | undefined, result: MessageResult) {
     if (ackId !== undefined) {
       // serverTime lets pages measure their offset from the server clock (#47).
-      ws.send(JSON.stringify({ type: 'ACK', id: ackId, serverTime: Date.now(), ...result }));
+      ws.send(encode({ type: 'ACK', id: ackId, serverTime: Date.now(), ...result }));
     }
   }
 
@@ -590,7 +591,7 @@ export class WebSocketServer {
     }
 
     console.warn(`Invalid WebSocket message from ${ws.data.role}:`, result.error);
-    ws.send(JSON.stringify({ type: 'ERROR', code: 'INVALID_MESSAGE', message: result.error }));
+    ws.send(encode({ type: 'ERROR', code: 'INVALID_MESSAGE', message: result.error }));
     this.sendAck(ws, result.ack, refused(result.error));
 
     return null;
@@ -676,25 +677,27 @@ export class WebSocketServer {
 
     if (ws.data.role === 'team' && activeItem && 'answers' in activeItem) {
       const team = ws.data;
-      const answers = team.id in activeItem.answers ? { [team.id]: activeItem.answers[team.id] } : {};
+      // A team sees only its own answer.
+      const own = activeItem.answers[team.id];
+      const answers = own ? { [team.id]: own } : {};
 
       ws.send(
-        JSON.stringify({
+        encode({
           type: 'ACTIVE_ITEM',
           activeItem: { ...activeItem, answers }
         })
       );
     } else {
-      ws.send(JSON.stringify({ type: 'ACTIVE_ITEM', activeItem }));
+      ws.send(encode({ type: 'ACTIVE_ITEM', activeItem }));
     }
   }
 
   sendRunStatus(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
-    ws.send(JSON.stringify({ type: 'RUN_STATUS', status: connection.run.status }));
+    ws.send(encode({ type: 'RUN_STATUS', status: connection.run.status }));
   }
 
   sendLanguages(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
-    ws.send(JSON.stringify({ type: 'LANGUAGES', languages: connection.languages }));
+    ws.send(encode({ type: 'LANGUAGES', languages: connection.languages }));
   }
 
   async sendTeamStatuses(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): Promise<void> {
@@ -702,7 +705,7 @@ export class WebSocketServer {
 
     const teamStatuses = teams.map((team) => this.teamStatus(connection, team));
 
-    ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+    ws.send(encode({ type: 'TEAM_STATUS', teams: teamStatuses }));
   }
 
   private markTeamSeen(eventId: string, teamId: string) {
@@ -731,7 +734,7 @@ export class WebSocketServer {
 
     this.server?.publish(
       `${eventId}:hosts`,
-      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id, number, status, lastSeenAt }] })
+      encode({ type: 'TEAM_STATUS', teams: [{ id, number, status, lastSeenAt }] })
     );
   }
 
@@ -749,7 +752,7 @@ export class WebSocketServer {
   }
 
   sendGracePeriod(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
-    ws.send(JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
+    ws.send(encode({ type: 'GRACE_PERIOD', gracePeriod: connection.run.gracePeriod }));
   }
 
   broadcastToAll(connection: EventConnection, message: string): void {
@@ -766,7 +769,7 @@ export class WebSocketServer {
   }
 
   broadcastActiveItemToManagers(connection: EventConnection) {
-    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
+    const message = encode({ type: 'ACTIVE_ITEM', activeItem: connection.activeItem });
 
     this.server?.publish(`${connection.eventId}:hosts`, message);
     this.server?.publish(`${connection.eventId}:presenters`, message);
@@ -775,7 +778,7 @@ export class WebSocketServer {
 
   broadcastActiveItemToAll(connection: EventConnection) {
     const activeItem = connection.activeItem;
-    const message = JSON.stringify({ type: 'ACTIVE_ITEM', activeItem });
+    const message = encode({ type: 'ACTIVE_ITEM', activeItem });
 
     this.broadcastActiveItemToManagers(connection);
 
@@ -974,7 +977,7 @@ export class WebSocketServer {
 
     if (teamWs) {
       teamWs.send(
-        JSON.stringify({
+        encode({
           type: 'CONNECTION_ERROR',
           code: 'RELEASED',
           message: 'The host released this device from the team. To join again, use your team’s code.'
@@ -1000,7 +1003,7 @@ export class WebSocketServer {
 
     this.server?.publish(
       `${connection.eventId}:hosts`,
-      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, hasDevice: false }] })
+      encode({ type: 'TEAM_STATUS', teams: [{ id: teamId, hasDevice: false }] })
     );
   }
 
@@ -1014,7 +1017,7 @@ export class WebSocketServer {
 
     this.server?.publish(
       `${connection.eventId}:hosts`,
-      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, joinCode }] })
+      encode({ type: 'TEAM_STATUS', teams: [{ id: teamId, joinCode }] })
     );
   }
 
@@ -1028,7 +1031,7 @@ export class WebSocketServer {
       connection.activeItem = await withAnswers(connection.eventId, connection.activeItem);
     }
 
-    const message = JSON.stringify({ type: 'RUN_STATUS', status });
+    const message = encode({ type: 'RUN_STATUS', status });
 
     this.broadcastToAll(connection, message);
     await this.pauseOrResumeTimer(connection, status);
@@ -1039,7 +1042,7 @@ export class WebSocketServer {
 
     connection.run.gracePeriod = gracePeriod;
 
-    const message = JSON.stringify({ type: 'GRACE_PERIOD', gracePeriod });
+    const message = encode({ type: 'GRACE_PERIOD', gracePeriod });
 
     this.broadcastToAll(connection, message);
 
@@ -1086,7 +1089,7 @@ export class WebSocketServer {
       return refused('That question isn’t in this event.');
     }
 
-    const message = JSON.stringify({
+    const message = encode({
       type: 'QUESTION_LOCKED',
       questionId,
       locked
@@ -1142,7 +1145,7 @@ export class WebSocketServer {
       return refused('That question isn’t in this event.');
     }
 
-    const message = JSON.stringify({
+    const message = encode({
       type: 'QUESTION_GRADED',
       questionId,
       graded
@@ -1168,7 +1171,7 @@ export class WebSocketServer {
       return refused('That answer isn’t in this event.');
     }
 
-    const message = JSON.stringify({
+    const message = encode({
       type: 'POINTS_UPDATED',
       questionId: answer.question_id,
       answerId,

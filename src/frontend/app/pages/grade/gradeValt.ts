@@ -4,7 +4,7 @@ import {
   type MessageResult,
   type WebSocketStatus
 } from '@/frontend/components/WebSocketManager';
-import type { ActiveItem } from '@/types';
+import type { ActiveItem, JudgeClientMessage, ServerMessage } from '@/types';
 import { proxy } from 'valtio';
 
 export interface Question {
@@ -48,17 +48,10 @@ interface GradeStore {
   selectedQuestion?: Question;
 }
 
-type WebSocketGradeMessage =
-  | { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' }
-  | { type: 'ACTIVE_ITEM'; activeItem: ActiveItem }
-  | { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null }
-  | { type: 'QUESTION_GRADED'; questionId: string; graded: boolean }
-  | { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean };
-
 const NO_ANSWER: MessageResult = { ok: false, error: 'That team has no answer to grade.' };
 
 export class GradeValt {
-  private ws: WebSocketManager<WebSocketGradeMessage> | null = null;
+  private ws: WebSocketManager<JudgeClientMessage> | null = null;
   public store: GradeStore;
 
   constructor() {
@@ -109,7 +102,7 @@ export class GradeValt {
       const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
       wsUrl.search = new URLSearchParams({ role: 'judge', eventId: this.store.eventId }).toString();
-      this.ws = new WebSocketManager(wsUrl.toString(), this.onStatusChange, this.onMessage);
+      this.ws = new WebSocketManager<JudgeClientMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
       this.ws.connect();
     }
   };
@@ -123,7 +116,7 @@ export class GradeValt {
     this.store.activeItem = null;
   };
 
-  onMessage = (message: WebSocketGradeMessage) => {
+  onMessage = (message: ServerMessage) => {
     switch (message.type) {
       case 'RUN_STATUS':
         this.store.runStatus = message.status;
@@ -214,7 +207,7 @@ export class GradeValt {
     return (await this.ws?.sendMessage({ type: 'SET_QUESTION_GRADED', questionId, graded })) ?? NOT_CONNECTED;
   };
 
-  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem) => {
+  private handleSET_ACTIVE_ITEM = (activeItem: ActiveItem | null) => {
     this.store.activeItem = activeItem;
 
     if (activeItem) {

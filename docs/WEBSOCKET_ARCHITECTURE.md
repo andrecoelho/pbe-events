@@ -1,546 +1,111 @@
-# WebSocket Architecture
+# Live Run WebSocket
 
-## Overview
+How an event is run live: the host steps through the event on the Run screen, the presenter screen shows it, teams answer from their own devices, and judges grade. Everything goes through one WebSocket endpoint served by the same Bun process as the API.
 
-The PBE Events application uses WebSockets for real-time communication during event runs. The system supports two types of connections:
+- Server: `src/server/webSocket.ts` (`WebSocketServer`), message schemas in `src/server/webSocketMessages.ts`.
+- Shared message types: `src/types.ts` (`ServerMessage`, `AckMessage`, `TeamClientMessage`, `HostClientMessage`, `JudgeClientMessage`, `PresenterClientMessage`). Compile-time checks in `webSocketMessages.ts` keep the schemas and the types in step, and the server sends only through `encode(message: ServerMessage | AckMessage)`.
+- Client: `src/frontend/components/WebSocketManager.ts`, used by each page's valt (`runValt`, `gradeValt`, `presenterValt`, `teamValt`).
 
-- **Host**: Admin/Owner users who control the event run (start questions, show slides, etc.)
-- **Teams**: Participants who answer questions and receive real-time updates
+## Connecting
 
-## Connection Setup
+Every role connects to `/event-run/ws` with a `role` query parameter.
 
-### WebSocket Server
+| Role                 | URL                         | Who may connect                            | Topics it's subscribed to                    |
+| -------------------- | --------------------------- | ------------------------------------------ | -------------------------------------------- |
+| host (Run screen)    | `?role=host&eventId=…`      | signed in, `owner` or `admin` of the event | `{eventId}:hosts`                            |
+| presenter            | `?role=presenter&eventId=…` | signed in, `owner` or `admin`              | `{eventId}:presenters`                       |
+| judge (Grade screen) | `?role=judge&eventId=…`     | signed in, any role on the event           | `{eventId}:judges`                           |
+| team                 | `?role=team`                | the device that joined the team (#44)      | `{eventId}:teams`, `{eventId}:team:{teamId}` |
 
-The WebSocket server is created in `src/server/index.ts` and passed to the routes that need it. Connections are managed per event, with support for:
+- Hosts, presenters and judges are checked against their session cookie. Several of each may be connected at once.
+- Teams are identified by the `teamToken` cookie the device got when it joined with the team's code (`/join/K7P4QX` or typing it at `/join`, which posts to `POST /api/join`). The server finds the team, and so the event, from that token; the database keeps only its SHA-256. A second device trying the same code gets 409 "Team N is already connected on another device. Ask the host to release it."
+- A refused connection still upgrades, then gets `CONNECTION_ERROR` with a message (and `code: 'NOT_JOINED'` for a team page without a valid token, which then goes to `/join`).
 
-- One host connection per event
-- Multiple team connections per event
-- Language-specific pub/sub channels for broadcasting translations
+What each role gets when it connects:
 
-### Authentication
+- host: `ACTIVE_ITEM`, `TEAM_STATUS` (every team)
+- presenter and judge: `LANGUAGES`, `RUN_STATUS`, `ACTIVE_ITEM`
+- team: `EVENT_INFO`, `TEAM_INFO`, `LANGUAGES`, `RUN_STATUS`, `ACTIVE_ITEM`, `GRACE_PERIOD`; hosts get a `TEAM_STATUS` for the team
 
-Authentication requirements differ between host and team connections:
+The event's live state (`EventConnection`: run status, grace period, the active item, languages, connected teams) is set up from the database by the first connection, shared by connections that arrive together (#52), and dropped when nobody is connected. An event without languages connects (it can't have teams); one missing its run record is refused with that reason.
 
-#### Host Authentication
+## Messages from pages
 
-- **Requires**: Valid session cookie (user must be logged in)
-- **Permission Check**: User must have `owner` or `admin` role for the event
-- **Validation**: Session is validated from the upgrade request's cookies before establishing the connection
-- **Single Connection**: Only one host can be connected per event at a time. If a second host attempts to connect, the connection is rejected with an error.
+Each page message carries `__ACK__` (added by `WebSocketManager`). Each role's messages are validated by its Zod schema; anything else is refused.
 
-#### Team Authentication
+| Role  | Message                                       | What happens                                                                                                                                                                                                                                                                                                                                                    |
+| ----- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| all   | `PING`                                        | Nothing; used for clock sync.                                                                                                                                                                                                                                                                                                                                   |
+| team  | `SUBMIT_ANSWER { answer, questionId? }`       | Saves the team's answer to the open question (an upsert, so a newer answer replaces the older one and clears its grading). Refused unless the question is in the prompt phase, not locked, within its time and grace period, and (when `questionId` is given) still the open question. True/false answers may be booleans; they're saved as `'true'`/`'false'`. |
+| team  | `SUBMIT_CHALLENGE { questionId, challenged }` | Sets or clears the team's challenge while the question's answer is shown.                                                                                                                                                                                                                                                                                       |
+| host  | `UPDATE_RUN_STATUS { status }`                | `not_started`, `in_progress`, `paused`, `completed`. Back to `not_started` erases every answer and unlocks every question. Pausing and resuming pause and resume the timer.                                                                                                                                                                                     |
+| host  | `UPDATE_GRACE_PERIOD { gracePeriod }`         | 0–600 seconds; moves a running question's time-up.                                                                                                                                                                                                                                                                                                              |
+| host  | `SET_ACTIVE_ITEM { activeItem }`              | Puts an item on screen: `null`, the title, a slide, or a question in its `reading`, `prompt` or `answer` phase. Opening a prompt starts its timer; going from a question's answer to the next question's reading locks the previous question. The page's `answers` are ignored (see Answers).                                                                   |
+| host  | `SET_QUESTION_LOCKED { questionId, locked }`  | Locks or unlocks a question for answers (grading needs it locked).                                                                                                                                                                                                                                                                                              |
+| host  | `START_TIMER` / `REMOVE_TIMER`                | Restarts the open question's full time / removes its time limit.                                                                                                                                                                                                                                                                                                |
+| host  | `RELEASE_TEAM_DEVICE { teamId }`              | Frees the team for another device; the device that held it gets `CONNECTION_ERROR` code `RELEASED` and is disconnected.                                                                                                                                                                                                                                         |
+| host  | `RENEW_JOIN_CODE { teamId }`                  | A new join code for the team; the old code and link stop working, a joined device stays.                                                                                                                                                                                                                                                                        |
+| judge | `UPDATE_POINTS { answerId, points }`          | Sets or clears (`null`) an answer's points.                                                                                                                                                                                                                                                                                                                     |
+| judge | `SET_QUESTION_GRADED { questionId, graded }`  | Marks a question graded or not.                                                                                                                                                                                                                                                                                                                                 |
 
-- **Join codes** (#44): each team has a code like `K7P-4QX` (`teams.join_code`: six characters with no look-alikes, from `new_join_code()`). A team opens `/join/K7P4QX` or types the code at `/join`, which posts it to `POST /api/join` (rate limited to 60 a minute per address).
-- **One device per team**: the first device to join gets a random token in the HttpOnly `teamToken` cookie; the database keeps only its SHA-256 (`teams.device_token_hash`). Another device gets 409 "Team N is already connected on another device. Ask the host to release it." The device holding the token can open the link again.
-- **Connecting**: the team socket is `role=team` with no ids; the server finds the team (and its event) from the cookie. Without a valid token it gets `CONNECTION_ERROR` with code `NOT_JOINED`, and the team page goes to `/join`.
-- **No Login Required**: Teams do not need to be logged in or have a session
-- **Connection Replacement**: the same device reconnecting (a reload, a dropped connection, a second tab) replaces its old socket.
-- **Host controls**: from a team badge's menu on the Run screen the host sends `RELEASE_TEAM_DEVICE { teamId }` (clears the token; the device gets `CONNECTION_ERROR` code `RELEASED` and is disconnected) or `RENEW_JOIN_CODE { teamId }` (the old code and link stop working; a joined device stays). Hosts get `joinCode` and `hasDevice` in `TEAM_STATUS`; updates carry only what changed.
+Every write is scoped to the socket's event: an answer or question id from another event is refused and changes nothing (#43).
 
-### Connection Flow
+## Messages from the server
 
-1. **Host Connection**: `ws://host/events/{eventId}`
-   - Validates session cookie and user authentication
-   - Checks user has `owner` or `admin` role for the event
-   - Ensures no other host is currently connected
-   - Stores connection in `connection.host`
-   - Receives real-time notifications about all team activity
+| Message                                                | Sent to                   | When                                                                                                            |
+| ------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ACK { id, serverTime, ok, error? }`                   | the sender                | after each message is handled (see Order and ACKs)                                                              |
+| `CONNECTION_ERROR { message, code? }`                  | the socket                | a refused connection; a team device released by the host                                                        |
+| `ERROR { code: 'INVALID_MESSAGE', message }`           | the sender                | a frame that isn't JSON or doesn't match its schema                                                             |
+| `EVENT_INFO`, `TEAM_INFO`                              | the team                  | when it connects                                                                                                |
+| `RUN_STATUS { status }`                                | everyone                  | on connect (not hosts) and when the host changes it                                                             |
+| `GRACE_PERIOD { gracePeriod }`                         | everyone                  | on connect (teams) and when the host changes it                                                                 |
+| `LANGUAGES { languages }`                              | presenters, judges, teams | on connect                                                                                                      |
+| `ACTIVE_ITEM { activeItem }`                           | everyone                  | on connect and whenever it changes; every 5 s while a timer runs. Teams get only their own answer in `answers`. |
+| `TEAM_STATUS { teams }`                                | hosts                     | on connect (every team) and on changes (only the changed fields): connection status, join code, device          |
+| `QUESTION_LOCKED`, `QUESTION_GRADED`, `POINTS_UPDATED` | hosts, presenters, judges | after the change                                                                                                |
 
-2. **Team Connection**: `/event-run/ws?role=team`, with the `teamToken` cookie from joining
-   - Finds the team and its event from the device token
-   - No session or login required
-   - Replaces any existing connection for this team (the same device)
-   - Requires language selection before run starts
-   - Subscribes to language-specific channel: `${eventId}:${languageCode}`
-   - Can reconnect and receive existing answer state
+## Order and ACKs (#53)
 
----
+The server handles an event's messages one at a time, in the order they arrive; timer events go through the same queue. So back-to-back messages can't overtake each other.
 
-## Message Protocol
+Each message is answered after its database writes with `{ type: 'ACK', id, serverTime, ok: true }` or `{ ok: false, error }`, where `error` is a sentence for the person ("Time is up: your answer wasn't saved."). `WebSocketManager.sendMessage` resolves with `{ ok, error }`, and the pages show the error in a toast. With no ACK within 2 seconds the client reconnects and resolves `ok: false` (or keeps a team's answer queued, see Reconnection). A handler that throws is logged and its ACK says `ok: false`.
 
-All messages are JSON strings with a `type` field and associated payload.
+## Answers (#54)
 
-**Order and acknowledgements (#53).** A client message carries an `__ACK__` id. The server handles an event's messages one at a time, in the order they arrive (the timer's ticks go through the same queue), and answers each one, after its database writes, with `{ type: 'ACK', id, ok: true }` or `{ type: 'ACK', id, ok: false, error }`, where `error` is a sentence for the person (e.g. "Time is up: your answer wasn't saved."). The client's `WebSocketManager.sendMessage` resolves with `{ ok, error }`; with no ACK within 2 seconds it reconnects and resolves `ok: false`.
+The `answers` table is the only place answers are stored. The active item's `answers` (one entry per team) is a copy kept in memory: the server builds it from the table when a question opens (ignoring the copy the host page sends), when an event's live state loads, and when a run starts over. Submitting, challenging and grading write the table first, then update the copy. `runs.active_item` is saved without answers, and `GET /api/events/:id/run` adds them back from the table.
 
-### Messages FROM Teams TO Server
-
-#### `SELECT_LANGUAGE`
-
-Team selects their language for receiving question translations. Must be done before the run starts.
-
-```typescript
-{
-  type: 'SELECT_LANGUAGE',
-  languageId: string
-}
-```
-
-**Response**: Team is subscribed to the language channel and notified to host via `TEAM_READY`
-
-**Errors**:
-
-- `RUN_ALREADY_STARTED` if run has begun
-- `INVALID_ROLE` if language not found
-
----
-
-#### `SUBMIT_ANSWER` / `UPDATE_ANSWER`
-
-Team submits or updates their answer for the active question. Both message types are handled identically.
-
-```typescript
-{
-  type: 'SUBMIT_ANSWER' | 'UPDATE_ANSWER',
-  answer: string
-}
-```
-
-**Response**:
-
-- Answer stored in database with timestamps
-- Host notified via `ANSWER_RECEIVED`
-- If past deadline (activeStartTime + seconds + gracePeriod), returns `DEADLINE_EXCEEDED` error
-
-**Errors**:
-
-- `NO_LANGUAGE_SELECTED` if team hasn't selected a language
-- `NO_ACTIVE_QUESTION` if no question is running
-- `DEADLINE_EXCEEDED` if submitted too late
-
----
-
-### Messages FROM Host TO Server
-
-#### `START_QUESTION`
-
-Host starts a specific question.
-
-```typescript
-{
-  type: 'START_QUESTION',
-  questionId: string,
-  hasTimer: boolean
-}
-```
-
-**Process**:
-
-1. Validates question belongs to event
-2. Updates run record with `active_id`, `active_type` ('question'), and `active_start_time`
-3. Loads question translations for all languages
-4. Broadcasts `QUESTION_STARTED` to each language channel with appropriate translation
-5. Calculates deadline: `startTime + seconds + gracePeriod`
-
-**Errors**:
-
-- `INVALID_ROLE` if question not found
-
----
-
-#### `PAUSE`
-
-Host pauses/ends the current question.
-
-```typescript
-{
-  type: 'PAUSE';
-}
-```
-
-**Process**:
-
-1. Clears `active_id`, `active_type`, and `active_start_time` in run record
-2. Broadcasts `QUESTION_ENDED` to all language channels
-3. Grades all submitted answers for the question
-
----
-
-#### `SHOW_SLIDE`
-
-Host displays a slide to all teams.
-
-```typescript
-{
-  type: 'SHOW_SLIDE',
-  slideNumber: number
-}
-```
-
-**Process**:
-
-1. Looks up slide by number for the event
-2. Broadcasts `SLIDE_SHOWN` to all language channels with slide content
-
-**Errors**:
-
-- `SLIDE_NOT_FOUND` if slide doesn't exist
-
----
-
-#### `COMPLETE_RUN`
-
-Host completes the entire run.
-
-```typescript
-{
-  type: 'COMPLETE_RUN';
-}
-```
-
-**Process**:
-
-1. Updates run status to `completed`
-2. Calculates final scores for all teams
-3. Broadcasts `RUN_COMPLETED` to all language channels
-4. Closes all team connections
-
-**Note**: The WebSocket handler version includes scores in the `RUN_COMPLETED` message, while the REST API version sends a simplified message without scores
-
----
-
-### Messages FROM Server TO Teams
-
-Teams receive messages on their language-specific pub/sub channel (`${eventId}:${languageCode}`).
-
-#### `QUESTION_STARTED`
-
-A question has started with translation in the team's language.
-
-```typescript
-{
-  type: 'QUESTION_STARTED',
-  translation: {
-    id: string,
-    prompt: string,
-    clarification: string | null,
-    languageId: string,
-    questionId: string
-  },
-  startTime: number,        // Unix timestamp in milliseconds
-  seconds: number,          // Time limit for question
-  hasTimer: boolean,        // Whether timer is enforced
-  gracePeriod: number       // Extra seconds after timer
-}
-```
-
-**Team Action**: Display question and start countdown if `hasTimer` is true
-
----
-
-#### `QUESTION_ENDED`
-
-Current question has ended/paused.
-
-```typescript
-{
-  type: 'QUESTION_ENDED';
-}
-```
-
-**Team Action**: Stop accepting answers, hide question interface
-
----
-
-#### `SLIDE_SHOWN`
-
-A slide is being displayed.
-
-```typescript
-{
-  type: 'SLIDE_SHOWN',
-  slide: {
-    id: string,
-    eventId: string,
-    number: number,
-    content: string,        // Markdown content
-    createdAt: string
-  }
-}
-```
-
-**Team Action**: Render slide content (Markdown)
-
----
-
-#### `RUN_COMPLETED`
-
-Run finished. Sent to all teams when the run is completed.
-
-```typescript
-{
-  type: 'RUN_COMPLETED';
-}
-```
-
-**Team Action**: Display run completion message. Connection will be closed immediately after this message.
-
-**Note**: This message is sent to teams both when the host sends the `COMPLETE_RUN` WebSocket message AND when an admin completes the run via the REST API (`PATCH /api/runs/:runId` with `action: 'complete'`)
-
----
-
-#### `YOUR_ANSWER`
-
-Sent to reconnecting team if they have an existing answer for the active question.
-
-```typescript
-{
-  type: 'YOUR_ANSWER',
-  answerId: string,
-  answer: string
-}
-```
-
-**Team Action**: Pre-populate answer field with existing submission
-
----
-
-#### `ERROR`
-
-An error occurred processing the team's request.
-
-```typescript
-{
-  type: 'ERROR',
-  code: ErrorCode,
-  message: string
-}
-```
-
-**Error Codes**:
-
-- `NO_ACTIVE_RUN` - No active run exists for the event
-- `INVALID_TEAM` - Team ID is invalid or doesn't belong to event
-- `UNAUTHORIZED` - Session/authentication required
-- `RUN_ALREADY_STARTED` - Cannot perform action after run has started
-- `NO_LANGUAGE_SELECTED` - Team must select a language before answering
-- `NO_ACTIVE_QUESTION` - No question is currently active
-- `DEADLINE_EXCEEDED` - Answer submitted after time limit + grace period
-- `TRANSLATION_NOT_FOUND` - Question translation not found for language
-- `SLIDE_NOT_FOUND` - Requested slide doesn't exist
-- `INVALID_ROLE` - Generic error for invalid operations
-
----
-
-### Messages FROM Server TO Host
-
-Host receives direct messages (not via pub/sub) about team activity.
-
-#### `TEAM_CONNECTED`
-
-A team connected or reconnected.
-
-```typescript
-{
-  type: 'TEAM_CONNECTED',
-  teamId: string,
-  teamName: string,
-  teamNumber: number,
-  languageCode: string    // e.g., 'en', 'es'
-}
-```
-
----
-
-#### `TEAM_DISCONNECTED`
-
-A team disconnected.
-
-```typescript
-{
-  type: 'TEAM_DISCONNECTED',
-  teamId: string
-}
-```
-
----
-
-#### `ANSWER_RECEIVED`
-
-Team submitted or updated an answer.
-
-```typescript
-{
-  type: 'ANSWER_RECEIVED',
-  teamId: string,
-  hasAnswer: boolean
-}
-```
-
-**Note**: `hasAnswer` is `false` if team cleared their answer, `true` if they submitted content
-
----
-
-#### `TEAM_READY`
-
-Team selected a language and is ready to participate.
-
-```typescript
-{
-  type: 'TEAM_READY',
-  teamId: string,
-  teamName: string,
-  teamNumber: number,
-  languageCode: string
-}
-```
-
----
-
-#### `GRACE_PERIOD_UPDATED`
-
-Grace period was changed via API (not from WebSocket).
-
-```typescript
-{
-  type: 'GRACE_PERIOD_UPDATED',
-  gracePeriod: number     // New grace period in seconds
-}
-```
-
-**Trigger**: `PATCH /api/runs/:runId` with `action: 'updateGracePeriod'`
-
----
-
-## State Management
-
-### Connection Cache
-
-The WebSocket server maintains in-memory state for each event:
-
-```typescript
-{
-  eventId: string,
-  host: ServerWebSocket | null,
-  teams: Map<teamId, {
-    ws: ServerWebSocket,
-    teamName: string,
-    teamNumber: number,
-    languageCode: string | null
-  }>,
-  run: {
-    id: string,
-    status: 'not_started' | 'in_progress' | 'completed',
-    gracePeriod: number,
-    activeId: string | null,
-    activeType: 'question' | 'slide' | null,
-    activeStartTime: number | null,  // Unix timestamp
-    hasTimer: boolean
-  } | null
-}
-```
-
-### Language Channels
-
-Teams are subscribed to pub/sub channels based on their selected language:
-
-- Channel format: `${eventId}:${languageCode}`
-- Example: `abc123:en`, `abc123:es`
-- All broadcasts use these channels to send language-specific translations
-
-### Answer Persistence (#54)
-
-The `answers` table is the only place answers are stored. The active item's `answers` (one entry per team) is a copy kept in memory: the server builds it from the table when a question opens (`SET_ACTIVE_ITEM` ignores the answers the host page sends), when an event's live state loads, and when a run starts over. Submitting, challenging and grading write the table first and then update the copy. `runs.active_item` is saved without answers, and `GET /api/events/:id/run` adds them back from the table.
-
----
-
-## Timing & Deadlines
-
-### Question Timer (#47)
+## Timer (#47)
 
 The server keeps one deadline per open question and broadcasts it only when it changes; every page counts down on its own.
 
 1. **Clock sync.** Every ACK carries `serverTime`. On connect, `WebSocketManager` sends 5 `PING`s one at a time and keeps the offset from the fastest round trip: `offset = serverTime − (sent + received) / 2` (`src/frontend/utils/serverClock.ts`). It re-syncs every minute, when the tab is shown again and when the network comes back.
-2. **Deadline.** Opening a question for answers (`SET_ACTIVE_ITEM` with phase `prompt`, not locked) or `START_TIMER` sets the prompt item's `endsAt` (server time, ms) to now + `seconds`. Pages show `ceil((endsAt − (Date.now() + offset)) / 1000)`, re-rendered every 250 ms. `REMOVE_TIMER` clears it (no time limit: `∞`).
-3. **Time up.** A server timeout at `endsAt` + grace period sets `isTimeUp` and broadcasts it. Team pages close their inputs at that same instant on their own, and the server refuses answers after it (it checks the deadline itself too). Changing the grace period moves the time-up.
-4. **Pause.** Pausing the run stores the time left in `pausedMs` (and clears `endsAt`); resuming sets a new `endsAt` = now + `pausedMs`, so every page resumes together (#25).
-5. **Safety net.** While a timer runs, the server re-sends the active item every 5 s.
-6. **Writes.** The run's `active_item` is saved when the timer starts, pauses, resumes or times up, not every second. After a server restart an open question keeps its deadline; one saved before #47 (with `startTime`) loads as having no timer.
+2. **Deadline.** Opening a question for answers, or `START_TIMER`, sets the prompt item's `endsAt` (server time, ms) to now + `seconds`. Pages show `ceil((endsAt − serverNow) / 1000)`. `REMOVE_TIMER` clears it (no time limit, shown as `∞`).
+3. **Time up.** A server timeout at `endsAt` + grace period sets `isTimeUp` and broadcasts it. Team pages close their inputs at that same instant on their own, and the server refuses answers after it (it checks the deadline itself too).
+4. **Pause.** Pausing the run keeps the time left in `pausedMs` (and clears `endsAt`); resuming sets a new `endsAt`, so every page resumes together.
+5. **Writes.** The run's `active_item` is saved when the timer starts, pauses, resumes or times up, not every second. After a server restart an open question keeps its deadline.
 
-## Error Handling
-
-### Connection Errors
-
-- **Authentication failure**: Upgrade request rejected with 401
-- **Permission denied**: Connection closed with error message
-- **Host already connected**: Second host connection rejected
-- **Invalid team**: Team connection rejected if team doesn't belong to event
-
-### Message Errors
-
-A message the server refuses (no open question, a locked question, an id from another event) gets `ok: false` and the reason in its ACK, and changes nothing. A malformed message also gets an `ERROR` message with code `INVALID_MESSAGE`. The connection stays open.
-
-### Disconnection Handling
-
-- **Team disconnect**: Host notified, team can reconnect without losing state
-- **Host disconnect**: Teams continue running, new host can connect
-- **Server restart**: All connections lost, clients should implement reconnection logic
-
----
-
-## Security Considerations
-
-1. **Session Validation**: Host, judge and presenter connections validate the session cookie; team connections validate the device token from joining with the team's code. When that session logs out the server closes its sockets at once with close code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted. Clients reload on 4001, which shows the login page
-2. **Permission Checks**: Host actions require `owner` or `admin` role
-3. **Team Isolation**: Teams can only submit answers for their own team
-4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event
-5. **SQL Injection Prevention**: All queries use parameterized statements via Bun SQL
-6. **Message Validation**: Every frame is parsed with its role's Zod schema in `src/server/webSocketMessages.ts`. A frame that isn't JSON or doesn't match gets `{ type: 'ERROR', code: 'INVALID_MESSAGE', message }` (plus its `ACK` when it had an `__ACK__` id) and changes nothing. Frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009. A handler that throws is logged and its ACK says `ok: false` instead of taking the server down
-
----
-
-## Integration with REST API
-
-The WebSocket system integrates with REST endpoints:
-
-- **Create Run**: `POST /api/events/:eventId/runs`
-  - Creates run record before WebSocket connection
-  - Sets initial grace period and status
-
-- **Update Run**: `PATCH /api/runs/:runId`
-  - Actions: `start`, `complete`, `updateGracePeriod`
-  - `updateGracePeriod` broadcasts to host via WebSocket
-  - `complete` sends `RUN_COMPLETED` to all teams and closes their connections
-
-- **Get Run**: `GET /api/runs/:runId`
-  - Fetches current run state including active question
-
-These endpoints use the same database tables as the WebSocket handlers, ensuring consistency.
-
----
-
-## Example Flows
-
-### Complete Run Flow
-
-1. Admin creates run via `POST /api/events/:eventId/runs`
-2. Host connects via WebSocket
-3. Teams connect and select languages via `SELECT_LANGUAGE`
-4. Host receives `TEAM_READY` for each team
-5. Host sends `START_QUESTION` with first question
-6. Teams receive `QUESTION_STARTED` in their language
-7. Teams submit answers via `SUBMIT_ANSWER`
-8. Host receives `ANSWER_RECEIVED` notifications
-9. Host sends `PAUSE` to end question
-10. Server grades answers automatically
-11. Repeat steps 5-10 for each question
-12. Host sends `COMPLETE_RUN`
-13. Teams receive `RUN_COMPLETED` with scores
-14. Connections close
-
-### Reconnection (#49, #50, #30)
+## Reconnection (#49, #50, #30)
 
 1. A dropped connection (a deploy, a Wi-Fi drop) is retried forever: 1 s, 2 s, 4 s … up to 30 s between attempts, each shortened at random by up to half so a room of devices doesn't reconnect at once. Pages show "Reconnecting…"; the team page adds that answers will be sent once the connection is back.
-2. A team's answers go through an outbox (`sendMessage(message, { queueKey })`): one that can't be sent, or whose ACK never comes, waits and is resent after reconnecting until the server answers. Only the latest answer per question is kept. Answers carry their `questionId`, and the server refuses one for a question that is no longer open ("That question has closed"), so a late resend can't land on the next question.
-3. The same device (same `teamToken` cookie) opening the team in a second tab replaces the first tab's socket, which the server closes with code 4003 (`TEAM_REPLACED_CLOSE_CODE`). That tab stops reconnecting and shows "This team is open in another tab" with a **Use this tab** button, instead of the two tabs taking the team from each other forever.
+2. A team's answers go through an outbox (`sendMessage(message, { queueKey })`): one that can't be sent, or whose ACK never comes, waits and is resent after reconnecting until the server answers. Only the latest answer per question is kept, and the server refuses one whose question has closed.
+3. The same device opening the team in a second tab replaces the first tab's socket, which the server closes with code 4003 (`TEAM_REPLACED_CLOSE_CODE`). That tab stops reconnecting and shows "This team is open in another tab" with a **Use this tab** button.
 
-### Team connection status (#48)
+## Team connection status (#48)
 
-Hosts get each team's `status` and `lastSeenAt` (server time, ms; null if not seen since the server started) in `TEAM_STATUS`: `connected`; `reconnecting` for 2 minutes after its socket drops (its page keeps retrying); then `offline`. A released device goes `offline` at once. The Run screen colors the badges (amber, pulsing, for reconnecting) and each team's menu says "Connected", "Reconnecting, last seen 20 s ago" or "Offline since 10:42". "N active" counts connected teams. Last-seen times live in the server's memory, so a restart forgets them.
+`TEAM_STATUS` gives each team's `status` and `lastSeenAt` (server time, ms; null if not seen since the server started): `connected`; `reconnecting` for 2 minutes after its socket drops (its page keeps retrying); then `offline`. A released device goes `offline` at once. The Run screen colors the badges (amber, pulsing, for reconnecting) and each team's menu says "Connected", "Reconnecting, last seen 20 s ago" or "Offline since 10:42". Last-seen times live in the server's memory, so a restart forgets them.
 
-### Grace Period Update Flow
+## Sessions and security
 
-1. Admin calls `PATCH /api/runs/:runId` with `updateGracePeriod`
-2. Server updates database
-3. Server updates cached run state
-4. Server sends `GRACE_PERIOD_UPDATED` to host
-5. New deadline applies to future answer submissions
+- When a host, judge or presenter session logs out, the server closes its sockets at once with code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted (#45). Pages reload on 4001, which shows the login page.
+- Every frame is parsed with its role's schema (#46); frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009.
+- Join attempts (`POST /api/join`) are rate limited to 60 a minute per address. Codes are six characters from an alphabet without look-alikes (about 887 million values).
+
+## Close codes
+
+| Code  | Meaning                    | Client                       |
+| ----- | -------------------------- | ---------------------------- |
+| 1009  | Frame too large            | reconnects                   |
+| 4001  | Session ended              | reloads (login page)         |
+| 4003  | Team opened in another tab | stops, offers "Use this tab" |
+| other | Connection dropped         | reconnects with backoff      |

@@ -2,10 +2,9 @@ import {
   NOT_CONNECTED,
   WebSocketManager,
   type MessageResult,
-  type WebSocketMessage,
   type WebSocketStatus
 } from '@/frontend/components/WebSocketManager';
-import type { ActiveItem } from '@/types';
+import type { ActiveItem, ServerMessage, TeamClientMessage } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -18,7 +17,7 @@ interface TeamStore {
     id: string;
     name: string;
     languageId: string;
-    languageCode: string;
+    languageCode: string | null;
   };
   errorMessage?: string;
   // RELEASED when the host released this device from the team.
@@ -31,22 +30,9 @@ interface TeamStore {
   connectionState: WebSocketStatus;
 }
 
-type WebSocketTeamMessage =
-  | (WebSocketMessage & { type: 'CONNECTION_ERROR'; message: string; code?: 'NOT_JOINED' | 'RELEASED' })
-  | (WebSocketMessage & { type: 'EVENT_INFO'; event: { id: string; name: string } })
-  | (WebSocketMessage & {
-      type: 'TEAM_INFO';
-      team: { id: string; name: string; languageId: string; languageCode: string };
-    })
-  | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
-  | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem | null })
-  | (WebSocketMessage & { type: 'LANGUAGES'; languages: Record<string, { id: string; code: string; name: string }> })
-  | (WebSocketMessage & { type: 'GRACE_PERIOD'; gracePeriod: number })
-  | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; challenged: boolean });
-
 export class TeamValt {
   store: TeamStore;
-  private ws: WebSocketManager<WebSocketTeamMessage> | null = null;
+  private ws: WebSocketManager<TeamClientMessage> | null = null;
 
   constructor() {
     this.store = proxy({
@@ -70,7 +56,7 @@ export class TeamValt {
       // The server knows the team (and event) from the device's cookie, set when it joined with the code.
       wsUrl.search = new URLSearchParams({ role: 'team' }).toString();
 
-      this.ws = new WebSocketManager<WebSocketTeamMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
+      this.ws = new WebSocketManager<TeamClientMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
       this.ws.connect();
     }
@@ -89,7 +75,7 @@ export class TeamValt {
     }
   };
 
-  onMessage = (message: WebSocketTeamMessage) => {
+  onMessage = (message: ServerMessage) => {
     switch (message.type) {
       case 'CONNECTION_ERROR':
         this.cleanup();
