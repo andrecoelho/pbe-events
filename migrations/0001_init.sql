@@ -1,15 +1,5 @@
-DROP TABLE IF EXISTS answers CASCADE;
-DROP TABLE IF EXISTS slides CASCADE;
-DROP TABLE IF EXISTS translations CASCADE;
-DROP TABLE IF EXISTS questions CASCADE;
-DROP TABLE IF EXISTS teams CASCADE;
-DROP TABLE IF EXISTS languages CASCADE;
-DROP TABLE IF EXISTS permissions CASCADE;
-DROP TABLE IF EXISTS roles CASCADE;
-DROP TABLE IF EXISTS runs CASCADE;
-DROP TABLE IF EXISTS events CASCADE;
-DROP TABLE IF EXISTS sessions CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+-- Initial schema, as it was in src/server/pbe.sql before migrations.
+-- Databases created before migrations already have it and are marked as applied by the runner.
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,

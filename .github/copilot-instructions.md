@@ -119,7 +119,7 @@ bun install      # Install dependencies
    - Frontend pages: `src/frontend/app/pages/*/` (each feature has Valt + Components + CSS)
    - Shared components: `src/frontend/components/`
 
-5. **Database Schema**: See `src/server/pbe.sql` for complete schema. Note the permission system:
+5. **Database Schema**: See `migrations/` for the schema (start with `0001_init.sql`). Note the permission system:
    - Events have many Users through Permissions
    - Permissions track role: `'owner' | 'admin' | 'judge'`
    - Query helpers in `src/server/queries.ts` enforce permission checks
@@ -143,5 +143,5 @@ bun install      # Install dependencies
 **Database queries:**
 
 - Always define at module level for reuse
-- Reference `src/server/pbe.sql` for accurate table/column names
+- Reference `migrations/` for accurate table/column names
 - Use joins for permission-aware queries (see `src/server/routes/events.ts`)

@@ -15,8 +15,8 @@ description = "Start the local Postgres container (docker-compose.yml)"
 run = "docker compose up -d postgres"
 
 [tasks.dev]
-description = "Install dependencies and start the dev server with hot reload"
-run = ["bun install", "bun dev"]
+description = "Install dependencies, apply migrations and start the dev server with hot reload"
+run = ["bun install", "bun run migrate", "bun dev"]
 
 # The staging database has no public address; these reach it over an SSH tunnel
 # with the Railway CLI. Always staging, never production.

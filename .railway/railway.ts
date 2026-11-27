@@ -38,6 +38,8 @@ export default defineRailway((ctx) => {
     // production deploys main, staging deploys staging; both wait for GitHub CI to pass.
     source: github('andrecoelho/pbe-events', { branch: production ? 'main' : 'staging', checkSuites: true }),
     build: { buildEnvironment: 'V3', builder: 'RAILPACK' },
+    // Apply pending migrations before the new version starts; a failure stops the deploy.
+    preDeploy: 'bun run migrate',
     healthcheck: '/api/health',
     healthcheckTimeout: 60,
     replicas: { [region]: 1 },

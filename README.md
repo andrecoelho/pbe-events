@@ -7,13 +7,22 @@ Tool versions and dev tasks are managed with [mise](https://mise.jdx.dev) (see `
 ```bash
 curl https://mise.run | sh                       # single binary in ~/.local/bin, no dependencies
 echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc   # then open a new terminal
-mise install                                     # installs the pinned Bun
+mise install                                     # installs the pinned Bun (and Node, for the Railway config)
 cp .env.example .env                             # then adjust as needed
 mise run db                                      # start local Postgres (Docker)
-mise run dev                                     # install dependencies and start the dev server
+mise run dev                                     # install dependencies, apply migrations, start the dev server
 ```
 
 Run `mise tasks` to list all tasks.
+
+### Database migrations
+
+The schema lives in `migrations/`, applied in name order and recorded in the `schema_migrations` table. To change it, add the next file (e.g. `migrations/0002_add_team_color.sql`); never edit one that has already run. Railway applies pending migrations before each deploy.
+
+```bash
+bun run migrate     # apply pending migrations to the database in POSTGRES_URL
+bun run db:reset    # local only: delete everything and rebuild from migrations (asks first)
+```
 
 ### Using the staging database
 
@@ -25,6 +34,8 @@ mise run db:tunnel     # just the tunnel on localhost:15432, for DB tools like T
 ```
 
 These only ever connect to **staging**, never production.
+
+`dev:staging` doesn't apply migrations, so a branch's unmerged migration never reaches staging's database; staging gets them when it deploys.
 
 ## Railway infrastructure
 
