@@ -15,8 +15,10 @@ export const QuestionTranslation = memo(({ languageCode }: Props) => {
   const answerRef = useRef<HTMLInputElement>(null);
   const clarificationRef = useRef<HTMLInputElement>(null);
 
-  const question = snap.selectedQuestion!;
-  const translation = question.translations[languageCode]!;
+  // This snapshot is sync while the editor's isn't, so right after a reload (an import that drops a
+  // language) it can be asked for a translation that no longer exists for one render.
+  const question = snap.selectedQuestion;
+  const translation = question?.translations[languageCode];
 
   const handleTranslationChange = useCallback(
     debounce(
@@ -32,6 +34,10 @@ export const QuestionTranslation = memo(({ languageCode }: Props) => {
     ),
     [questionsValt]
   );
+
+  if (!question || !translation) {
+    return null;
+  }
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     questionsValt.changeStoreTranslation(question, translation, { prompt: e.target.value });

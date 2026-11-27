@@ -4,10 +4,11 @@ import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo, useRef } from 'react';
 import { useSnapshot } from 'valtio';
+import { importConflictModal } from './ImportConflictModal';
 import { QuestionEditor } from './QuestionEditor';
 import './Questions.css';
 import { QuestionsList } from './QuestionsList';
-import { QuestionsValt, QuestionsValtContext } from './questionsValt';
+import { QuestionsValt, QuestionsValtContext, type ImportOptions } from './questionsValt';
 
 const init = () => {
   const valt = new QuestionsValt();
@@ -54,9 +55,22 @@ export const Questions = memo(() => {
           );
 
     if (confirmed) {
-      const result = await valt.importQuestions(file);
+      let options: ImportOptions = {};
+      let result = await valt.importQuestions(file);
 
-      if (result.error) {
+      // The server says what the import would break; ask and retry until it goes through or is cancelled.
+      while (!result.ok && result.conflict) {
+        const chosen = await importConflictModal.open(result.conflict, options);
+
+        if (!chosen) {
+          break;
+        }
+
+        options = chosen;
+        result = await valt.importQuestions(file, options);
+      }
+
+      if (!result.ok && result.error) {
         alertModal.open(`Error importing questions: ${result.error}`);
       }
     }

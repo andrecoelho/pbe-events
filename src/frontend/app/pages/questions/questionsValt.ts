@@ -29,6 +29,20 @@ export interface QuestionsStore {
   selectedQuestion: Question | null;
 }
 
+export interface ImportOptions {
+  teamLanguage?: string;
+  deleteAnswers?: boolean;
+}
+
+export interface ImportConflict {
+  error: string;
+  missingLanguages: { code: string; name: string; teamCount: number }[];
+  answerCount: number;
+  fileLanguages: { code: string; name: string }[];
+}
+
+export type ImportResult = { ok: true } | { ok: false; error?: string; conflict?: ImportConflict };
+
 export class QuestionsValt {
   store: QuestionsStore;
 
@@ -428,11 +442,21 @@ export class QuestionsValt {
   }
 
   /**
-   * Import questions from a YAML file
+   * Import questions from a YAML file. A 409 comes back as `conflict`: the import needs the
+   * user to choose a language for some teams and/or agree to erase recorded answers, then retry
+   * with those options.
    */
-  async importQuestions(file: File) {
+  async importQuestions(file: File, options: ImportOptions = {}): Promise<ImportResult> {
     const formData = new FormData();
     formData.append('file', file);
+
+    if (options.teamLanguage) {
+      formData.append('teamLanguage', options.teamLanguage);
+    }
+
+    if (options.deleteAnswers) {
+      formData.append('deleteAnswers', 'true');
+    }
 
     const result = await fetch(`/api/events/${this.store.eventId}/questions/import`, {
       method: 'POST',
@@ -443,6 +467,10 @@ export class QuestionsValt {
       // Reload questions after successful import
       await this.init(this.store.eventId);
       return { ok: true };
+    }
+
+    if (result.status === 409) {
+      return { ok: false, conflict: (await result.json()) as ImportConflict };
     }
 
     const response = (await result.json()) as { error: string };

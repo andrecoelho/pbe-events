@@ -175,6 +175,7 @@ Same app, at `/app/admin`. Needs `users.is_super_admin` and `admin_audit_log`.
 - [ ] Questions table, lean version: inline editing, Tab navigation, autosave, paste from spreadsheets. Time-boxed to 2–3 days.
 - [ ] Teams: paste names in bulk, rename inline, copy or print join codes.
 - [ ] Languages: one-click English / Spanish / French.
+- [ ] #88 Import: map each team to a language when the file drops theirs (today the import dialog moves them all to one language).
 - [ ] #12 Lock question editing during an event, with a banner.
 - [ ] #10 One `api()` helper with clear failure messages.
 

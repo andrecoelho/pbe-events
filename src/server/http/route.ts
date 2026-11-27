@@ -49,6 +49,7 @@ export const badRequest = (message = 'Bad Request', details?: Record<string, unk
 export const unauthorized = (message = 'Please sign in again.') => new HttpError(401, message);
 export const forbidden = (message = 'You do not have permission to do that.') => new HttpError(403, message);
 export const notFound = (message = 'Not Found') => new HttpError(404, message);
+export const conflict = (message: string, details?: Record<string, unknown>) => new HttpError(409, message, details);
 export const tooManyRequests = (message: string, retryAfterSeconds: number) =>
   new HttpError(429, message, { retryAfterSeconds });
 

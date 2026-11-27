@@ -109,10 +109,14 @@ export const questionsRoutes: Routes = {
     }))
   },
 
-  // Replaces the event's languages and questions with a YAML file's (multipart form, field `file`).
+  // Replaces the event's questions with a YAML file's (multipart form: `file`, and optionally
+  // `teamLanguage` and `deleteAnswers` to resolve a 409; see docs/QUESTIONS_IMPORT_API.md).
   '/api/events/:eventId/questions/import': {
     POST: route(managers(), async ({ event, req }) => {
-      const file = (await req.formData()).get('file');
+      const form = await req.formData();
+      const file = form.get('file');
+      const teamLanguage = form.get('teamLanguage');
+      const deleteAnswers = form.get('deleteAnswers');
 
       if (!file || !(file instanceof File)) {
         throw badRequest('No file provided');
@@ -136,7 +140,10 @@ export const questionsRoutes: Routes = {
         throw badRequest(validation.error || 'Invalid data');
       }
 
-      await replaceQuestions(event.id, validation.languages!, validation.questions!);
+      await replaceQuestions(event.id, validation.languages!, validation.questions!, {
+        teamLanguage: typeof teamLanguage === 'string' && teamLanguage !== '' ? teamLanguage : undefined,
+        deleteAnswers: deleteAnswers === 'true'
+      });
 
       return {
         message: 'Questions and languages imported successfully',

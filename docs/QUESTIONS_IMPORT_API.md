@@ -6,7 +6,7 @@
 
 **POST** `/api/events/:eventId/questions/import`
 
-Imports questions from a YAML file for a specific event. This endpoint replaces all existing questions for the event.
+Imports questions from a YAML file for a specific event. This endpoint replaces all existing questions for the event and brings the event's languages in line with the file (see [Languages Section](#languages-section)). It is all or nothing: if anything fails, the event is left as it was.
 
 ### Export Questions
 
@@ -28,6 +28,8 @@ Exports all questions for a specific event as a YAML file. The exported file can
 **Form Data:**
 
 - `file` (File): YAML file containing languages and questions
+- `teamLanguage` (optional): code of a language in the file. Teams whose language the file leaves out move to it. Send it after a `409` that lists `missingLanguages`.
+- `deleteAnswers` (optional): `true` to allow erasing the answers (and grades) already recorded for the event. Send it after a `409` with an `answerCount`.
 
 ## YAML File Format
 
@@ -50,7 +52,11 @@ questions:
 
 ### Languages Section
 
-The `languages` array defines all languages that will be available for the event. **This section overrides all existing languages for the event.**
+The `languages` array defines all languages that will be available for the event. Languages are matched to the event's existing ones by `code`:
+
+- A code the event already has keeps that language, so teams using it stay on it. Its name becomes the file's.
+- A code the event doesn't have is added.
+- An existing language the file leaves out is deleted. If teams still use it, the import is refused with a `409` unless `teamLanguage` says where to move them.
 
 ```yaml
 languages:
@@ -220,6 +226,29 @@ questions:
 }
 ```
 
+```json
+{
+  "error": "Language \"de\" is not in the file"
+}
+```
+
+**Status:** 409 Conflict
+
+The import would strand teams on a deleted language and/or erase recorded answers, so nothing was changed. The response lists everything that needs a decision; send the same file again with `teamLanguage` and/or `deleteAnswers=true` to go ahead. The questions page does this through a dialog.
+
+```json
+{
+  "error": "Can't import yet: teams use Español (es), which the file leaves out; importing would erase 12 recorded answers.",
+  "missingLanguages": [{ "code": "es", "name": "Español", "teamCount": 3 }],
+  "answerCount": 12,
+  "fileLanguages": [{ "code": "en", "name": "English" }]
+}
+```
+
+- `missingLanguages`: languages the file leaves out that teams still use (empty when resolved or not an issue)
+- `answerCount`: answers that importing would erase (0 when resolved or there are none)
+- `fileLanguages`: the file's languages, to choose `teamLanguage` from
+
 **Status:** 401 Unauthorized
 
 ```json
@@ -240,7 +269,8 @@ questions:
 
 ```json
 {
-  "error": "Failed to import questions"
+  "error": "Something went wrong on our side. Please try again.",
+  "requestId": "..."
 }
 ```
 
@@ -326,6 +356,29 @@ Returns a YAML file in the same format used for import. The file will be automat
   "error": "Nothing to export - event has no languages or questions configured"
 }
 ```
+
+```json
+{
+  "error": "Language \"de\" is not in the file"
+}
+```
+
+**Status:** 409 Conflict
+
+The import would strand teams on a deleted language and/or erase recorded answers, so nothing was changed. The response lists everything that needs a decision; send the same file again with `teamLanguage` and/or `deleteAnswers=true` to go ahead. The questions page does this through a dialog.
+
+```json
+{
+  "error": "Can't import yet: teams use Español (es), which the file leaves out; importing would erase 12 recorded answers.",
+  "missingLanguages": [{ "code": "es", "name": "Español", "teamCount": 3 }],
+  "answerCount": 12,
+  "fileLanguages": [{ "code": "en", "name": "English" }]
+}
+```
+
+- `missingLanguages`: languages the file leaves out that teams still use (empty when resolved or not an issue)
+- `answerCount`: answers that importing would erase (0 when resolved or there are none)
+- `fileLanguages`: the file's languages, to choose `teamLanguage` from
 
 **Status:** 401 Unauthorized
 

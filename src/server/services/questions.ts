@@ -1,5 +1,6 @@
 // Questions and their translations. Callers check permissions first.
 import type { LanguageDefinition, QuestionImport, QuestionTranslation } from '@/server/questionsFile';
+import { badRequest, conflict } from '@/server/http/route';
 import { sql } from 'bun';
 
 export type QuestionType = 'PG' | 'PS' | 'TF' | 'FB';
@@ -188,20 +189,106 @@ export async function deleteQuestion(question: Question) {
   });
 }
 
-// Replaces the event's languages and questions with the file's, all or nothing.
-export async function replaceQuestions(eventId: string, languages: LanguageDefinition[], questions: QuestionImport[]) {
+export interface ReplaceQuestionsOptions {
+  // Code of a file language to move teams to when their language isn't in the file.
+  teamLanguage?: string;
+  // Allow erasing the answers (and grades) already recorded for the event's questions.
+  deleteAnswers?: boolean;
+}
+
+// A language the file leaves out while teams still use it.
+export interface MissingLanguage {
+  code: string;
+  name: string;
+  teamCount: number;
+}
+
+// Replaces the event's questions with the file's, all or nothing. Languages are matched by code:
+// existing ones keep their id (so teams keep them) and take the file's name, new ones are added, and
+// ones the file leaves out are deleted. Throws a 409 when that would strand teams on a deleted
+// language or erase recorded answers, unless the options say how to resolve it.
+export async function replaceQuestions(
+  eventId: string,
+  languages: LanguageDefinition[],
+  questions: QuestionImport[],
+  options: ReplaceQuestionsOptions = {}
+) {
+  const fileCodes = new Set(languages.map((language) => language.code));
+
+  if (options.teamLanguage !== undefined && !fileCodes.has(options.teamLanguage)) {
+    throw badRequest(`Language "${options.teamLanguage}" is not in the file`);
+  }
+
   await sql.begin(async (tx) => {
-    // Deleting the languages also deletes their translations; then the questions go too.
-    await tx`DELETE FROM languages WHERE event_id = ${eventId}`;
-    await tx`DELETE FROM questions WHERE event_id = ${eventId}`;
+    // Lock the event's languages so teams can't be moved onto one mid-import.
+    const existing: { id: string; code: string; name: string }[] = await tx`
+      SELECT id, code, name FROM languages WHERE event_id = ${eventId} ORDER BY code FOR UPDATE
+    `;
+    const dropped = existing.filter((language) => !fileCodes.has(language.code));
+    const teamCounts: { language_id: string; count: number }[] = await tx`
+      SELECT language_id, COUNT(*)::int AS count FROM teams WHERE event_id = ${eventId} GROUP BY language_id
+    `;
+    const teamsByLanguage = new Map(teamCounts.map((row) => [row.language_id, row.count]));
+    const missingLanguages: MissingLanguage[] = dropped
+      .filter((language) => teamsByLanguage.has(language.id))
+      .map((language) => ({ code: language.code, name: language.name, teamCount: teamsByLanguage.get(language.id)! }));
+    const answerRows: { count: number }[] = await tx`
+      SELECT COUNT(*)::int AS count FROM answers a JOIN questions q ON q.id = a.question_id WHERE q.event_id = ${eventId}
+    `;
+    const answerCount = answerRows[0]?.count ?? 0;
+
+    const languagesUnresolved = missingLanguages.length > 0 && options.teamLanguage === undefined;
+    const answersUnresolved = answerCount > 0 && !options.deleteAnswers;
+
+    if (languagesUnresolved || answersUnresolved) {
+      const reasons = [
+        languagesUnresolved &&
+          `teams use ${missingLanguages.map((language) => `${language.name} (${language.code})`).join(', ')}, which the file leaves out`,
+        answersUnresolved && `importing would erase ${answerCount} recorded answer${answerCount === 1 ? '' : 's'}`
+      ].filter(Boolean);
+
+      throw conflict(`Can't import yet: ${reasons.join('; ')}.`, {
+        missingLanguages: languagesUnresolved ? missingLanguages : [],
+        answerCount: answersUnresolved ? answerCount : 0,
+        fileLanguages: languages
+      });
+    }
 
     const languageIds = new Map<string, string>();
+    const existingByCode = new Map(existing.map((language) => [language.code, language]));
 
     for (const language of languages) {
-      const id = Bun.randomUUIDv7();
-      await tx`INSERT INTO languages (id, code, name, event_id) VALUES (${id}, ${language.code}, ${language.name}, ${eventId})`;
-      languageIds.set(language.code, id);
+      const current = existingByCode.get(language.code);
+
+      if (current) {
+        if (current.name !== language.name) {
+          await tx`UPDATE languages SET name = ${language.name} WHERE id = ${current.id}`;
+        }
+
+        languageIds.set(language.code, current.id);
+      } else {
+        const id = Bun.randomUUIDv7();
+        await tx`INSERT INTO languages (id, code, name, event_id) VALUES (${id}, ${language.code}, ${language.name}, ${eventId})`;
+        languageIds.set(language.code, id);
+      }
     }
+
+    if (dropped.length > 0) {
+      const droppedIds = dropped.map((language) => language.id);
+
+      if (options.teamLanguage !== undefined) {
+        await tx`
+          UPDATE teams SET language_id = ${languageIds.get(options.teamLanguage)!}
+          WHERE event_id = ${eventId} AND language_id IN ${sql(droppedIds)}
+        `;
+      }
+
+      // Their translations go with them.
+      await tx`DELETE FROM languages WHERE id IN ${sql(droppedIds)}`;
+    }
+
+    // Deleting the questions also deletes their translations and answers.
+    await tx`DELETE FROM questions WHERE event_id = ${eventId}`;
 
     for (const [index, question] of questions.entries()) {
       const questionId = Bun.randomUUIDv7();
