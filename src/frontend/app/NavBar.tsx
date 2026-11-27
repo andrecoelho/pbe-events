@@ -53,7 +53,7 @@ export const NavBar = memo(() => {
               Settings
             </a>
           </li>
-          {snap.user.isSuperAdmin && (
+          {snap.user.isEventAdmin && (
             <li>
               <a href='/admin' onClick={closeMenu}>
                 Admin

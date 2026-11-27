@@ -127,10 +127,11 @@ export const route = (...stack: [...Middleware[], Handler]) => (req: BunRequest)
 
 ## Phase 3 — Admin page
 
-Same app, at `/app/admin`. Needs `users.is_super_admin` and `admin_audit_log`.
+Same app, at `/app/admin` (`/admin` until the app moves under `/app` in Phase 8). Needs `users.is_super_admin` and `admin_audit_log`.
 
-- [ ] Live connections per event.
+- [ ] Live connections per event: a summary row per open event, and a page per event with everyone connected and every team.
 - [ ] Reset an event in memory; force-release a team device.
+- [ ] #89 Event admins (owner or admin role) get the live connections and the event pages, with both actions, for the events they manage; super admins see every event without being in it. The other sections stay super-admin only. _(Added during Phase 3.)_
 - [ ] Users: search, edit name/email, one-time reset link, sign out everywhere, disable.
 - [ ] Events: list all, transfer ownership, add yourself to debug.
 - [ ] System health: uptime, memory, DB latency, version, recent errors.

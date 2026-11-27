@@ -1,7 +1,8 @@
-// The admin page's API (Phase 3). Super admins only.
-import { superAdmin } from '@/server/http/middleware';
+// The admin page's API (Phase 3). Super admins see every event; event admins (owner or admin) see theirs (#89).
+import { auth, eventRoleOrSuperAdmin } from '@/server/http/middleware';
 import { badRequest, notFound, route } from '@/server/http/route';
 import { getEventName } from '@/server/services/events';
+import { listEventIdsForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { countTeams, listTeams } from '@/server/services/teams';
 import { getUsersByIds } from '@/server/services/users';
 import type { Routes } from '@/server/types';
@@ -66,10 +67,12 @@ export function describeActiveItem(item: ActiveItem | null) {
 
 export function createAdminRoutes(wsServer: WebSocketServer): Routes {
   return {
-    // The events open in memory, one summary each (#56).
+    // The events open in memory, one summary each (#56): all of them for super admins, the ones they manage for
+    // everyone else.
     '/api/admin/connections': {
-      GET: route(superAdmin(), async (): Promise<LiveConnectionsResponse> => {
-        const events = wsServer.liveEvents();
+      GET: route(auth(), async ({ user }): Promise<LiveConnectionsResponse> => {
+        const managed = user.is_super_admin ? null : await listEventIdsForRoles(user.id, MANAGER_ROLES);
+        const events = wsServer.liveEvents().filter((event) => !managed || managed.has(event.eventId));
         const teamCounts = await countTeams(events.map((event) => event.eventId));
 
         return {
@@ -104,52 +107,55 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
 
     // One event: who is connected, and every team with its connection (#56). Works for events that aren't open.
     '/api/admin/events/:id': {
-      GET: route(superAdmin(), async ({ params: { id = '' } }): Promise<AdminEventResponse> => {
-        const event = await getEventName(id);
+      GET: route(
+        eventRoleOrSuperAdmin(...MANAGER_ROLES),
+        async ({ params: { id = '' } }): Promise<AdminEventResponse> => {
+          const event = await getEventName(id);
 
-        if (!event) {
-          throw notFound('Event not found');
+          if (!event) {
+            throw notFound('Event not found');
+          }
+
+          const live = wsServer.liveEvent(id);
+          const teamSockets = new Map((live?.sockets ?? []).flatMap((s) => (s.team ? [[s.team.id, s]] : [])));
+          const teams = await listTeams(id);
+
+          return {
+            serverTime: Date.now(),
+            event,
+            live: live && {
+              runStatus: live.runStatus,
+              activeItem: describeActiveItem(live.activeItem),
+              connections: await namedConnections(live.sockets)
+            },
+            teams: teams.map((team) => {
+              const socket = teamSockets.get(team.id);
+
+              return {
+                id: team.id,
+                number: team.number,
+                name: team.name,
+                languageCode: team.language_code,
+                hasDevice: team.has_device,
+                ...wsServer.teamConnection(id, team.id),
+                connectedAt: socket?.connectedAt ?? null,
+                lastMessageAt: socket?.lastMessageAt ?? null
+              };
+            })
+          };
         }
-
-        const live = wsServer.liveEvent(id);
-        const teamSockets = new Map((live?.sockets ?? []).flatMap((s) => (s.team ? [[s.team.id, s]] : [])));
-        const teams = await listTeams(id);
-
-        return {
-          serverTime: Date.now(),
-          event,
-          live: live && {
-            runStatus: live.runStatus,
-            activeItem: describeActiveItem(live.activeItem),
-            connections: await namedConnections(live.sockets)
-          },
-          teams: teams.map((team) => {
-            const socket = teamSockets.get(team.id);
-
-            return {
-              id: team.id,
-              number: team.number,
-              name: team.name,
-              languageCode: team.language_code,
-              hasDevice: team.has_device,
-              ...wsServer.teamConnection(id, team.id),
-              connectedAt: socket?.connectedAt ?? null,
-              lastMessageAt: socket?.lastMessageAt ?? null
-            };
-          })
-        };
-      })
+      )
     },
 
     // Drops the event's in-memory state and closes its sockets; the pages reconnect and reload it (#57).
     '/api/admin/events/:id/reset': {
-      POST: route(superAdmin(), async ({ params: { id = '' }, user }) => {
+      POST: route(eventRoleOrSuperAdmin(...MANAGER_ROLES), async ({ params: { id = '' }, user }) => {
         if (!wsServer.resetEvent(id)) {
           throw badRequest('This event isn’t open in the server’s memory, so there’s nothing to reset.');
         }
 
         // Until the audit log (#61).
-        console.log(`Admin ${user.email} reset event ${id} in memory`);
+        console.log(`${user.email} reset event ${id} in memory`);
 
         return {};
       })
@@ -157,12 +163,12 @@ export function createAdminRoutes(wsServer: WebSocketServer): Routes {
 
     // Frees a team for another device, as the host's Release device does (#57).
     '/api/admin/events/:id/teams/:teamId/release': {
-      POST: route(superAdmin(), async ({ params: { id = '', teamId = '' }, user }) => {
+      POST: route(eventRoleOrSuperAdmin(...MANAGER_ROLES), async ({ params: { id = '', teamId = '' }, user }) => {
         if (!(await wsServer.releaseDevice(id, teamId))) {
           throw notFound('Team not found');
         }
 
-        console.log(`Admin ${user.email} released the device of team ${teamId} in event ${id}`);
+        console.log(`${user.email} released the device of team ${teamId} in event ${id}`);
 
         return {};
       })

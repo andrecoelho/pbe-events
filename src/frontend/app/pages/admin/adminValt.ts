@@ -35,6 +35,8 @@ export class AdminValt {
     if (result.ok) {
       polled.data = result.data as AdminStore[K]['data'];
       polled.error = null;
+    } else if (result.status === 403 && key === 'event') {
+      polled.error = 'You can only see the events you own or are an admin of.';
     } else {
       polled.error = result.error;
     }

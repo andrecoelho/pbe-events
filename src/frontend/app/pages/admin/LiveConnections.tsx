@@ -1,3 +1,4 @@
+import { useAppValt } from '@/frontend/app/appValt';
 import { AdminLayout } from '@/frontend/app/pages/admin/Admin';
 import { formatAgo, ROLE_LABELS, RUN_STATUS } from '@/frontend/app/pages/admin/adminFormat';
 import { useAdminValt } from '@/frontend/app/pages/admin/adminValt';
@@ -54,6 +55,7 @@ function Teams({ event }: { event: LiveEventSummary }) {
 function ConnectionsList() {
   const valt = useAdminValt();
   const snap = useSnapshot(valt.store.connections);
+  const { isSuperAdmin } = useSnapshot(useAppValt().store).user;
 
   useEffect(() => valt.poll(valt.loadConnections), [valt]);
 
@@ -67,9 +69,9 @@ function ConnectionsList() {
   return (
     <div className='flex flex-col gap-4 max-w-6xl'>
       <p className='text-base-content/70'>
-        Events open in the server’s memory: one appears when someone opens its run, presenter, judge, results or team
-        screen, and goes away when the last one closes. Open an event to see who is connected. Refreshes every 5
-        seconds.
+        {isSuperAdmin ? 'Events' : 'Your events (as owner or admin)'} open in the server’s memory: one appears when
+        someone opens its run, presenter, judge, results or team screen, and goes away when the last one closes. Open an
+        event to see who is connected. Refreshes every 5 seconds.
       </p>
 
       {snap.error && (
@@ -79,7 +81,9 @@ function ConnectionsList() {
       )}
 
       {snap.data && events.length === 0 && (
-        <p className='text-lg text-base-content/60'>No events are open right now.</p>
+        <p className='text-lg text-base-content/60'>
+          {isSuperAdmin ? 'No events are open right now.' : 'None of your events are open right now.'}
+        </p>
       )}
 
       {events.length > 0 && (

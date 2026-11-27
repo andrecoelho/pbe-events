@@ -4,14 +4,16 @@ import { useMemo, type ReactNode } from 'react';
 import { useSnapshot } from 'valtio';
 
 // The admin page's sections. Each has its own route in App.tsx; pages inside a section (an event's page) keep
-// its tab active.
-const TABS = [{ id: 'connections', href: '/admin', label: 'Live connections' }] as const;
+// its tab active. Event admins see only the sections not marked superAdminOnly (#89).
+const TABS: { id: string; href: string; label: string; superAdminOnly?: boolean }[] = [
+  { id: 'connections', href: '/admin', label: 'Live connections' }
+];
 
-export type AdminTab = (typeof TABS)[number]['id'];
+export type AdminTab = 'connections';
 
 const init = () => new AdminValt();
 
-// The admin page's frame: title, tabs and the section's content. Only super admins get past it.
+// The admin page's frame: title, tabs and the section's content. Super admins and event admins get past it.
 export function AdminLayout({ tab, children }: { tab: AdminTab; children: ReactNode }) {
   const appValt = useAppValt();
   const appSnap = useSnapshot(appValt.store);
@@ -20,10 +22,10 @@ export function AdminLayout({ tab, children }: { tab: AdminTab; children: ReactN
   return (
     <div className='bg-base-100/95 flex-1 overflow-auto p-8 pt-4'>
       <h1 className='text-3xl font-bold mb-4'>Admin</h1>
-      {appSnap.user.isSuperAdmin ? (
+      {appSnap.user.isEventAdmin ? (
         <AdminValtContext.Provider value={valt}>
           <div role='tablist' className='tabs tabs-border mb-6'>
-            {TABS.map((t) => (
+            {TABS.filter((t) => appSnap.user.isSuperAdmin || !t.superAdminOnly).map((t) => (
               <a key={t.id} role='tab' href={t.href} className={`tab ${t.id === tab ? 'tab-active' : ''}`}>
                 {t.label}
               </a>
@@ -32,8 +34,9 @@ export function AdminLayout({ tab, children }: { tab: AdminTab; children: ReactN
           {children}
         </AdminValtContext.Provider>
       ) : (
-        <div role='alert' className='alert alert-warning max-w-xl'>
-          Only super admins can open the admin page. Ask one to give you access if you need it.
+        <div role='status' className='alert max-w-xl'>
+          You’re not an admin of any event. This page shows the live connections of the events you own or are an admin
+          of.
         </div>
       )}
     </div>

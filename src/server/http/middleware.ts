@@ -1,6 +1,6 @@
 import { badRequest, forbidden, middleware, notFound, tooManyRequests, unauthorized } from '@/server/http/route';
 import type { BaseCtx } from '@/server/http/route';
-import { getEventRole, type EventWithRole, type Role } from '@/server/services/permissions';
+import { getEventForRoles, getEventRole, type EventWithRole, type Role } from '@/server/services/permissions';
 import { getSessionUser, type SessionUser } from '@/server/session';
 import type { Session } from '@/server/types';
 import { z } from 'zod';
@@ -36,6 +36,20 @@ export const superAdmin = () =>
     const user = await requireUser(ctx);
 
     if (!user.is_super_admin) {
+      throw forbidden();
+    }
+
+    return next();
+  });
+
+// 403 unless the user is a super admin or has one of `roles` on the `:id` event (the admin page's event pages,
+// #89: super admins see every event without being in it). Signs the user in itself. Doesn't check the event
+// exists for super admins; the handler does.
+export const eventRoleOrSuperAdmin = (...roles: Role[]) =>
+  middleware<{ session: Session; user: SessionUser }>(async (ctx, next) => {
+    const user = await requireUser(ctx);
+
+    if (!user.is_super_admin && !(await getEventForRoles(ctx.params.id ?? '', user.id, roles))) {
       throw forbidden();
     }
 

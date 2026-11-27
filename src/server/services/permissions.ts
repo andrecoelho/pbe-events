@@ -65,3 +65,21 @@ export async function updatePermission(eventId: string, userId: string, roleId: 
 export async function removePermission(eventId: string, userId: string) {
   await sql`DELETE FROM permissions WHERE user_id = ${userId} AND event_id = ${eventId}`;
 }
+
+// The ids of the events where the user has one of `roles` (the admin page's list for event admins, #89).
+export async function listEventIdsForRoles(userId: string, roles: readonly Role[]): Promise<Set<string>> {
+  const rows: { event_id: string }[] = await sql`
+    SELECT event_id FROM permissions WHERE user_id = ${userId} AND role_id IN ${sql(roles as Role[])}
+  `;
+
+  return new Set(rows.map((row) => row.event_id));
+}
+
+// Whether the user has one of `roles` on any event.
+export async function hasAnyEventRole(userId: string, roles: readonly Role[]) {
+  const rows = await sql`
+    SELECT 1 FROM permissions WHERE user_id = ${userId} AND role_id IN ${sql(roles as Role[])} LIMIT 1
+  `;
+
+  return rows.length > 0;
+}

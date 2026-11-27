@@ -8,8 +8,10 @@ interface User {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
-  // Can open the admin page (/admin).
+  // Sees every event on the admin page (/admin), and its other sections.
   isSuperAdmin: boolean;
+  // Owner or admin of an event (or a super admin): the admin page shows their events' live connections (#89).
+  isEventAdmin: boolean;
 }
 
 interface AppStore {

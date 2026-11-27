@@ -17,15 +17,26 @@ mock.module('@/server/session', () => ({
   }
 }));
 
+const getEventRole = async (eventId: string, userId: string) => {
+  const role = roles[`${eventId}:${userId}`];
+  return role ? { id: eventId, name: `Event ${eventId}`, title_remarks: null, role_id: role } : null;
+};
+
+// Bun's module mocks apply to every test file, so the rest of the module stays real.
+const permissions = await import('@/server/services/permissions');
+
 mock.module('@/server/services/permissions', () => ({
-  getEventRole: async (eventId: string, userId: string) => {
-    const role = roles[`${eventId}:${userId}`];
-    return role ? { id: eventId, name: `Event ${eventId}`, title_remarks: null, role_id: role } : null;
+  ...permissions,
+  getEventRole,
+  getEventForRoles: async (eventId: string, userId: string, allowed: string[]) => {
+    const event = await getEventRole(eventId, userId);
+    return event && allowed.includes(event.role_id) ? event : null;
   }
 }));
 
 const { route, notFound } = await import('@/server/http/route');
-const { auth, eventRole, json, rateLimit, superAdmin } = await import('@/server/http/middleware');
+const { auth, eventRole, eventRoleOrSuperAdmin, json, rateLimit, superAdmin } =
+  await import('@/server/http/middleware');
 
 const server = { requestIP: () => ({ address: '10.0.0.1', family: 'IPv4', port: 1 }) } as unknown as Server<unknown>;
 
@@ -130,6 +141,21 @@ describe('superAdmin', () => {
     const handler = route(superAdmin(), () => ({ ok: true }));
     expect((await call(handler, { session: 'session-alice' })).status).toBe(403);
     expect((await call(handler, { session: 'session-root' })).status).toBe(200);
+  });
+});
+
+describe('eventRoleOrSuperAdmin', () => {
+  const handler = route(eventRoleOrSuperAdmin('owner', 'admin'), ({ user }) => ({ userId: user.id }));
+
+  test('lets in the event’s managers and super admins, who needn’t be in the event', async () => {
+    expect((await call(handler, { session: 'session-alice', params: { id: 'event-1' } })).status).toBe(200);
+    expect((await call(handler, { session: 'session-root', params: { id: 'event-1' } })).status).toBe(200);
+  });
+
+  test('403 for another role or no role, 401 without a session', async () => {
+    expect((await call(handler, { session: 'session-alice', params: { id: 'event-2' } })).status).toBe(403);
+    expect((await call(handler, { session: 'session-alice', params: { id: 'event-9' } })).status).toBe(403);
+    expect((await call(handler, { params: { id: 'event-1' } })).status).toBe(401);
   });
 });
 
