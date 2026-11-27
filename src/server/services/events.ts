@@ -214,3 +214,7 @@ export async function duplicateEvent(sourceEventId: string, userId: string, name
     return { id: newEventId, name, roleId: 'owner' as const };
   });
 }
+
+export async function setTitleRemarks(eventId: string, titleRemarks: string) {
+  await sql`UPDATE events SET title_remarks = ${titleRemarks} WHERE id = ${eventId}`;
+}

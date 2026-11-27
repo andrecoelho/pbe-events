@@ -1,121 +1,81 @@
+import { route, unauthorized, badRequest } from '@/server/http/route';
 import { createSession, deleteSession } from '@/server/session';
-import type { Routes, User } from '@/server/types';
-import { apiBadRequest, apiData, apiUnauthorized } from '@/server/utils/responses';
-import { sql } from 'bun';
-import { join } from 'node:path';
+import { checkAvatar, createUser, getLoginByEmail, isEmailTaken, saveAvatarFile } from '@/server/services/users';
+import type { Routes } from '@/server/types';
+import { apiData } from '@/server/utils/responses';
+
+function sessionCookie(value: string, extra = '') {
+  const secure = Bun.env.NODE_ENV === 'production' ? 'Secure; ' : '';
+  return `sessionId=${value}; HttpOnly; ${secure}SameSite=Lax; Path=/;${extra}`;
+}
 
 export const authRoutes: Routes = {
   '/api/login': {
-    POST: async (req) => {
-      const { email, password } = await req.json();
-      const invalidMessage = 'Invalid credentials';
+    POST: route(async ({ req }) => {
+      const { email, password } = (await req.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
 
-      if (!email || !password) {
-        return apiUnauthorized(invalidMessage);
+      // One message for every failure, so it doesn't reveal which emails have accounts.
+      const invalid = () => unauthorized('Invalid credentials');
+
+      if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+        throw invalid();
       }
 
-      const users: User[] = await sql`SELECT * FROM users WHERE email = ${email}`;
-      const user = users[0];
+      const user = await getLoginByEmail(email);
 
-      if (!user) {
-        return apiUnauthorized(invalidMessage);
+      if (!user || !(await Bun.password.verify(password, user.password))) {
+        throw invalid();
       }
 
-      const isMatch = await Bun.password.verify(password, user.password);
-
-      if (!isMatch) {
-        return apiUnauthorized(invalidMessage);
-      }
-
-      const sessionId = await createSession(user.id);
-
-      const isProduction = Bun.env.NODE_ENV === 'production';
-      const secureCookie = isProduction ? 'Secure; ' : '';
-      return apiData({}, { 'Set-Cookie': `sessionId=${sessionId}; HttpOnly; ${secureCookie}SameSite=Lax; Path=/;` });
-    }
+      return apiData({}, { 'Set-Cookie': sessionCookie(await createSession(user.id)) });
+    })
   },
+
   '/api/logout': {
-    POST: async (req) => {
+    POST: route(async ({ req }) => {
       await deleteSession(req);
 
-      const isProduction = Bun.env.NODE_ENV === 'production';
-      const secureCookie = isProduction ? 'Secure; ' : '';
-      return apiData({}, { 'Set-Cookie': `sessionId=; HttpOnly; ${secureCookie}SameSite=Lax; Path=/; Max-Age=0` });
-    }
+      return apiData({}, { 'Set-Cookie': sessionCookie('', ' Max-Age=0') });
+    })
   },
+
+  // Multipart form: email, firstName, lastName, password and an optional avatar.
   '/api/signup': {
-    POST: async (req) => {
-      const formData = await req.formData();
-      const email = formData.get('email') as string | null;
-      const firstName = formData.get('firstName') as string | null;
-      const lastName = formData.get('lastName') as string | null;
-      const password = formData.get('password') as string | null;
-      const avatar = formData.get('avatar') as File | null;
+    POST: route(async ({ req }) => {
+      const form = await req.formData();
+      const text = (name: string) => {
+        const value = form.get(name);
+        return typeof value === 'string' ? value : '';
+      };
+      const email = text('email');
+      const firstName = text('firstName');
+      const lastName = text('lastName');
+      const password = text('password');
+      const avatar = form.get('avatar');
 
       if (!email || !firstName || !lastName || !password) {
-        return apiBadRequest('All fields are required');
+        throw badRequest('All fields are required');
       }
 
       if (password.length < 8) {
-        return apiBadRequest('Password must be at least 8 characters');
+        throw badRequest('Password must be at least 8 characters');
       }
 
-      // Check if email is already taken
-      const existingUsers: { id: string }[] = await sql`
-        SELECT id FROM users WHERE email = ${email}
-      `;
-
-      if (existingUsers.length > 0) {
-        return apiBadRequest('Email is already in use');
+      if (await isEmailTaken(email)) {
+        throw badRequest('Email is already in use');
       }
 
-      // Hash password
-      const hashedPassword = await Bun.password.hash(password);
-
-      // Generate user ID
-      const userId = Bun.randomUUIDv7();
-
-      // Handle avatar if provided
+      const id = Bun.randomUUIDv7();
       let avatarUrl: string | null = null;
 
-      if (avatar && avatar instanceof File && avatar.size > 0) {
-        // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        if (!allowedTypes.includes(avatar.type)) {
-          return apiBadRequest('Invalid file type. Allowed: JPEG, PNG, WebP, GIF');
-        }
-
-        // Validate file size (max 500KB)
-        const maxSize = 500 * 1024;
-        if (avatar.size > maxSize) {
-          return apiBadRequest('File size must be less than 500KB');
-        }
-
-        // Get file extension from mime type
-        const extensions: Record<string, string> = {
-          'image/jpeg': '.jpg',
-          'image/png': '.png',
-          'image/webp': '.webp',
-          'image/gif': '.gif'
-        };
-        const ext = extensions[avatar.type] || '.png';
-
-        // Save file to disk
-        const fileName = `${userId}${ext}`;
-        const filePath = join(global.PBE.imageDir, fileName);
-
-        await Bun.write(filePath, avatar);
-
-        avatarUrl = `/user-image/${fileName}`;
+      if (avatar instanceof File && avatar.size > 0) {
+        checkAvatar(avatar);
+        avatarUrl = await saveAvatarFile(id, avatar);
       }
 
-      // Create user
-      await sql`
-        INSERT INTO users (id, email, password, first_name, last_name, avatar_url)
-        VALUES (${userId}, ${email}, ${hashedPassword}, ${firstName}, ${lastName}, ${avatarUrl})
-      `;
+      await createUser({ id, email, firstName, lastName, password, avatarUrl });
 
-      return apiData();
-    }
+      return {};
+    })
   }
 };

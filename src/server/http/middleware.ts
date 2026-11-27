@@ -47,6 +47,9 @@ interface EventRoleOptions {
   eventId?: (ctx: BaseCtx) => string | undefined | Promise<string | undefined>;
 }
 
+// What eventRole() adds to the context.
+export type EventRoleAdds = { session: Session; user: SessionUser; event: EventWithRole };
+
 // 403 unless the user has one of `roles` on the event. Signs the user in itself.
 // Adds `session`, `user` and `event` ({ id, name, title_remarks, role_id }).
 export function eventRole(...args: [...Role[]] | [...Role[], EventRoleOptions]) {
@@ -54,7 +57,7 @@ export function eventRole(...args: [...Role[]] | [...Role[], EventRoleOptions]) 
   const options: EventRoleOptions = typeof last === 'object' ? last : {};
   const roles = args.filter((arg): arg is Role => typeof arg === 'string');
 
-  return middleware<{ session: Session; user: SessionUser; event: EventWithRole }>(async (ctx, next) => {
+  return middleware<EventRoleAdds>(async (ctx, next) => {
     const user = await requireUser(ctx);
     const eventId = options.eventId ? await options.eventId(ctx) : (ctx.params.id ?? ctx.params.eventId);
 

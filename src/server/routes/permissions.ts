@@ -1,114 +1,46 @@
+import { eventRole, json } from '@/server/http/middleware';
+import { badRequest, route } from '@/server/http/route';
 import {
   addPermission,
-  getEventForRoles,
   listEventPermissions,
   MANAGER_ROLES,
   removePermission,
-  type Role,
   updatePermission
 } from '@/server/services/permissions';
-import { getSession } from '@/server/session';
 import type { Routes } from '@/server/types';
-import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import type { BunRequest } from 'bun';
+import { z } from 'zod';
+
+const required = 'userId and roleId are required';
+const UserRole = z.object({
+  userId: z.string({ error: required }).min(1, required),
+  roleId: z.enum(['owner', 'admin', 'judge'], { error: required })
+});
+const UserOnly = z.object({ userId: z.string({ error: 'userId is required' }).min(1, 'userId is required') });
 
 export const permissionRoutes: Routes = {
   '/api/events/:id/permissions': {
-    GET: async (req: BunRequest<'/api/events/:id/permissions'>) => {
-      const session = await getSession(req);
+    GET: route(eventRole(...MANAGER_ROLES), async ({ event }) => ({
+      eventName: event.name,
+      permissions: await listEventPermissions(event.id)
+    })),
 
-      if (!session) {
-        return apiUnauthorized();
+    POST: route(eventRole(...MANAGER_ROLES), json(UserRole), async ({ event, body }) => {
+      await addPermission(event.id, body.userId, body.roleId);
+      return {};
+    }),
+
+    PATCH: route(eventRole(...MANAGER_ROLES), json(UserRole), async ({ event, body }) => {
+      if (body.roleId === 'owner') {
+        throw badRequest('Cannot assign owner role');
       }
 
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
+      await updatePermission(event.id, body.userId, body.roleId);
+      return {};
+    }),
 
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const permissions = await listEventPermissions(eventId);
-
-      return apiData({ eventName: event.name, permissions });
-    },
-    POST: async (req: BunRequest<'/api/events/:id/permissions'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: Role };
-
-      if (!userId || !roleId) {
-        return apiBadRequest('userId and roleId are required');
-      }
-
-      await addPermission(eventId, userId, roleId);
-
-      return apiData();
-    },
-
-    PATCH: async (req: BunRequest<'/api/events/:id/permissions'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const { userId, roleId } = (await req.json()) as { userId: string; roleId: Role };
-
-      if (!userId || !roleId) {
-        return apiBadRequest('userId and roleId are required');
-      }
-
-      if (roleId === 'owner') {
-        return apiBadRequest('Cannot assign owner role');
-      }
-
-      await updatePermission(eventId, userId, roleId);
-
-      return apiData();
-    },
-
-    DELETE: async (req: BunRequest<'/api/events/:id/permissions'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const { userId } = (await req.json()) as { userId: string };
-
-      if (!userId) {
-        return apiBadRequest('userId is required');
-      }
-
-      await removePermission(eventId, userId);
-
-      return apiData();
-    }
+    DELETE: route(eventRole(...MANAGER_ROLES), json(UserOnly), async ({ event, body }) => {
+      await removePermission(event.id, body.userId);
+      return {};
+    })
   }
 };

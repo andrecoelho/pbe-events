@@ -1,184 +1,72 @@
-import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
-import { getSession } from '@/server/session';
+import { eventRole, json } from '@/server/http/middleware';
+import { badRequest, route } from '@/server/http/route';
+import { getLanguage, listLanguages } from '@/server/services/languages';
+import { MANAGER_ROLES } from '@/server/services/permissions';
+import { addTeam, deleteTeam, findTeamByName, listTeams, updateTeam } from '@/server/services/teams';
 import type { Routes } from '@/server/types';
-import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import type { BunRequest } from 'bun';
-import { sql } from 'bun';
-import { listLanguages } from '@/server/services/languages';
-import { listTeams } from '@/server/services/teams';
+import { z } from 'zod';
 
-interface Team {
-  id: string;
-  name: string;
-  number: number;
-  event_id: string;
-  language_id: string;
-  language_name: string;
-  created_at: number;
+const NewTeam = z.object({
+  name: z.string({ error: 'Team name is required' }).trim(),
+  languageId: z.string({ error: 'Language is required' }).min(1, 'Language is required')
+});
+const TeamChange = NewTeam.extend({
+  id: z.string({ error: 'Team not found' }),
+  number: z.number({ error: 'Team number is required' }).int().positive('Team number must be positive')
+});
+const TeamId = z.object({ id: z.string({ error: 'Team not found' }) });
+
+const managers = () => eventRole(...MANAGER_ROLES);
+
+// The checks shared by adding and editing a team, in the order the old routes made them.
+async function checkTeam(eventId: string, team: { name: string; languageId: string }, teamId?: string) {
+  const language = await getLanguage(eventId, team.languageId);
+
+  if (!language) {
+    throw badRequest('Invalid language selected');
+  }
+
+  if (!team.name) {
+    throw badRequest('Team name is required');
+  }
+
+  const sameName = await findTeamByName(eventId, team.name);
+
+  if (sameName && sameName !== teamId) {
+    throw badRequest('A team with this name already exists');
+  }
+
+  return language;
 }
 
 export const teamsRoutes: Routes = {
   '/api/events/:id/teams': {
-    GET: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = await getSession(req);
+    GET: route(managers(), async ({ event }) => {
+      const [teams, languages] = await Promise.all([listTeams(event.id), listLanguages(event.id)]);
 
-      if (!session) {
-        return apiUnauthorized();
+      return { eventName: event.name, teams, languages };
+    }),
+
+    POST: route(managers(), json(NewTeam), async ({ event, body }) => {
+      const language = await checkTeam(event.id, body);
+      const team = await addTeam(event.id, body.name, body.languageId);
+
+      return { ...team, languageId: language.id, languageName: language.name };
+    }),
+
+    PATCH: route(managers(), json(TeamChange), async ({ event, body }) => {
+      await checkTeam(event.id, body, body.id);
+      await updateTeam(event.id, body.id, body);
+
+      return {};
+    }),
+
+    DELETE: route(managers(), json(TeamId), async ({ event, body }) => {
+      if (!(await deleteTeam(event.id, body.id))) {
+        throw badRequest('Team not found');
       }
 
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const [teams, languages] = await Promise.all([listTeams(eventId), listLanguages(eventId)]);
-
-      return apiData({ eventName: event.name, teams, languages });
-    },
-
-    POST: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const body = (await req.json()) as { name: string; languageId: string };
-      const name = body.name.trim();
-      const languageId = body.languageId;
-
-      if (!languageId) {
-        return apiBadRequest('Language is required');
-      }
-
-      // Validate language exists and belongs to this event
-      const languages: { id: string }[] = await sql`
-        SELECT id FROM languages WHERE id = ${languageId} AND event_id = ${eventId}
-      `;
-
-      if (languages.length === 0) {
-        return apiBadRequest('Invalid language selected');
-      }
-
-      if (!name) {
-        return apiBadRequest('Team name is required');
-      }
-
-      const existingTeams: { id: string }[] = await sql`
-        SELECT id FROM teams WHERE event_id = ${eventId} AND name = ${name}
-      `;
-
-      if (existingTeams.length > 0) {
-        return apiBadRequest('A team with this name already exists');
-      }
-
-      const teams: Team[] = await sql`
-        SELECT id, name, number, event_id, created_at
-        FROM teams
-        WHERE event_id = ${eventId}
-      `;
-
-      const teamNumber = teams.length > 0 ? Math.max(...teams.map((t: Team) => t.number)) + 1 : 1;
-
-      const id = Bun.randomUUIDv7();
-
-      await sql`INSERT INTO teams (id, event_id, name, number, language_id) VALUES (${id}, ${eventId}, ${name}, ${teamNumber}, ${languageId})`;
-
-      // Fetch language name for response
-      const languageResult: { name: string }[] = await sql`SELECT name FROM languages WHERE id = ${languageId}`;
-      const languageName = languageResult[0]?.name || '';
-
-      return apiData({ id, number: teamNumber, languageId, languageName });
-    },
-
-    PATCH: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const body = (await req.json()) as { id: string; name: string; number: number; languageId: string };
-      const name = body.name.trim();
-      const languageId = body.languageId;
-
-      if (!languageId) {
-        return apiBadRequest('Language is required');
-      }
-
-      // Validate language exists and belongs to this event
-      const languages: { id: string }[] = await sql`
-        SELECT id FROM languages WHERE id = ${languageId} AND event_id = ${eventId}
-      `;
-
-      if (languages.length === 0) {
-        return apiBadRequest('Invalid language selected');
-      }
-
-      if (!name) {
-        return apiBadRequest('Team name is required');
-      }
-
-      const existingTeams: { id: string }[] = await sql`
-        SELECT id FROM teams WHERE event_id = ${eventId} AND name = ${name}
-      `;
-
-      if (existingTeams.length > 0 && existingTeams[0]!.id !== body.id) {
-        return apiBadRequest('A team with this name already exists');
-      }
-
-      await sql`UPDATE teams SET name = ${name}, number = ${body.number}, language_id = ${languageId} WHERE id = ${body.id}`;
-
-      return apiData();
-    },
-
-    DELETE: async (req: BunRequest<'/api/events/:id/teams'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const { id } = await req.json();
-
-      // Get the team number before deleting
-      const teamResults: { number: number }[] = await sql`SELECT number FROM teams WHERE id = ${id}`;
-      const teamToDelete = teamResults[0];
-
-      if (!teamToDelete) {
-        return apiBadRequest('Team not found');
-      }
-
-      // Delete the team
-      await sql`DELETE FROM teams WHERE id = ${id}`;
-
-      // Renumber all teams with higher numbers to close the gap
-      await sql`UPDATE teams SET number = number - 1 WHERE event_id = ${eventId} AND number > ${teamToDelete.number}`;
-
-      return apiData();
-    }
+      return {};
+    })
   }
 };

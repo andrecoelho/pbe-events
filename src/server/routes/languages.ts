@@ -1,143 +1,57 @@
-import { getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
-import { getSession } from '@/server/session';
+import { eventRole, json } from '@/server/http/middleware';
+import { badRequest, route } from '@/server/http/route';
+import {
+  addLanguage,
+  deleteLanguage,
+  findLanguageByCode,
+  listLanguagesWithDates,
+  updateLanguage
+} from '@/server/services/languages';
+import { MANAGER_ROLES } from '@/server/services/permissions';
 import type { Routes } from '@/server/types';
-import { apiBadRequest, apiData, apiForbidden, apiUnauthorized } from '@/server/utils/responses';
-import type { BunRequest } from 'bun';
-import { sql } from 'bun';
+import { z } from 'zod';
 
-interface Language {
-  id: string;
-  code: string;
-  name: string;
-  event_id: string;
-  created_at: number;
-}
+const NewLanguage = z.object({
+  code: z.string({ error: 'Language code is required' }).trim().min(1, 'Language code is required'),
+  name: z.string({ error: 'Language name is required' }).trim().min(1, 'Language name is required')
+});
+const LanguageChange = NewLanguage.extend({ id: z.string({ error: 'Language not found' }) });
+const LanguageId = z.object({ id: z.string({ error: 'Language not found' }) });
+
+const managers = () => eventRole(...MANAGER_ROLES);
 
 export const languagesRoutes: Routes = {
   '/api/events/:id/languages': {
-    GET: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = await getSession(req);
+    GET: route(managers(), async ({ event }) => ({
+      eventName: event.name,
+      languages: await listLanguagesWithDates(event.id)
+    })),
 
-      if (!session) {
-        return apiUnauthorized();
+    POST: route(managers(), json(NewLanguage), async ({ event, body }) => {
+      if (await findLanguageByCode(event.id, body.code)) {
+        throw badRequest('A language with this code already exists');
       }
 
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
+      return { id: await addLanguage(event.id, body.code, body.name) };
+    }),
 
-      if (!event) {
-        return apiForbidden();
+    PATCH: route(managers(), json(LanguageChange), async ({ event, body }) => {
+      const sameCode = await findLanguageByCode(event.id, body.code);
+
+      if (sameCode && sameCode !== body.id) {
+        throw badRequest('A language with this code already exists');
       }
 
-      const languages: Language[] = await sql`
-        SELECT id, code, name, event_id, created_at
-        FROM languages
-        WHERE event_id = ${eventId}
-        ORDER BY code
-      `;
-
-      return apiData({ eventName: event.name, languages });
-    },
-
-    POST: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
+      if (!(await updateLanguage(event.id, body.id, body.code, body.name))) {
+        throw badRequest('Language not found');
       }
 
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
+      return {};
+    }),
 
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const body = (await req.json()) as { code: string; name: string };
-      const code = body.code.trim();
-      const name = body.name.trim();
-
-      if (!code) {
-        return apiBadRequest('Language code is required');
-      }
-
-      if (!name) {
-        return apiBadRequest('Language name is required');
-      }
-
-      const existingLanguages: { id: string }[] = await sql`
-        SELECT id FROM languages WHERE event_id = ${eventId} AND code = ${code}
-      `;
-
-      if (existingLanguages.length > 0) {
-        return apiBadRequest('A language with this code already exists');
-      }
-
-      const id = Bun.randomUUIDv7();
-
-      await sql`INSERT INTO languages (id, event_id, code, name) VALUES (${id}, ${eventId}, ${code}, ${name})`;
-
-      return apiData({ id });
-    },
-
-    PATCH: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const body = (await req.json()) as { id: string; code: string; name: string };
-      const code = body.code.trim();
-      const name = body.name.trim();
-
-      if (!code) {
-        return apiBadRequest('Language code is required');
-      }
-
-      if (!name) {
-        return apiBadRequest('Language name is required');
-      }
-
-      const existingLanguages: { id: string }[] = await sql`
-        SELECT id FROM languages WHERE event_id = ${eventId} AND code = ${code}
-      `;
-
-      if (existingLanguages.length > 0 && existingLanguages[0]!.id !== body.id) {
-        return apiBadRequest('A language with this code already exists');
-      }
-
-      await sql`UPDATE languages SET code = ${code}, name = ${name} WHERE id = ${body.id}`;
-
-      return apiData();
-    },
-
-    DELETE: async (req: BunRequest<'/api/events/:id/languages'>) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const eventId = req.params.id;
-      const event = await getEventForRoles(eventId, session.user_id, MANAGER_ROLES);
-
-      if (!event) {
-        return apiForbidden();
-      }
-
-      const { id } = await req.json();
-
-      await sql`DELETE FROM languages WHERE id = ${id}`;
-
-      return apiData();
-    }
+    DELETE: route(managers(), json(LanguageId), async ({ event, body }) => {
+      await deleteLanguage(event.id, body.id);
+      return {};
+    })
   }
 };

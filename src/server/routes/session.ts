@@ -1,27 +1,11 @@
-import { getSession } from '@/server/session';
-import type { Routes, User } from '@/server/types';
-import { apiData, apiNotFound, apiUnauthorized } from '@/server/utils/responses';
-import { sql } from 'bun';
+import { auth } from '@/server/http/middleware';
+import { route } from '@/server/http/route';
+import type { Routes } from '@/server/types';
 
 export const sessionRoutes: Routes = {
   '/api/session': {
-    GET: async (req) => {
-      const session = await getSession(req);
-
-      if (!session) {
-        return apiUnauthorized();
-      }
-
-      const users: User[] =
-        await sql`SELECT id, email, first_name, last_name, avatar_url FROM users WHERE id = ${session.user_id}`;
-
-      const user = users[0];
-
-      if (!user) {
-        return apiNotFound();
-      }
-
-      return apiData({ user });
-    }
+    GET: route(auth(), ({ user: { id, email, first_name, last_name, avatar_url } }) => ({
+      user: { id, email, first_name, last_name, avatar_url }
+    }))
   }
 };
