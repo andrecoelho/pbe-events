@@ -1,6 +1,8 @@
 // Smoke test of the API and a live run over the WebSocket, against a local server with the seeded demo
 // event (`bun run db:seed`). Prints a normalized transcript (ids and times masked) so two versions of the
 // server can be diffed; scripts/smoke/compare.sh does that. Usage: bun scripts/smoke/run.ts [base URL]
+import { sql } from 'bun';
+
 const base = process.argv[2] ?? 'http://localhost:3456';
 const out: string[] = [];
 const log = (label: string, value: unknown) => out.push(`${label}: ${JSON.stringify(normalize(value))}`);
@@ -13,7 +15,8 @@ function normalize(value: unknown): unknown {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => [
           k,
-          /^(id|answerId|requestId|startTime|createdAt|created_at|__ACK__)$/.test(k) && typeof v !== 'object'
+          /^(id|answerId|requestId|startTime|createdAt|created_at|__ACK__|joinCode|join_code)$/.test(k) &&
+          typeof v !== 'object'
             ? '<x>'
             : k === 'answers' && v && typeof v === 'object' && !Array.isArray(v)
               ? Object.fromEntries(
@@ -71,8 +74,9 @@ await api('GET', `/api/events/${ev}/permissions`);
 
 // WebSocket run-through
 const wsBase = base.replace('http', 'ws') + '/event-run/ws';
-function open(query: string, withCookie: boolean) {
-  const ws = new WebSocket(`${wsBase}?${query}`, withCookie ? ({ headers: { Cookie: cookie } } as any) : undefined);
+function open(query: string, withCookie: boolean | string) {
+  const sendCookie = withCookie === true ? cookie : withCookie || null;
+  const ws = new WebSocket(`${wsBase}?${query}`, sendCookie ? ({ headers: { Cookie: sendCookie } } as any) : undefined);
   const messages: any[] = [];
   ws.addEventListener('message', (e) => messages.push(JSON.parse(String(e.data))));
   return new Promise<{ ws: WebSocket; messages: any[] }>((resolve) =>
@@ -90,7 +94,18 @@ const dump = (label: string, messages: any[]) => {
 
 const host = await open(`role=host&eventId=${ev}`, true);
 const judge = await open(`role=judge&eventId=${ev}`, true);
-const team = await open(`role=team&eventId=${ev}&teamId=seed-team-1&hash=h1`, false);
+// Team 1 joins with its code (#44) and connects with the device cookie that gives it. Servers from before
+// join codes have no /api/join, so the team connects with its id in the URL there.
+const [{ join_code: teamCode }] = await sql`SELECT join_code FROM teams WHERE id = 'seed-team-1'`;
+const joined = await fetch(`${base}/api/join`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: teamCode })
+});
+const deviceCookie = joined.headers.get('set-cookie')?.split(';')[0];
+const team = deviceCookie
+  ? await open('role=team', deviceCookie)
+  : await open(`role=team&eventId=${ev}&teamId=seed-team-1&hash=h1`, false);
 const bad = await open(`role=host&eventId=${ev}`, false);
 const badTeam = await open(`role=team&eventId=${ev}&teamId=nope&hash=h`, false);
 await sleep(300);

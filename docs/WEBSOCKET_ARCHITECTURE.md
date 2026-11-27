@@ -30,12 +30,12 @@ Authentication requirements differ between host and team connections:
 
 #### Team Authentication
 
-- **Requires**: Valid team ID in the URL path
+- **Join codes** (#44): each team has a code like `K7P-4QX` (`teams.join_code`: six characters with no look-alikes, from `new_join_code()`). A team opens `/join/K7P4QX` or types the code at `/join`, which posts it to `POST /api/join` (rate limited to 60 a minute per address).
+- **One device per team**: the first device to join gets a random token in the HttpOnly `teamToken` cookie; the database keeps only its SHA-256 (`teams.device_token_hash`). Another device gets 409 "Team N is already connected on another device. Ask the host to release it." The device holding the token can open the link again.
+- **Connecting**: the team socket is `role=team` with no ids; the server finds the team (and its event) from the cookie. Without a valid token it gets `CONNECTION_ERROR` with code `NOT_JOINED`, and the team page goes to `/join`.
 - **No Login Required**: Teams do not need to be logged in or have a session
-- **Validation**: Server validates that the team ID exists and belongs to the specified event
-- **Connection Replacement**: If a team attempts to connect while already connected (e.g., opened in multiple tabs), the new connection replaces the old one. The previous connection is closed and the new one takes over.
-
-This asymmetric authentication model allows event administrators to control the run while teams can participate without account creation or login, using only their team identifier.
+- **Connection Replacement**: the same device reconnecting (a reload, a dropped connection, a second tab) replaces its old socket.
+- **Host controls**: from a team badge's menu on the Run screen the host sends `RELEASE_TEAM_DEVICE { teamId }` (clears the token; the device gets `CONNECTION_ERROR` code `RELEASED` and is disconnected) or `RENEW_JOIN_CODE { teamId }` (the old code and link stop working; a joined device stays). Hosts get `joinCode` and `hasDevice` in `TEAM_STATUS`; updates carry only what changed.
 
 ### Connection Flow
 
@@ -46,10 +46,10 @@ This asymmetric authentication model allows event administrators to control the 
    - Stores connection in `connection.host`
    - Receives real-time notifications about all team activity
 
-2. **Team Connection**: `ws://host/events/{eventId}/teams/{teamId}`
-   - Validates team ID exists and belongs to the event
+2. **Team Connection**: `/event-run/ws?role=team`, with the `teamToken` cookie from joining
+   - Finds the team and its event from the device token
    - No session or login required
-   - Replaces any existing connection for this team ID
+   - Replaces any existing connection for this team (the same device)
    - Requires language selection before run starts
    - Subscribes to language-specific channel: `${eventId}:${languageCode}`
    - Can reconnect and receive existing answer state
@@ -510,7 +510,7 @@ All validation errors are sent back to the client as `ERROR` messages with speci
 
 ## Security Considerations
 
-1. **Session Validation**: Host, judge and presenter connections validate the session cookie; team connections validate team ID only. When that session logs out the server closes its sockets at once with close code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted. Clients reload on 4001, which shows the login page
+1. **Session Validation**: Host, judge and presenter connections validate the session cookie; team connections validate the device token from joining with the team's code. When that session logs out the server closes its sockets at once with close code 4001 (`SESSION_ENDED_CLOSE_CODE`), and it checks every minute for sessions that expired or were deleted. Clients reload on 4001, which shows the login page
 2. **Permission Checks**: Host actions require `owner` or `admin` role
 3. **Team Isolation**: Teams can only submit answers for their own team
 4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event

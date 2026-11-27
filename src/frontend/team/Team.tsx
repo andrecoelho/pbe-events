@@ -7,11 +7,7 @@ import { useSnapshot } from 'valtio';
 import '../base.css';
 
 const init = () => {
-  const url = new URL(window.location.href);
-  const eventId = url.searchParams.get('eventId');
-  const teamId = url.searchParams.get('teamId');
-
-  const valt = new TeamValt(eventId, teamId);
+  const valt = new TeamValt();
 
   const handleReconnect = () => {
     valt.connect();
@@ -52,10 +48,17 @@ export const Team = () => {
         <span className='alert alert-error w-lg'>
           <Icon name='x-circle' className='size-5' />
           {snap.errorMessage}
-          <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
-            <Icon name='arrow-path' className='size-3' />
-            Try Again
-          </button>
+          {snap.errorCode === 'RELEASED' ? (
+            <a className='btn btn-primary btn-xs' href='/join'>
+              <Icon name='chevron-right' className='size-3' />
+              Join Again
+            </a>
+          ) : (
+            <button className='btn btn-primary btn-xs' onClick={handleReconnect}>
+              <Icon name='arrow-path' className='size-3' />
+              Try Again
+            </button>
+          )}
         </span>
       </div>
     );

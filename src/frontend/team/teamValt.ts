@@ -15,6 +15,8 @@ interface TeamStore {
     languageCode: string;
   };
   errorMessage?: string;
+  // RELEASED when the host released this device from the team.
+  errorCode?: string;
   activeItem: ActiveItem | null;
   gracePeriod: number;
   answer: string | null;
@@ -24,7 +26,7 @@ interface TeamStore {
 }
 
 type WebSocketTeamMessage =
-  | (WebSocketMessage & { type: 'CONNECTION_ERROR'; message: string })
+  | (WebSocketMessage & { type: 'CONNECTION_ERROR'; message: string; code?: 'NOT_JOINED' | 'RELEASED' })
   | (WebSocketMessage & { type: 'EVENT_INFO'; event: { id: string; name: string } })
   | (WebSocketMessage & {
       type: 'TEAM_INFO';
@@ -38,11 +40,9 @@ type WebSocketTeamMessage =
 
 export class TeamValt {
   store: TeamStore;
-  eventId: string;
-  teamId: string;
   private ws: WebSocketManager<WebSocketTeamMessage> | null = null;
 
-  constructor(eventId: string | null, teamId: string | null) {
+  constructor() {
     this.store = proxy({
       activeItem: null,
       answer: null,
@@ -50,9 +50,6 @@ export class TeamValt {
       runStatus: 'not_started',
       connectionState: 'init'
     });
-
-    this.eventId = eventId || '';
-    this.teamId = teamId || '';
   }
 
   connect = () => {
@@ -64,19 +61,8 @@ export class TeamValt {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
 
-      let hash = sessionStorage.getItem('teamHash') || '';
-
-      if (!hash) {
-        hash = crypto.randomUUID();
-        sessionStorage.setItem('teamHash', hash);
-      }
-
-      wsUrl.search = new URLSearchParams({
-        role: 'team',
-        eventId: this.eventId,
-        teamId: this.teamId,
-        hash
-      }).toString();
+      // The server knows the team (and event) from the device's cookie, set when it joined with the code.
+      wsUrl.search = new URLSearchParams({ role: 'team' }).toString();
 
       this.ws = new WebSocketManager<WebSocketTeamMessage>(wsUrl.toString(), this.onStatusChange, this.onMessage);
 
@@ -100,8 +86,16 @@ export class TeamValt {
   onMessage = (message: WebSocketTeamMessage) => {
     switch (message.type) {
       case 'CONNECTION_ERROR':
-        this.store.errorMessage = message.message;
         this.cleanup();
+
+        // This device hasn't joined a team (or its token is gone): join with the code.
+        if (message.code === 'NOT_JOINED') {
+          window.location.replace('/join');
+          return;
+        }
+
+        this.store.errorMessage = message.message;
+        this.store.errorCode = message.code;
         break;
       case 'EVENT_INFO':
         this.store.event = message.event;
@@ -122,7 +116,7 @@ export class TeamValt {
         this.store.answer = null;
 
         if (message.activeItem?.type === 'question' && message.activeItem.phase === 'prompt') {
-          const savedAnswer = message.activeItem.answers[this.teamId];
+          const savedAnswer = message.activeItem.answers[this.store.team?.id ?? ''];
 
           if (savedAnswer) {
             this.store.answer = savedAnswer.answerText;

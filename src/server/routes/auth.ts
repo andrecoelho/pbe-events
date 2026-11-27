@@ -2,11 +2,11 @@ import { route, unauthorized, badRequest } from '@/server/http/route';
 import { createSession, deleteSession } from '@/server/session';
 import { checkAvatar, createUser, getLoginByEmail, isEmailTaken, saveAvatarFile } from '@/server/services/users';
 import type { Routes } from '@/server/types';
+import { httpOnlyCookie } from '@/server/utils/cookies';
 import { apiData } from '@/server/utils/responses';
 
 function sessionCookie(value: string, extra = '') {
-  const secure = Bun.env.NODE_ENV === 'production' ? 'Secure; ' : '';
-  return `sessionId=${value}; HttpOnly; ${secure}SameSite=Lax; Path=/;${extra}`;
+  return httpOnlyCookie('sessionId', value, extra);
 }
 
 export const authRoutes: Routes = {

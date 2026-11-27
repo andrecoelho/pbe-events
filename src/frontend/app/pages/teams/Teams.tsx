@@ -1,3 +1,4 @@
+import { formatJoinCode } from '@/joinCode';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
@@ -84,6 +85,7 @@ export function Teams() {
                   <th className='col-number'>#</th>
                   <th className='col-name'>Name</th>
                   <th className='col-language'>Language</th>
+                  <th className='col-code'>Join code</th>
                   <th className='col-actions'>Actions</th>
                 </tr>
               </thead>
@@ -93,6 +95,7 @@ export function Teams() {
                     <td className='col-number'>{team.number}</td>
                     <td className='col-name'>{team.name}</td>
                     <td className='col-language'>{team.languageName}</td>
+                    <td className='col-code font-mono tracking-widest'>{formatJoinCode(team.joinCode)}</td>
                     <td className='col-actions'>
                       <button
                         className='tooltip tooltip-neutral'
@@ -104,9 +107,9 @@ export function Teams() {
                       </button>
                       <button
                         className='tooltip tooltip-neutral'
-                        data-tip={snap.copiedTeamIds.has(team.id) ? 'Copied!' : 'Copy Connection Link'}
+                        data-tip={snap.copiedTeamIds.has(team.id) ? 'Copied!' : 'Copy Join Link'}
                         onClick={() => handleCopyTeamLink(team)}
-                        aria-label={`Connection link for team ${team.name}`}
+                        aria-label={`Join link for team ${team.name}`}
                       >
                         <Icon
                           name={snap.copiedTeamIds.has(team.id) ? 'check' : 'link'}

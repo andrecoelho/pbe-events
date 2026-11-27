@@ -13,6 +13,10 @@
     width: 150px;
   }
 
+  .col-code {
+    width: 130px;
+  }
+
   .col-actions {
     @apply flex justify-center gap-4;
   }

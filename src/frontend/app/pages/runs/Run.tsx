@@ -1,5 +1,6 @@
 import type { TeamStatus } from '@/frontend/app/pages/runs/runValt';
 import { RunValt, RunValtContext } from '@/frontend/app/pages/runs/runValt';
+import { TeamMenu } from '@/frontend/app/pages/runs/TeamMenu';
 import { ActiveItemScreen } from '@/frontend/components/ActiveItemScreens/ActiveItemScreen';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
@@ -236,7 +237,7 @@ export const Run = () => {
                   const stateClass = TEAM_STATE_CLASSES[team.status] ?? TEAM_STATE_CLASSES.offline;
 
                   return (
-                    <span key={teamId} className='relative inline-flex'>
+                    <TeamMenu key={teamId} team={team}>
                       <span className={`team-badge ${stateClass}`}>{formatTeamNumber(team.number)}</span>
                       {isBadgeAllowed && teamHasAnswer && (
                         <span className='team-badge-check'>
@@ -253,7 +254,7 @@ export const Run = () => {
                           <Icon name='face-frown' variant='solid' className='size-4' />
                         </span>
                       )}
-                    </span>
+                    </TeamMenu>
                   );
                 })}
               </div>
@@ -304,6 +305,10 @@ export const Run = () => {
                 </span>
               </span>
               <span>Connected + No Answer</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <Icon name='key' className='size-4' />
+              <span>Click a team for its join code, or to release its device</span>
             </div>
           </div>
         </div>

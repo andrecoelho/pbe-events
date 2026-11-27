@@ -87,7 +87,9 @@ export const HostMessage = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SET_ACTIVE_ITEM'), activeItem: ActiveItemSchema.nullable(), __ACK__: ack }),
   z.object({ type: z.literal('SET_QUESTION_LOCKED'), questionId: id, locked: z.boolean(), __ACK__: ack }),
   z.object({ type: z.literal('START_TIMER'), __ACK__: ack }),
-  z.object({ type: z.literal('REMOVE_TIMER'), __ACK__: ack })
+  z.object({ type: z.literal('REMOVE_TIMER'), __ACK__: ack }),
+  z.object({ type: z.literal('RELEASE_TEAM_DEVICE'), teamId: id, __ACK__: ack }),
+  z.object({ type: z.literal('RENEW_JOIN_CODE'), teamId: id, __ACK__: ack })
 ]);
 
 export const JudgeMessage = z.discriminatedUnion('type', [

@@ -15,7 +15,7 @@ function normalize(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => [k, /^(createdAt|created_at|requestId)$/.test(k) ? '<x>' : normalize(v)])
+        .map(([k, v]) => [k, /^(createdAt|created_at|requestId|joinCode)$/.test(k) ? '<x>' : normalize(v)])
     );
   }
   return value;

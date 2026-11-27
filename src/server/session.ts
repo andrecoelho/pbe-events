@@ -1,3 +1,4 @@
+import { getCookie } from '@/server/utils/cookies';
 import { sql } from 'bun';
 import type { Session } from '@/server/types';
 import type { BunRequest } from 'bun';
@@ -16,18 +17,7 @@ export interface SessionUser {
 }
 
 export function getSessionIdFromCookies(req: Request) {
-  const cookies = req.headers.get('Cookie');
-
-  if (!cookies) {
-    return null;
-  }
-
-  const sessionId = cookies
-    .split(';')
-    .find((cookie) => cookie.trim().startsWith('sessionId='))
-    ?.split('=')[1];
-
-  return sessionId ?? null;
+  return getCookie(req, 'sessionId');
 }
 
 export async function createSession(userId: string) {

@@ -7,6 +7,7 @@ import team from '@/frontend/team/team.html';
 import { answersRoutes } from '@/server/routes/answers';
 import { authRoutes } from '@/server/routes/auth';
 import { eventsRoutes } from '@/server/routes/events';
+import { joinRoutes } from '@/server/routes/join';
 import { languagesRoutes } from '@/server/routes/languages';
 import { permissionRoutes } from '@/server/routes/permissions';
 import { questionsRoutes } from '@/server/routes/questions';
@@ -50,6 +51,7 @@ const server = Bun.serve({
     ...eventsRoutes,
     ...permissionRoutes,
     ...teamsRoutes,
+    ...joinRoutes,
     ...languagesRoutes,
     ...userRoutes,
     ...questionsRoutes,
@@ -65,7 +67,8 @@ const server = Bun.serve({
       return wsServer.upgradeWebSocket(req, session);
     }
 
-    if (url.pathname === '/event-run/team') {
+    // The team screen, and the pages where a team joins with its code (/join, /join/K7P4QX).
+    if (url.pathname === '/event-run/team' || url.pathname === '/join' || url.pathname.startsWith('/join/')) {
       return await fetch(`${server.url}${teamNounce}`);
     }
 

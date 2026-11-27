@@ -7,7 +7,16 @@ import { getLanguagesByCode, type Language } from '@/server/services/languages';
 import { ALL_ROLES, getEventForRoles, MANAGER_ROLES } from '@/server/services/permissions';
 import { getTranslation, setQuestionGraded, setQuestionLocked } from '@/server/services/questions';
 import { getRun, saveActiveItem, setGracePeriod, setRunStatus, type RunStatus } from '@/server/services/runs';
-import { getTeam, listTeams } from '@/server/services/teams';
+import {
+  getTeam,
+  getTeamByDeviceToken,
+  listTeams,
+  releaseTeamDevice,
+  renewJoinCode,
+  TEAM_TOKEN_COOKIE,
+  type Team
+} from '@/server/services/teams';
+import { getCookie } from '@/server/utils/cookies';
 import { getLiveSessionIds, onSessionEnded } from '@/server/session';
 import { SESSION_ENDED_CLOSE_CODE } from '@/types';
 import {
@@ -29,7 +38,6 @@ export type TeamWebsocketData = {
   number: number;
   languageId: string;
   languageCode: string;
-  hash: string;
 };
 
 export type HostWebsocketData = {
@@ -54,6 +62,8 @@ export type PresenterWebsocketData = {
 export type ErrorWebsocketData = {
   role: 'error';
   message: string;
+  // NOT_JOINED: a team socket from a device that hasn't joined a team (or was released).
+  code?: string;
 };
 
 type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterWebsocketData;
@@ -180,27 +190,45 @@ export class WebSocketServer {
   async upgradeWebSocket(req: Request, session: Session | null): Promise<Response | undefined> {
     const url = new URL(req.url);
     const role = url.searchParams.get('role');
-    const eventId = url.searchParams.get('eventId');
+
+    // An error socket only tells the client why (CONNECTION_ERROR) when it opens.
+    const refuse = (message: string, code?: string) => {
+      this.server?.upgrade(req, { data: { role: 'error', message, code } });
+      return undefined;
+    };
 
     if (!role) {
-      this.server?.upgrade(req, { data: { role: 'error', message: 'Missing role in URL' } });
-      return;
+      return refuse('Missing role in URL');
     }
 
     if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge') {
-      this.server?.upgrade(req, { data: { role: 'error', message: 'Invalid URL role' } });
-      return;
+      return refuse('Invalid URL role');
     }
 
-    if (!eventId) {
-      this.server?.upgrade(req, { data: { role: 'error', message: 'Missing eventId in URL' } });
-      return;
-    }
+    // A team is identified by its device's token (from joining with the team's code, #44), which also
+    // gives the event; the other roles name the event and sign in.
+    let team: Team | null = null;
+    let eventId: string | null;
 
-    // Check if event exists
-    if (!(await eventExists(eventId))) {
-      this.server?.upgrade(req, { data: { role: 'error', message: 'Event not found' } });
-      return;
+    if (role === 'team') {
+      const token = getCookie(req, TEAM_TOKEN_COOKIE);
+      team = token ? await getTeamByDeviceToken(token) : null;
+
+      if (!team) {
+        return refuse('This device hasn’t joined a team. Join with your team’s code.', 'NOT_JOINED');
+      }
+
+      eventId = team.event_id;
+    } else {
+      eventId = url.searchParams.get('eventId');
+
+      if (!eventId) {
+        return refuse('Missing eventId in URL');
+      }
+
+      if (!(await eventExists(eventId))) {
+        return refuse('Event not found');
+      }
     }
 
     // Initialize connection tracking if needed
@@ -208,22 +236,17 @@ export class WebSocketServer {
       await this.initializeEventConnection(eventId);
 
       if (!this.eventConnections.has(eventId)) {
-        this.server?.upgrade(req, {
-          data: { role: 'error', message: 'Could not initialize event connection' }
-        });
-        return;
+        return refuse('Could not initialize event connection');
       }
     }
 
     if (role === 'host') {
       if (!session) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
-        return;
+        return refuse('Unauthorized');
       }
 
       if (!(await getEventForRoles(eventId, session.user_id, MANAGER_ROLES))) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Host permission denied' } });
-        return;
+        return refuse('Host permission denied');
       }
 
       if (this.server?.upgrade(req, { data: { role: 'host', session, eventId } })) {
@@ -231,13 +254,11 @@ export class WebSocketServer {
       }
     } else if (role === 'judge') {
       if (!session) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
-        return;
+        return refuse('Unauthorized');
       }
 
       if (!(await getEventForRoles(eventId, session.user_id, ALL_ROLES))) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Judge permission denied' } });
-        return;
+        return refuse('Judge permission denied');
       }
 
       if (this.server?.upgrade(req, { data: { role: 'judge', session, eventId, wsId: Bun.randomUUIDv7() } })) {
@@ -245,59 +266,20 @@ export class WebSocketServer {
       }
     } else if (role === 'presenter') {
       if (!session) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Unauthorized' } });
-        return;
+        return refuse('Unauthorized');
       }
 
       if (!(await getEventForRoles(eventId, session.user_id, MANAGER_ROLES))) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Presenter permission denied' } });
-        return;
+        return refuse('Presenter permission denied');
       }
 
       if (this.server?.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
         return;
       }
-    } else {
-      const hash = url.searchParams.get('hash');
-
-      if (!hash) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Missing hash in URL' } });
-        return;
-      }
-
-      const teamId = url.searchParams.get('teamId');
-
-      if (!teamId) {
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Missing teamId in URL' } });
-        return;
-      }
-
-      const connection = this.eventConnections.get(eventId);
-      const existingTeam = connection?.teams.get(teamId);
-      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${teamId}`);
-
-      if (existingTeam || (subscriberCount && subscriberCount > 0)) {
-        if (existingTeam?.data.hash !== hash) {
-          this.server?.upgrade(req, { data: { role: 'error', message: 'Team already connected' } });
-          return;
-        } else {
-          existingTeam?.close();
-          connection?.teams.delete(teamId);
-
-          if (!this.eventConnections.has(eventId)) {
-            await this.initializeEventConnection(eventId);
-          }
-        }
-      }
-
-      // Validate team exists for team role
-      const team = await getTeam(eventId, teamId);
-
-      if (!team) {
-        this.cleanUpEventConnection(eventId);
-        this.server?.upgrade(req, { data: { role: 'error', message: 'Team not found' } });
-        return;
-      }
+    } else if (team) {
+      // Only the device holding the token gets here, so an open socket for the team is this device's own
+      // (a reload or a dropped connection): the new one replaces it.
+      this.eventConnections.get(eventId)?.teams.get(team.id)?.close();
 
       if (
         this.server?.upgrade(req, {
@@ -308,8 +290,7 @@ export class WebSocketServer {
             name: team.name,
             number: team.number,
             languageId: team.language_id,
-            languageCode: team.language_code ?? '',
-            hash
+            languageCode: team.language_code ?? ''
           }
         })
       ) {
@@ -317,7 +298,7 @@ export class WebSocketServer {
       }
     }
 
-    console.error('WebSocket upgrade failed', req.url);
+    console.error('WebSocket upgrade failed', url.pathname, role);
     this.cleanUpEventConnection(eventId);
     return textServerError('WebSocket upgrade failed');
   }
@@ -327,16 +308,22 @@ export class WebSocketServer {
     const { role } = ws.data;
 
     if (role === 'error') {
-      ws.send(JSON.stringify({ type: 'CONNECTION_ERROR', message: ws.data.message }));
+      ws.send(JSON.stringify({ type: 'CONNECTION_ERROR', message: ws.data.message, code: ws.data.code }));
       return;
     }
 
     const { eventId } = ws.data as Exclude<WebsocketData, ErrorWebsocketData>;
 
-    const connection = this.eventConnections.get(eventId)!;
+    // A socket this one replaced (the same team device reconnecting) may have cleaned the connection up.
+    if (!this.eventConnections.has(eventId)) {
+      await this.initializeEventConnection(eventId);
+    }
+
+    const connection = this.eventConnections.get(eventId);
 
     if (!connection) {
       console.error('No event connection found for eventId', eventId, ws.data);
+      ws.close();
       return;
     }
 
@@ -404,15 +391,7 @@ export class WebSocketServer {
           `${eventId}:hosts`,
           JSON.stringify({
             type: 'TEAM_STATUS',
-            teams: [
-              {
-                id,
-                status: 'connected',
-                name: team.name,
-                number: team.number,
-                languageCode: team.language_code
-              }
-            ]
+            teams: [this.teamStatus(team, 'connected')]
           })
         );
 
@@ -449,23 +428,12 @@ export class WebSocketServer {
     }
 
     if (role === 'team') {
-      const { id, number, languageCode } = ws.data;
-      const team = connection.teams.get(id);
+      const { id, number } = ws.data;
 
-      if (!team || team !== ws) {
-        console.log(`Team ${number} WebSocket mismatch on close`, eventId, id);
-      }
+      // A socket the same device replaced (a reload) closes after its replacement took over: leave that alone.
+      if (connection.teams.get(id) === ws) {
+        connection.teams.delete(id);
 
-      connection.teams.delete(id);
-
-      ws.unsubscribe(`${eventId}:${languageCode}`);
-      ws.unsubscribe(`${eventId}:team:${id}`);
-
-      const subscriberCount = this.server?.subscriberCount(`${eventId}:team:${id}`);
-
-      console.log(`Subscriber count for team ${number}`, `${eventId}:team:${id}`, ':', subscriberCount);
-
-      if (!subscriberCount || subscriberCount === 0) {
         this.server?.publish(
           `${eventId}:hosts`,
           JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id, number, status: 'offline' }] })
@@ -535,6 +503,12 @@ export class WebSocketServer {
             break;
           case 'REMOVE_TIMER':
             this.handleREMOVE_TIMER(connection);
+            break;
+          case 'RELEASE_TEAM_DEVICE':
+            await this.handleRELEASE_TEAM_DEVICE(connection, msg.teamId);
+            break;
+          case 'RENEW_JOIN_CODE':
+            await this.handleRENEW_JOIN_CODE(connection, msg.teamId);
             break;
         }
 
@@ -658,21 +632,24 @@ export class WebSocketServer {
   async sendTeamStatuses(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): Promise<void> {
     const teams = await listTeams(connection.eventId);
 
-    const teamStatuses = teams.map((team) => {
-      const teamWs = connection.teams.get(team.id);
-      const subscriberCount = this.server?.subscriberCount(`${connection.eventId}:team:${team.id}`);
-      const teamStatus = teamWs || (subscriberCount && subscriberCount > 0) ? 'connected' : 'offline';
-
-      console.log('    Team status for', team.id, ':', teamStatus, subscriberCount);
-
-      return {
-        id: team.id,
-        number: team.number,
-        status: teamStatus
-      };
-    });
+    const teamStatuses = teams.map((team) =>
+      this.teamStatus(team, connection.teams.has(team.id) ? 'connected' : 'offline')
+    );
 
     ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
+  }
+
+  // A team's entry in TEAM_STATUS (sent to hosts only: it has the join code).
+  private teamStatus(team: Team, status: 'connected' | 'offline') {
+    return {
+      id: team.id,
+      number: team.number,
+      name: team.name,
+      languageCode: team.language_code,
+      joinCode: team.join_code,
+      hasDevice: team.has_device,
+      status
+    };
   }
 
   sendGracePeriod(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): void {
@@ -881,6 +858,43 @@ export class WebSocketServer {
         this.broadcastActiveItemToManagers(connection);
         this.sendActiveItem(ws, connection);
       }
+    }
+  }
+
+  // Frees the team for another device (#44): the device that held it is told and disconnected.
+  private async handleRELEASE_TEAM_DEVICE(connection: EventConnection, teamId: string): Promise<void> {
+    if (!(await releaseTeamDevice(connection.eventId, teamId))) {
+      return;
+    }
+
+    const teamWs = connection.teams.get(teamId);
+
+    if (teamWs) {
+      teamWs.send(
+        JSON.stringify({
+          type: 'CONNECTION_ERROR',
+          code: 'RELEASED',
+          message: 'The host released this device from the team. To join again, use your team’s code.'
+        })
+      );
+      teamWs.close();
+    }
+
+    this.server?.publish(
+      `${connection.eventId}:hosts`,
+      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, hasDevice: false }] })
+    );
+  }
+
+  // A new join code for the team (#44): the old code and link stop working; its device stays connected.
+  private async handleRENEW_JOIN_CODE(connection: EventConnection, teamId: string): Promise<void> {
+    const joinCode = await renewJoinCode(connection.eventId, teamId);
+
+    if (joinCode) {
+      this.server?.publish(
+        `${connection.eventId}:hosts`,
+        JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id: teamId, joinCode }] })
+      );
     }
   }
 

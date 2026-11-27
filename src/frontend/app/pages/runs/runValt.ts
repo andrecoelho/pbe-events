@@ -6,8 +6,12 @@ import { proxy } from 'valtio';
 export interface TeamStatus {
   id: string;
   number: number;
+  name: string;
   status: 'offline' | 'connected';
   languageCode: string | null;
+  // The code the team joins with (#44), and whether a device has joined with it.
+  joinCode: string;
+  hasDevice: boolean;
 }
 
 export interface Question {
@@ -79,7 +83,7 @@ type AnswerReceivedMessage = WebSocketMessage & {
 type WebSocketRunMessage =
   | (WebSocketMessage & { type: 'RUN_STATUS'; status: 'not_started' | 'in_progress' | 'paused' | 'completed' })
   | (WebSocketMessage & { type: 'ACTIVE_ITEM'; activeItem: ActiveItem })
-  | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: TeamStatus[] })
+  | (WebSocketMessage & { type: 'TEAM_STATUS'; teams: (Partial<TeamStatus> & { id: string })[] })
   | AnswerReceivedMessage
   | (WebSocketMessage & { type: 'ANSWER_CHALLENGE'; questionId: string; teamId: string; challenged: boolean })
   | (WebSocketMessage & { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null })
@@ -368,6 +372,16 @@ export class RunValt {
     await this.ws?.sendMessage({ type: 'START_TIMER' });
   };
 
+  // Frees the team for another device; the device that held it is disconnected (#44).
+  releaseTeamDevice = async (teamId: string) => {
+    return (await this.ws?.sendMessage({ type: 'RELEASE_TEAM_DEVICE', teamId })) ?? false;
+  };
+
+  // Gives the team a new join code; the old code and link stop working (#44).
+  renewJoinCode = async (teamId: string) => {
+    return (await this.ws?.sendMessage({ type: 'RENEW_JOIN_CODE', teamId })) ?? false;
+  };
+
   lockQuestion = async (questionId: string, locked: boolean) => {
     await this.ws?.sendMessage({ type: 'SET_QUESTION_LOCKED', questionId, locked });
   };
@@ -388,9 +402,16 @@ export class RunValt {
     }
   };
 
-  private handleTEAM_STATUS = (teams: TeamStatus[]) => {
+  // Updates carry only what changed (a team going offline, a new code), so merge them in.
+  private handleTEAM_STATUS = (teams: (Partial<TeamStatus> & { id: string })[]) => {
     for (const team of teams) {
-      this.store.teams[team.id] = team;
+      const current = this.store.teams[team.id];
+
+      if (current) {
+        Object.assign(current, team);
+      } else if (team.number !== undefined) {
+        this.store.teams[team.id] = team as TeamStatus;
+      }
     }
   };
 

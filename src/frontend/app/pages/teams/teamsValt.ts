@@ -1,3 +1,4 @@
+import { joinLink } from '@/joinCode';
 import { proxy } from 'valtio';
 
 export interface Language {
@@ -12,6 +13,8 @@ export interface Team {
   number: number;
   languageId: string | null;
   languageName: string;
+  // The code the team joins with (#44).
+  joinCode: string;
 }
 
 export interface TeamsStore {
@@ -71,6 +74,7 @@ export class TeamsValt {
       const response = (await result.json()) as {
         id: string;
         number: number;
+        joinCode: string;
         languageId: string;
         languageName: string;
       };
@@ -79,7 +83,8 @@ export class TeamsValt {
         name,
         number: response.number,
         languageId: response.languageId,
-        languageName: response.languageName
+        languageName: response.languageName,
+        joinCode: response.joinCode
       });
       return { ok: true };
     }
@@ -154,13 +159,16 @@ export class TeamsValt {
     return { ok: false, error: response.error };
   }
 
+  // Copies the link the team joins with (/join/K7P4QX).
   async copyTeamLink(teamId: string) {
-    const teamEventUrl = new URL('/event-run/team', window.location.origin);
+    const team = this.store.teams.find((t) => t.id === teamId);
 
-    teamEventUrl.search = new URLSearchParams({ eventId: this.store.eventId, teamId }).toString();
+    if (!team) {
+      return;
+    }
 
     try {
-      await navigator.clipboard.writeText(teamEventUrl.toString());
+      await navigator.clipboard.writeText(joinLink(window.location.origin, team.joinCode));
 
       // Clear any existing timeout for this team
       const existingTimeout = this.copyTimeouts.get(teamId);
