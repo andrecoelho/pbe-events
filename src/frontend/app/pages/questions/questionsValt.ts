@@ -45,6 +45,8 @@ export type ImportResult = { ok: true } | { ok: false; error?: string; conflict?
 
 export class QuestionsValt {
   store: QuestionsStore;
+  // Translation creates in flight, by `${questionId}:${languageCode}`.
+  private pendingCreates = new Map<string, Promise<{ ok: boolean; error?: string }>>();
 
   constructor() {
     this.store = proxy<QuestionsStore>({
@@ -353,12 +355,25 @@ export class QuestionsValt {
     translation: IQuestionTranslation,
     updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
   ) {
-    if (translation.id) {
-      // Update existing translation
-      return await this.updateTranslation(question, translation, updates);
-    } else {
-      // Create new translation
-      return await this.addTranslation(question, translation);
+    const key = `${question.id}:${translation.languageCode}`;
+
+    // An edit made while the translation is still being created waits for it, then updates it.
+    await this.pendingCreates.get(key);
+
+    // The id comes from the store: the caller's snapshot can predate the create that set it.
+    const id = this.store.questions[question.id]?.translations[translation.languageCode]?.id;
+
+    if (id) {
+      return await this.updateTranslation(question, { ...translation, id }, updates);
+    }
+
+    const create = this.addTranslation(question, translation);
+    this.pendingCreates.set(key, create);
+
+    try {
+      return await create;
+    } finally {
+      this.pendingCreates.delete(key);
     }
   }
 

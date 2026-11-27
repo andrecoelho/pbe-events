@@ -8,6 +8,7 @@ import {
   updateLanguage
 } from '@/server/services/languages';
 import { MANAGER_ROLES } from '@/server/services/permissions';
+import { listTeams } from '@/server/services/teams';
 import type { Routes } from '@/server/types';
 import { z } from 'zod';
 
@@ -50,6 +51,17 @@ export const languagesRoutes: Routes = {
     }),
 
     DELETE: route(managers(), json(LanguageId), async ({ event, body }) => {
+      // Teams can't be left without a language, so say which ones to move first.
+      const teams = (await listTeams(event.id)).filter((team) => team.language_id === body.id);
+
+      if (teams.length > 0) {
+        const names = teams.map((team) => team.name).join(', ');
+        throw badRequest(
+          `${teams.length === 1 ? 'Team' : 'Teams'} ${names} ${teams.length === 1 ? 'uses' : 'use'} this language. ` +
+            `Give ${teams.length === 1 ? 'it' : 'them'} another language first.`
+        );
+      }
+
       await deleteLanguage(event.id, body.id);
       return {};
     })

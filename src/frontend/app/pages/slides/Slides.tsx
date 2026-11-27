@@ -28,12 +28,24 @@ const init = () => {
     }
   }, 500);
 
-  const debouncedUpdateSlide = debounce(async (slideId: string, content: string) => {
-    const result = await valt.updateSlide(slideId, content);
-    if (!result.ok) {
-      toast.show({ message: result.error || 'Failed to save slide', type: 'error' });
+  // One delayed save per slide, so editing another slide within the delay doesn't drop this one's.
+  const slideSavers = new Map<string, (content: string) => void>();
+
+  const saveSlideSoon = (slideId: string, content: string) => {
+    let save = slideSavers.get(slideId);
+
+    if (!save) {
+      save = debounce(async (latest: string) => {
+        const result = await valt.updateSlide(slideId, latest);
+        if (!result.ok) {
+          toast.show({ message: result.error || 'Failed to save slide', type: 'error' });
+        }
+      }, 500);
+      slideSavers.set(slideId, save);
     }
-  }, 500);
+
+    save(content);
+  };
 
   const handleTitleRemarksChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     valt.setTitleRemarks(e.target.value);
@@ -42,7 +54,7 @@ const init = () => {
 
   const handleSlideContentChange = (slideId: string, content: string) => {
     valt.setSlideContent(slideId, content);
-    debouncedUpdateSlide(slideId, content);
+    saveSlideSoon(slideId, content);
   };
 
   const handleAddSlide = async () => {
