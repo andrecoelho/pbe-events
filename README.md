@@ -54,7 +54,7 @@ These only ever connect to **staging**, never production. Each tunnel stays open
 
 For production, `mise run db:tunnel:prod` opens a tunnel on localhost:15433, a different port so a saved connection can't point at the wrong database. It's for looking at data in a DB tool; nothing in the app or its scripts uses it.
 
-On staging the demo password comes from `SEED_DEMO_PASSWORD` in your `.env` (see `.env.example`), not the repo, since the repo is public. The seed won't replace a real staging account that uses the demo email.
+On staging the demo password isn't in the repo, since the repo is public. Set `SEED_DEMO_PASSWORD` only for the run that first creates the demo user (`SEED_DEMO_PASSWORD=... mise run db:seed:staging`) and keep it in a password manager; later runs keep the existing password. The seed won't replace a real staging account that uses the demo email.
 
 `dev:staging` doesn't apply migrations, so a branch's unmerged migration never reaches staging's database; staging gets them when it deploys.
 

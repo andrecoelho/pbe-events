@@ -6,7 +6,8 @@
 // Demo sign-in:
 //   email:    demo@example.com
 //   password: demo-password locally (a test value for local development only);
-//             on staging, SEED_DEMO_PASSWORD from your .env, so the password isn't public.
+//             on staging, set once from SEED_DEMO_PASSWORD (kept in a password manager, not the repo).
+//             Later staging runs keep the existing password unless SEED_DEMO_PASSWORD is set again.
 import { sql } from 'bun';
 import { requireLocalDatabase, requireStagingTunnel } from './local-db';
 
@@ -16,11 +17,6 @@ export const DEMO_PASSWORD = 'demo-password';
 const staging = process.argv.includes('--staging');
 const target = staging ? requireStagingTunnel('db:seed') : requireLocalDatabase('db:seed');
 const password = staging ? process.env.SEED_DEMO_PASSWORD : DEMO_PASSWORD;
-
-if (!password) {
-  console.error('Set SEED_DEMO_PASSWORD in your .env first: the staging demo password stays out of the repo.');
-  process.exit(1);
-}
 
 const userId = 'seed-user-demo';
 const eventId = 'seed-event-demo';
@@ -108,7 +104,14 @@ const slides = [
   '## Rules\n\n- Answer before the timer runs out\n- One answer per team'
 ];
 
-const passwordHash = await Bun.password.hash(password);
+// On staging without SEED_DEMO_PASSWORD, keep the demo user's current password.
+const [current] = await sql`SELECT password FROM users WHERE id = ${userId}`;
+const passwordHash = password ? await Bun.password.hash(password) : current?.password;
+
+if (!passwordHash) {
+  console.error('The demo user does not exist yet: set SEED_DEMO_PASSWORD (for this run only) to create it.');
+  process.exit(1);
+}
 
 // Don't take over a real account that happens to use the demo email.
 const [existing] = await sql`SELECT id FROM users WHERE email = ${DEMO_EMAIL} AND id <> ${userId}`;
