@@ -58,7 +58,7 @@ Status: **draft 2**, updated with review comments. Once agreed, each `- [ ]` ite
   - Run migrations as the pre-deploy command.
 - [ ] DB migrations: `migrations/0001_init.sql` and a ~50-line runner backed by `schema_migrations`. The destructive reset becomes a dev-only script.
 - [ ] Seed script (demo user and event), also used for screenshots and browser tests.
-- [ ] Update `README.md` and `.github/copilot-instructions.md`.
+- [ ] Update `README.md`, and replace `.github/copilot-instructions.md` with `CLAUDE.md`.
 
 ## Phase 1 — Server middleware
 

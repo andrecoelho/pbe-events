@@ -6,5 +6,5 @@
   "jsxSingleQuote": true,
   "singleQuote": true,
   "sortPackageJson": false,
-  "ignorePatterns": ["bun.lock", "data/", "node_modules/", "dist/", ".github/instructions/"]
+  "ignorePatterns": ["bun.lock", "data/", "node_modules/", "dist/", "docs/daisyui.md"]
 }

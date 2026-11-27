@@ -1,5 +1,7 @@
 # PBE Events
 
+Runs Pathfinder Bible Experience quiz events: organizers write questions in several languages, a presenter screen shows them, teams answer from their own devices in real time, and judges grade. A single Bun server with a React frontend and Postgres, deployed on Railway.
+
 ## Development setup
 
 Tool versions and dev tasks are managed with [mise](https://mise.jdx.dev) (see `mise.toml`).
@@ -9,11 +11,22 @@ curl https://mise.run | sh                       # single binary in ~/.local/bin
 echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc   # then open a new terminal
 mise install                                     # installs the pinned Bun (and Node, for the Railway config)
 cp .env.example .env                             # then adjust as needed
-mise run db                                      # start local Postgres (Docker)
+mise run db                                      # start local Postgres (needs Docker)
 mise run dev                                     # install dependencies, apply migrations, start the dev server
 ```
 
 Run `mise tasks` to list all tasks.
+
+### Checks
+
+CI runs these on every pull request and on pushes to `staging` and `main`:
+
+```bash
+bun run typecheck      # TypeScript
+bun run lint           # oxlint (0 errors; warnings are known issues)
+bun run format:check   # oxfmt; `bun run format` fixes it
+bun test               # tests (*.test.ts)
+```
 
 ### Database migrations
 
@@ -47,7 +60,7 @@ On staging the demo password comes from `SEED_DEMO_PASSWORD` in your `.env` (see
 
 ## Railway infrastructure
 
-Railway deploys `staging` to the staging environment and `main` to production, each after GitHub CI passes. The services, database and volumes are described in [`.railway/railway.ts`](.railway/railway.ts); secrets stay in Railway. Changes to that file are not applied on deploy. Preview, then apply each environment by hand:
+Railway deploys `staging` to the staging environment (https://runpbe-staging.up.railway.app) and `main` to production, each after GitHub CI passes and after running pending migrations. The services, database and volumes are described in [`.railway/railway.ts`](.railway/railway.ts); secrets stay in Railway. Changes to that file are not applied on deploy. Preview, then apply each environment by hand:
 
 ```bash
 railway config plan --environment staging
@@ -78,5 +91,7 @@ bun start
 
 ## Documentation
 
-- [Questions Import/Export API](docs/QUESTIONS_IMPORT_API.md) - API documentation for importing and exporting questions
-- [Questions Example YAML](docs/questions-example.yaml) - Sample YAML file for questions import
+- [PBE 2027 plan](docs/PBE_2027_PLAN.md): the modernization plan, tracked on the "PBE 2027" GitHub project
+- [Questions Import/Export API](docs/QUESTIONS_IMPORT_API.md) and [example YAML](docs/questions-example.yaml)
+- [WebSocket architecture](docs/WEBSOCKET_ARCHITECTURE.md): how a live event runs
+- [CLAUDE.md](CLAUDE.md): conventions for AI coding agents (Claude Code), with the [daisyUI reference](docs/daisyui.md) it uses for UI work

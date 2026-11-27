@@ -1,10 +1,4 @@
----
-description: daisyUI 5
-alwaysApply: true
-applyTo: "**"
-downloadedFrom: https://daisyui.com/llms.txt
-version: 5.5.x
----
+<!-- daisyUI 5.5 reference for AI agents, from https://daisyui.com/llms.txt. Not formatted by oxfmt. -->
 
 # daisyUI 5
 daisyUI 5 is a CSS library for Tailwind CSS 4

@@ -9,7 +9,7 @@
     "builtin": true,
     "browser": true
   },
-  "ignorePatterns": ["data/", "dist/", ".github/instructions/"],
+  "ignorePatterns": ["data/", "dist/"],
   "rules": {
     "react/react-in-jsx-scope": "off",
     "import/no-unassigned-import": "off",
