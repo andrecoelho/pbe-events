@@ -119,7 +119,7 @@ export function parseMessage<T extends z.ZodType>(schema: T, raw: string | Buffe
     return { ok: true, message: result.data };
   }
 
-  const ackId = json && typeof json === 'object' && '__ACK__' in json ? json.__ACK__ : undefined;
+  const ackId = json && typeof json === 'object' && '__ACK__' in json ? json['__ACK__'] : undefined;
   const issue = result.error.issues[0];
   const path = issue?.path.length ? ` (${issue.path.join('.')})` : '';
 

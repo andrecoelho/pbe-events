@@ -500,7 +500,7 @@ export class WebSocketServer {
           return;
         }
 
-        this.sendAck(ws, msg.__ACK__);
+        this.sendAck(ws, msg['__ACK__']);
 
         switch (msg.type) {
           case 'SUBMIT_ANSWER':
@@ -538,12 +538,12 @@ export class WebSocketServer {
             break;
         }
 
-        this.sendAck(ws, msg.__ACK__);
+        this.sendAck(ws, msg['__ACK__']);
       } else if (this.isPresenterWebSocket(ws)) {
         const msg = this.parse(ws, PresenterMessage, message);
 
         if (msg) {
-          this.sendAck(ws, msg.__ACK__);
+          this.sendAck(ws, msg['__ACK__']);
         }
       } else if (this.isJudgeWebSocket(ws)) {
         const msg = this.parse(ws, JudgeMessage, message);
@@ -552,7 +552,7 @@ export class WebSocketServer {
           return;
         }
 
-        this.sendAck(ws, msg.__ACK__);
+        this.sendAck(ws, msg['__ACK__']);
 
         switch (msg.type) {
           case 'UPDATE_POINTS':
