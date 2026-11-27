@@ -200,6 +200,11 @@ export function validateQuestionsData(data: unknown): {
           };
         }
       } else {
+        // YAML reads an unquoted answer like `1945` as a number; keep it as the text the author wrote
+        if (typeof translation.answer === 'number' && Number.isFinite(translation.answer)) {
+          translation.answer = String(translation.answer);
+        }
+
         // For other question types, answer must be a non-empty string
         if (typeof translation.answer !== 'string' || translation.answer.trim() === '') {
           return {
