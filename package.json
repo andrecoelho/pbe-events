@@ -17,7 +17,8 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "bun test"
+    "test": "bun test",
+    "smoke": "scripts/smoke/compare.sh"
   },
   "dependencies": {
     "bun-plugin-tailwind": "^0.1.2",

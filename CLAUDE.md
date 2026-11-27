@@ -11,6 +11,7 @@ bun run typecheck      # tsc (TypeScript 7)
 bun run lint           # oxlint; must have 0 errors (warnings are known issues)
 bun run format         # oxfmt; `format:check` is what CI runs
 bun test               # bun:test, files named *.test.ts next to the code
+bun run smoke [ref]    # local only: API + live-run smoke tests here vs. a git ref (default origin/staging), diffed
 bun run migrate        # apply pending migrations to POSTGRES_URL
 bun run db:reset       # local only: rebuild the database from migrations (asks first)
 bun run db:seed        # local only: demo@example.com / demo-password owning "Demo Event"
