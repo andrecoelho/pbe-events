@@ -2,18 +2,11 @@
 // Run with `bun run db:reset` (add `-- --yes` to skip the question). Refuses anything but a database on this machine.
 import { migrate } from '@/server/migrate';
 import { sql } from 'bun';
+import { requireLocalDatabase } from './local-db';
 
-const url = new URL(process.env.POSTGRES_URL ?? '');
-const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-
-// The staging tunnel is also on localhost, so refuse its port too.
-if (!local || url.port === '15432' || process.env.NODE_ENV === 'production') {
-  console.error(`Refusing to reset ${url.hostname}:${url.port}: db:reset only runs against a local dev database.`);
-  process.exit(1);
-}
+const target = requireLocalDatabase('db:reset');
 
 // A tunnel on another port looks local too, so show what would be lost and ask, unless --yes.
-const target = `${url.hostname}:${url.port}${url.pathname}`;
 const [{ hasEvents }] = await sql`SELECT to_regclass('public.events') IS NOT NULL AS "hasEvents"`;
 const events = hasEvents ? (await sql`SELECT count(*)::int AS n FROM events`)[0].n : 0;
 

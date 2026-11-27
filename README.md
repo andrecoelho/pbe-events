@@ -22,7 +22,10 @@ The schema lives in `migrations/`, applied in name order and recorded in the `sc
 ```bash
 bun run migrate     # apply pending migrations to the database in POSTGRES_URL
 bun run db:reset    # local only: delete everything and rebuild from migrations (asks first)
+bun run db:seed     # local only: add (or refresh) a demo user and event
 ```
+
+The demo event has English and Spanish, one question of each type, three teams and two slides. Sign in as `demo@example.com` / `demo-password` (local test values; see `scripts/seed.ts`). `db:reset` and `db:seed` refuse anything but a local database, including the staging and production tunnels.
 
 ### Using the staging database
 
