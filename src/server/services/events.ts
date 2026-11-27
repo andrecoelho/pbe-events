@@ -18,6 +18,13 @@ export async function listEventsForUser(userId: string): Promise<EventListItem[]
   `;
 }
 
+// The event's id and name, or null.
+export async function getEventName(eventId: string) {
+  const rows: { id: string; name: string }[] = await sql`SELECT id, name FROM events WHERE id = ${eventId}`;
+
+  return rows[0] ?? null;
+}
+
 export async function eventExists(eventId: string) {
   const rows: { id: string }[] = await sql`SELECT id FROM events WHERE id = ${eventId}`;
 

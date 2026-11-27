@@ -1,65 +1,70 @@
 import { api } from '@/frontend/utils/api';
-import type { LiveConnectionsResponse, LiveEvent } from '@/types';
+import type { AdminEventResponse, LiveConnectionsResponse } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
-// How often the live connections refresh while the page is open.
+// How often the live data refreshes while the page is open.
 const REFRESH_MS = 5000;
 
-export type AdminStore = {
-  connections: {
-    loaded: boolean;
-    // Why the last refresh failed, while it keeps failing.
-    error: string | null;
-    // The server's clock when the list was read, so ages don't depend on this computer's clock.
-    serverTime: number;
-    events: LiveEvent[];
-  };
+// Data read from the server every few seconds.
+type Polled<T> = {
+  loaded: boolean;
+  // Why the last refresh failed, while it keeps failing.
+  error: string | null;
+  data: T | null;
 };
+
+export type AdminStore = {
+  connections: Polled<LiveConnectionsResponse>;
+  event: Polled<AdminEventResponse>;
+};
+
+const empty = () => ({ loaded: false, error: null, data: null });
 
 export class AdminValt {
   store: AdminStore;
-  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    this.store = proxy<AdminStore>({ connections: { loaded: false, error: null, serverTime: 0, events: [] } });
+    this.store = proxy<AdminStore>({ connections: empty(), event: empty() });
   }
 
-  async loadConnections() {
-    const result = await api<LiveConnectionsResponse>('/api/admin/connections');
-    const connections = this.store.connections;
+  private async load<K extends keyof AdminStore>(key: K, path: string) {
+    const result = await api<NonNullable<AdminStore[K]['data']>>(path);
+    const polled = this.store[key];
 
     if (result.ok) {
-      connections.serverTime = result.data.serverTime;
-      connections.events = result.data.events;
-      connections.error = null;
+      polled.data = result.data as AdminStore[K]['data'];
+      polled.error = null;
     } else {
-      connections.error = result.error;
+      polled.error = result.error;
     }
 
-    connections.loaded = true;
+    polled.loaded = true;
   }
 
-  // Refreshes the live connections every few seconds while the tab is visible. Returns the cleanup.
-  watchConnections = () => {
+  loadConnections = () => this.load('connections', '/api/admin/connections');
+
+  loadEvent = (eventId: string) => this.load('event', `/api/admin/events/${eventId}`);
+
+  // Calls `load` now and every few seconds while the tab is visible. Returns the cleanup, for useEffect.
+  poll(load: () => Promise<void>) {
     const refresh = () => {
       if (document.visibilityState === 'visible') {
-        this.loadConnections();
+        load();
       }
     };
 
-    this.loadConnections();
-    this.timer = setInterval(refresh, REFRESH_MS);
+    load();
+
+    const timer = setInterval(refresh, REFRESH_MS);
+
     document.addEventListener('visibilitychange', refresh);
 
     return () => {
-      if (this.timer) {
-        clearInterval(this.timer);
-      }
-
+      clearInterval(timer);
       document.removeEventListener('visibilitychange', refresh);
     };
-  };
+  }
 }
 
 export const AdminValtContext = createContext<AdminValt>(new AdminValt());

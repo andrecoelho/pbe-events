@@ -157,3 +157,16 @@ export async function renewJoinCode(eventId: string, teamId: string) {
 
   return rows[0]?.join_code ?? null;
 }
+
+// How many teams each event has (the admin page's open events, #56).
+export async function countTeams(eventIds: string[]): Promise<Map<string, number>> {
+  if (eventIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: { event_id: string; count: number }[] = await sql`
+    SELECT event_id, count(*)::int AS count FROM teams WHERE event_id IN ${sql(eventIds)} GROUP BY event_id
+  `;
+
+  return new Map(rows.map((row) => [row.event_id, row.count]));
+}

@@ -158,25 +158,52 @@ export type ResultsClientMessage = Ping;
 // Admin page (Phase 3): the events open in the server's memory and who is connected to each (#56).
 export type LiveConnectionRole = 'host' | 'judge' | 'presenter' | 'results' | 'team';
 
+// One open socket of a signed-in person (host, presenter, judge or results screen).
 export type LiveConnection = {
-  role: LiveConnectionRole;
-  // The signed-in user, or the team.
+  role: Exclude<LiveConnectionRole, 'team'>;
   name: string;
-  detail: string;
-  userId: string | null;
-  teamId: string | null;
+  email: string;
+  userId: string;
   // Server time (ms since the epoch).
   connectedAt: number;
+  // The last message other than a ping.
   lastMessageAt: number | null;
 };
 
-export type LiveEvent = {
+// A row of the admin page's list of open events.
+export type LiveEventSummary = {
   eventId: string;
   eventName: string;
   runStatus: RunStatus;
   // What the presenter shows, e.g. "Question 3 · answering"; null before the run starts.
   activeItem: string | null;
-  connections: LiveConnection[];
+  counts: Record<LiveConnectionRole, number>;
+  // Every team in the event, and how many of them are reconnecting (their socket dropped a moment ago).
+  teamCount: number;
+  teamsReconnecting: number;
+  lastMessageAt: number | null;
 };
 
-export type LiveConnectionsResponse = { serverTime: number; events: LiveEvent[] };
+export type LiveConnectionsResponse = { serverTime: number; events: LiveEventSummary[] };
+
+// Every team of an event, connected or not, on the admin page's event page.
+export type AdminTeam = {
+  id: string;
+  number: number;
+  name: string;
+  languageCode: string | null;
+  hasDevice: boolean;
+  status: TeamConnectionStatus;
+  lastSeenAt: number | null;
+  // While connected.
+  connectedAt: number | null;
+  lastMessageAt: number | null;
+};
+
+export type AdminEventResponse = {
+  serverTime: number;
+  event: { id: string; name: string };
+  // Null when the event isn't open in the server's memory.
+  live: { runStatus: RunStatus; activeItem: string | null; connections: LiveConnection[] } | null;
+  teams: AdminTeam[];
+};

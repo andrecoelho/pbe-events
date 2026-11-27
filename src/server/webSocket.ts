@@ -383,30 +383,44 @@ export class WebSocketServer {
 
   // The events open in memory and their sockets, for the admin page (#56).
   liveEvents(): LiveEventState[] {
-    return [...this.eventConnections.values()].map((connection) => ({
-      eventId: connection.eventId,
-      eventName: connection.eventName,
-      runStatus: connection.run.status,
-      activeItem: connection.activeItem,
-      sockets: [...(this.eventSockets.get(connection.eventId) ?? [])].flatMap((ws): LiveSocket[] => {
-        const { data } = ws;
-
-        if (data.role === 'error') {
-          return [];
-        }
-
-        return [
-          {
-            role: data.role,
-            userId: data.role === 'team' ? null : data.session.user_id,
-            team: data.role === 'team' ? { id: data.id, name: data.name, number: data.number } : null,
-            connectedAt: data.connectedAt ?? Date.now(),
-            lastMessageAt: data.lastMessageAt ?? null
-          }
-        ];
-      })
-    }));
+    return [...this.eventConnections.values()].map(this.liveState);
   }
+
+  // How many of the event's teams dropped a moment ago and are expected back (#48), for the admin page.
+  teamsReconnecting(eventId: string) {
+    return [...this.teamOfflineTimers.keys()].filter((key) => key.startsWith(`${eventId}:`)).length;
+  }
+
+  // One event's, or null when it isn't open in memory.
+  liveEvent(eventId: string): LiveEventState | null {
+    const connection = this.eventConnections.get(eventId);
+
+    return connection ? this.liveState(connection) : null;
+  }
+
+  private liveState = (connection: EventConnection): LiveEventState => ({
+    eventId: connection.eventId,
+    eventName: connection.eventName,
+    runStatus: connection.run.status,
+    activeItem: connection.activeItem,
+    sockets: [...(this.eventSockets.get(connection.eventId) ?? [])].flatMap((ws): LiveSocket[] => {
+      const { data } = ws;
+
+      if (data.role === 'error') {
+        return [];
+      }
+
+      return [
+        {
+          role: data.role,
+          userId: data.role === 'team' ? null : data.session.user_id,
+          team: data.role === 'team' ? { id: data.id, name: data.name, number: data.number } : null,
+          connectedAt: data.connectedAt ?? Date.now(),
+          lastMessageAt: data.lastMessageAt ?? null
+        }
+      ];
+    })
+  });
 
   // Called when a new WebSocket connection is opened
   private handleOpen = async (ws: ServerWebSocket<WebsocketData>) => {
@@ -823,13 +837,14 @@ export class WebSocketServer {
   }
 
   // Connected; reconnecting within RECONNECTING_MS of last being seen (its page keeps retrying); else offline.
-  private teamConnection(connection: EventConnection, teamId: string) {
-    const lastSeenAt = this.teamLastSeen.get(connection.eventId)?.get(teamId) ?? null;
-    const status: TeamConnectionStatus = connection.teams.has(teamId)
+  // Also read by the admin page (#56), for events that may not be open.
+  teamConnection(eventId: string, teamId: string) {
+    const lastSeenAt = this.teamLastSeen.get(eventId)?.get(teamId) ?? null;
+    const status: TeamConnectionStatus = this.eventConnections.get(eventId)?.teams.has(teamId)
       ? 'connected'
       : lastSeenAt !== null &&
           Date.now() - lastSeenAt < RECONNECTING_MS &&
-          this.teamOfflineTimers.has(`${connection.eventId}:${teamId}`)
+          this.teamOfflineTimers.has(`${eventId}:${teamId}`)
         ? 'reconnecting'
         : 'offline';
 
@@ -854,7 +869,7 @@ export class WebSocketServer {
       languageCode: team.language_code,
       joinCode: team.join_code,
       hasDevice: team.has_device,
-      ...this.teamConnection(connection, team.id)
+      ...this.teamConnection(connection.eventId, team.id)
     };
   }
 
