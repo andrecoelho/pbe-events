@@ -541,6 +541,10 @@ These endpoints use the same database tables as the WebSocket handlers, ensuring
 2. A team's answers go through an outbox (`sendMessage(message, { queueKey })`): one that can't be sent, or whose ACK never comes, waits and is resent after reconnecting until the server answers. Only the latest answer per question is kept. Answers carry their `questionId`, and the server refuses one for a question that is no longer open ("That question has closed"), so a late resend can't land on the next question.
 3. The same device (same `teamToken` cookie) opening the team in a second tab replaces the first tab's socket, which the server closes with code 4003 (`TEAM_REPLACED_CLOSE_CODE`). That tab stops reconnecting and shows "This team is open in another tab" with a **Use this tab** button, instead of the two tabs taking the team from each other forever.
 
+### Team connection status (#48)
+
+Hosts get each team's `status` and `lastSeenAt` (server time, ms; null if not seen since the server started) in `TEAM_STATUS`: `connected`; `reconnecting` for 2 minutes after its socket drops (its page keeps retrying); then `offline`. A released device goes `offline` at once. The Run screen colors the badges (amber, pulsing, for reconnecting) and each team's menu says "Connected", "Reconnecting, last seen 20 s ago" or "Offline since 10:42". "N active" counts connected teams. Last-seen times live in the server's memory, so a restart forgets them.
+
 ### Grace Period Update Flow
 
 1. Admin calls `PATCH /api/runs/:runId` with `updateGracePeriod`

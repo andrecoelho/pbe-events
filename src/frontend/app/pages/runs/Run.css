@@ -10,6 +10,10 @@
     @apply from-slate-500 via-gray-700 to-slate-900 opacity-75;
   }
 
+  .team-badge--reconnecting {
+    @apply from-amber-400 via-orange-400 to-amber-600 animate-pulse;
+  }
+
   .team-badge--connected {
     @apply from-green-500 via-emerald-500 to-teal-600;
   }

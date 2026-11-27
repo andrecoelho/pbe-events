@@ -6,6 +6,7 @@ import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { copyText } from '@/frontend/utils/clipboard';
+import { serverNow, useServerNow } from '@/frontend/utils/serverClock';
 import { formatJoinCode, joinLink } from '@/joinCode';
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -15,11 +16,31 @@ interface Props {
   children: ReactNode;
 }
 
+// "Connected", "Reconnecting, last seen 20 s ago", "Offline since 10:42" (#48).
+export function connectionText(team: TeamStatus, now = serverNow()) {
+  if (team.status === 'connected') {
+    return 'Connected';
+  }
+
+  if (!team.lastSeenAt) {
+    return 'Not connected yet';
+  }
+
+  const seconds = Math.max(Math.round((now - team.lastSeenAt) / 1000), 0);
+  const ago = seconds < 60 ? `${seconds} s ago` : `${Math.round(seconds / 60)} min ago`;
+
+  return team.status === 'reconnecting'
+    ? `Reconnecting, last seen ${ago}`
+    : `Offline since ${new Date(team.lastSeenAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
+
 export function TeamMenu({ team, children }: Props) {
   const valt = useRunValt();
   const popoverId = `team-menu-${team.id}`;
   const anchorName = `--team-menu-${team.id}`;
   const label = `Team ${team.number}`;
+  // Keeps "last seen 20 s ago" current while the team isn't connected.
+  const status = connectionText(team, useServerNow(team.status !== 'connected', 5000));
 
   const close = () => document.getElementById(popoverId)?.hidePopover();
 
@@ -71,6 +92,7 @@ export function TeamMenu({ team, children }: Props) {
         popoverTarget={popoverId}
         style={{ anchorName } as CSSProperties}
         aria-label={`${label} options`}
+        title={`${label}: ${status}`}
       >
         {children}
       </button>
@@ -85,6 +107,7 @@ export function TeamMenu({ team, children }: Props) {
             {label}: {team.name}
           </span>
           <span className='font-mono text-lg text-base-content tracking-widest'>{formatJoinCode(team.joinCode)}</span>
+          <span className='font-normal'>{status}</span>
           <span className='font-normal'>{team.hasDevice ? 'A device has joined' : 'No device has joined yet'}</span>
         </li>
         <li>

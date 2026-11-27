@@ -38,6 +38,8 @@ export type TeamWebsocketData = {
   number: number;
   languageId: string;
   languageCode: string;
+  // Set when the host released this device, so its disconnect shows as offline rather than reconnecting.
+  released?: boolean;
 };
 
 export type HostWebsocketData = {
@@ -85,6 +87,11 @@ const refused = (error: string): MessageResult => ({ ok: false, error });
 
 type PromptItem = Extract<ActiveItem, { type: 'question'; phase: 'prompt' }>;
 
+// A team whose socket dropped shows as reconnecting this long (its page keeps retrying), then offline (#48).
+const RECONNECTING_MS = 2 * 60_000;
+
+export type TeamConnectionStatus = 'connected' | 'reconnecting' | 'offline';
+
 // While a question's timer runs, its state is re-sent this often, in case a page missed a message (#47).
 const RESEND_MS = 5000;
 
@@ -111,6 +118,10 @@ export interface Run {
 export class WebSocketServer {
   private eventConnections: Map<string, EventConnection>;
   private pendingSetups = new Map<string, Promise<EventConnection | null>>();
+  // When each team was last connected, by event then team id (#48). Kept apart from the event's live state,
+  // which is dropped when nobody is connected.
+  private teamLastSeen = new Map<string, Map<string, number>>();
+  private teamOfflineTimers = new Map<string, NodeJS.Timeout>();
   private server: Bun.Server<WebsocketData> | null = null;
   // Host, judge and presenter sockets by session id, so they can be closed when the session ends.
   private sessionSockets = new Map<string, Set<ServerWebSocket<SignedInWebsocketData>>>();
@@ -397,13 +408,12 @@ export class WebSocketServer {
         this.sendActiveItem(ws, connection);
         this.sendGracePeriod(ws, connection);
 
-        // Send TEAM_CONNECTED to host
+        this.markTeamSeen(eventId, id);
+        clearTimeout(this.teamOfflineTimers.get(`${eventId}:${id}`));
+
         this.server?.publish(
           `${eventId}:hosts`,
-          JSON.stringify({
-            type: 'TEAM_STATUS',
-            teams: [this.teamStatus(team, 'connected')]
-          })
+          JSON.stringify({ type: 'TEAM_STATUS', teams: [this.teamStatus(connection, team)] })
         );
 
         console.log(`Team ${team.number} connected for event`, eventId, id);
@@ -444,11 +454,28 @@ export class WebSocketServer {
       // A socket the same device replaced (a reload) closes after its replacement took over: leave that alone.
       if (connection.teams.get(id) === ws) {
         connection.teams.delete(id);
+        this.markTeamSeen(eventId, id);
 
-        this.server?.publish(
-          `${eventId}:hosts`,
-          JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id, number, status: 'offline' }] })
-        );
+        // A released device won't come back; any other is retrying, so it's reconnecting for a while.
+        const status: TeamConnectionStatus = ws.data.released ? 'offline' : 'reconnecting';
+
+        this.publishTeamConnection(eventId, id, number, status);
+
+        if (status === 'reconnecting') {
+          const key = `${eventId}:${id}`;
+
+          clearTimeout(this.teamOfflineTimers.get(key));
+          this.teamOfflineTimers.set(
+            key,
+            setTimeout(() => {
+              this.teamOfflineTimers.delete(key);
+
+              if (!this.eventConnections.get(eventId)?.teams.has(id)) {
+                this.publishTeamConnection(eventId, id, number, 'offline');
+              }
+            }, RECONNECTING_MS)
+          );
+        }
 
         console.log(`Team ${number} disconnected for event`, eventId, id);
       }
@@ -673,15 +700,43 @@ export class WebSocketServer {
   async sendTeamStatuses(ws: ServerWebSocket<WebsocketData>, connection: EventConnection): Promise<void> {
     const teams = await listTeams(connection.eventId);
 
-    const teamStatuses = teams.map((team) =>
-      this.teamStatus(team, connection.teams.has(team.id) ? 'connected' : 'offline')
-    );
+    const teamStatuses = teams.map((team) => this.teamStatus(connection, team));
 
     ws.send(JSON.stringify({ type: 'TEAM_STATUS', teams: teamStatuses }));
   }
 
+  private markTeamSeen(eventId: string, teamId: string) {
+    const seen = this.teamLastSeen.get(eventId) ?? new Map<string, number>();
+
+    seen.set(teamId, Date.now());
+    this.teamLastSeen.set(eventId, seen);
+  }
+
+  // Connected; reconnecting within RECONNECTING_MS of last being seen (its page keeps retrying); else offline.
+  private teamConnection(connection: EventConnection, teamId: string) {
+    const lastSeenAt = this.teamLastSeen.get(connection.eventId)?.get(teamId) ?? null;
+    const status: TeamConnectionStatus = connection.teams.has(teamId)
+      ? 'connected'
+      : lastSeenAt !== null &&
+          Date.now() - lastSeenAt < RECONNECTING_MS &&
+          this.teamOfflineTimers.has(`${connection.eventId}:${teamId}`)
+        ? 'reconnecting'
+        : 'offline';
+
+    return { status, lastSeenAt };
+  }
+
+  private publishTeamConnection(eventId: string, id: string, number: number, status: TeamConnectionStatus) {
+    const lastSeenAt = this.teamLastSeen.get(eventId)?.get(id) ?? null;
+
+    this.server?.publish(
+      `${eventId}:hosts`,
+      JSON.stringify({ type: 'TEAM_STATUS', teams: [{ id, number, status, lastSeenAt }] })
+    );
+  }
+
   // A team's entry in TEAM_STATUS (sent to hosts only: it has the join code).
-  private teamStatus(team: Team, status: 'connected' | 'offline') {
+  private teamStatus(connection: EventConnection, team: Team) {
     return {
       id: team.id,
       number: team.number,
@@ -689,7 +744,7 @@ export class WebSocketServer {
       languageCode: team.language_code,
       joinCode: team.join_code,
       hasDevice: team.has_device,
-      status
+      ...this.teamConnection(connection, team.id)
     };
   }
 
@@ -925,7 +980,22 @@ export class WebSocketServer {
           message: 'The host released this device from the team. To join again, use your team’s code.'
         })
       );
+      teamWs.data.released = true;
       teamWs.close();
+    } else {
+      // Already disconnected: it won't be back on that device, so it's offline now rather than reconnecting.
+      const key = `${connection.eventId}:${teamId}`;
+
+      if (this.teamOfflineTimers.has(key)) {
+        clearTimeout(this.teamOfflineTimers.get(key));
+        this.teamOfflineTimers.delete(key);
+
+        const team = await getTeam(connection.eventId, teamId);
+
+        if (team) {
+          this.publishTeamConnection(connection.eventId, teamId, team.number, 'offline');
+        }
+      }
     }
 
     this.server?.publish(

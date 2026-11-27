@@ -30,9 +30,9 @@ export function secondsLeft(endsAt: number, now = serverNow()) {
   return Math.max(Math.ceil((endsAt - now) / 1000), 0);
 }
 
-// The current server time, re-rendering the component every quarter second while `running`. It reads the
-// clock on every render, so the first render after a timer starts is already right.
-export function useServerNow(running: boolean) {
+// The current server time, re-rendering the component every `everyMs` (a quarter second by default) while
+// `running`. It reads the clock on every render, so the first render after a timer starts is already right.
+export function useServerNow(running: boolean, everyMs = 250) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -40,10 +40,10 @@ export function useServerNow(running: boolean) {
       return;
     }
 
-    const timer = setInterval(() => setTick((tick) => tick + 1), 250);
+    const timer = setInterval(() => setTick((tick) => tick + 1), everyMs);
 
     return () => clearInterval(timer);
-  }, [running]);
+  }, [running, everyMs]);
 
   return serverNow();
 }

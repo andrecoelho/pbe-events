@@ -12,6 +12,7 @@ import './Run.css';
 
 const TEAM_STATE_CLASSES: Record<TeamStatus['status'], string> = {
   offline: 'team-badge--offline',
+  reconnecting: 'team-badge--reconnecting',
   connected: 'team-badge--connected'
 };
 
@@ -146,7 +147,7 @@ export const Run = () => {
   const snap = useSnapshot(valt.store);
 
   const activeTeamsCount = useMemo(
-    () => Object.values(snap.teams).filter((t) => t.status !== 'offline').length,
+    () => Object.values(snap.teams).filter((t) => t.status === 'connected').length,
     [snap.teams]
   );
 
@@ -333,6 +334,12 @@ export const Run = () => {
                 </span>
               </span>
               <span>Connected + No Answer</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <span className='relative inline-flex'>
+                <span className='team-badge team-badge--sm team-badge--reconnecting'>12</span>
+              </span>
+              <span>Reconnecting</span>
             </div>
             <div className='flex items-center gap-2'>
               <Icon name='key' className='size-4' />

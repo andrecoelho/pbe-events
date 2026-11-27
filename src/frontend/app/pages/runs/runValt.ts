@@ -14,7 +14,10 @@ export interface TeamStatus {
   id: string;
   number: number;
   name: string;
-  status: 'offline' | 'connected';
+  // Reconnecting: its connection dropped recently and its page is retrying (#48).
+  status: 'offline' | 'reconnecting' | 'connected';
+  // When the team was last connected (server time, ms), or null if not since the server started.
+  lastSeenAt?: number | null;
   languageCode: string | null;
   // The code the team joins with (#44), and whether a device has joined with it.
   joinCode: string;
