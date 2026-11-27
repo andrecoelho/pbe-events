@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-local-db",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "PATH=$HOME/.local/bin:$PATH exec mise exec -- bun run dev"],
+      "port": 3000
+    },
+    {
+      "name": "prod-local-db",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "PATH=$HOME/.local/bin:$PATH exec mise exec -- bun run start"],
+      "port": 3000
+    },
+    {
+      "name": "dev-staging-db",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "PATH=$HOME/.railway/bin:$HOME/.local/bin:$PATH exec mise exec -- scripts/with-staging-db.sh bun run dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
