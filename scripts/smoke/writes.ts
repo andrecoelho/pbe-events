@@ -50,8 +50,11 @@ async function call(cookie: string, method: string, path: string, body?: unknown
 
 // A second user, removed first in case an earlier run stopped halfway.
 const email2 = 'smoke-judge@example.com';
-const leftover = await login(email2, 'smoke-password-2');
-if (leftover) await call(leftover, 'DELETE', '/api/users/me', undefined, 'cleanup');
+// The password depends on how far that run got.
+for (const password of ['smoke-password', 'smoke-password-2']) {
+  const leftover = await login(email2, password);
+  if (leftover) await call(leftover, 'DELETE', '/api/users/me', undefined, 'cleanup');
+}
 out.length = 0;
 
 process.on('uncaughtException', (error) => {
