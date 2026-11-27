@@ -49,6 +49,8 @@ export async function listEventPermissions(eventId: string): Promise<EventPermis
     FROM permissions
     JOIN users ON permissions.user_id = users.id
     WHERE permissions.event_id = ${eventId}
+    ORDER BY CASE permissions.role_id WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
+      users.first_name, users.last_name, users.email
   `;
 }
 

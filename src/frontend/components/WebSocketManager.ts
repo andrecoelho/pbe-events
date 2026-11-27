@@ -29,14 +29,7 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
     this.onMessage = onMessage;
 
     if (document.visibilityState === 'visible') {
-      try {
-        const wakeLock = (navigator as any).wakeLock;
-        if (wakeLock && typeof wakeLock.request === 'function') {
-          void wakeLock.request('screen');
-        }
-      } catch (error) {
-        console.warn('Failed to acquire screen wake lock:', error);
-      }
+      void this.requestWakeLock();
     }
 
     this.addEventListeners();
@@ -133,15 +126,20 @@ export class WebSocketManager<TMessage extends WebSocketMessage = WebSocketMessa
 
   private handleVisibilityChange = async () => {
     if (document.visibilityState === 'visible') {
-      if ('wakeLock' in navigator && (navigator as any).wakeLock?.request) {
-        try {
-          await (navigator as any).wakeLock.request('screen');
-        } catch (error) {
-          // Failed to acquire wake lock; proceed without it
-          console.error('Failed to acquire wake lock', error);
-        }
-      }
+      await this.requestWakeLock();
       await this.sendPing();
+    }
+  };
+
+  // Keeps the screen on during the event where the browser allows it. Browsers refuse it at times (a hidden
+  // tab, no permission, battery saver); the page works the same without it, so a refusal is ignored.
+  private requestWakeLock = async () => {
+    try {
+      await (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<unknown> } }).wakeLock?.request(
+        'screen'
+      );
+    } catch {
+      // Not allowed right now; the screen may dim as usual.
     }
   };
 

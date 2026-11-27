@@ -1,3 +1,4 @@
+import { copyText } from '@/frontend/utils/clipboard';
 import { joinLink } from '@/joinCode';
 import { proxy } from 'valtio';
 
@@ -159,42 +160,36 @@ export class TeamsValt {
     return { ok: false, error: response.error };
   }
 
-  // Copies the link the team joins with (/join/K7P4QX).
-  async copyTeamLink(teamId: string) {
+  // Copies the link the team joins with (/join/K7P4QX); the copy button shows a checkmark for 2 seconds.
+  // When the browser refuses, returns the link so the page can show it.
+  async copyTeamLink(teamId: string): Promise<{ ok: true } | { ok: false; link: string }> {
     const team = this.store.teams.find((t) => t.id === teamId);
 
     if (!team) {
-      return;
+      return { ok: true };
     }
 
-    try {
-      await navigator.clipboard.writeText(joinLink(window.location.origin, team.joinCode));
+    const link = joinLink(window.location.origin, team.joinCode);
 
-      // Clear any existing timeout for this team
-      const existingTimeout = this.copyTimeouts.get(teamId);
+    if (!(await copyText(link))) {
+      return { ok: false, link };
+    }
 
-      if (existingTimeout) {
-        clearTimeout(existingTimeout);
-      }
+    // Restart the 2-second checkmark if the link was copied again.
+    clearTimeout(this.copyTimeouts.get(teamId));
 
-      // Add team to copied set
-      this.store.copiedTeamIds.add(teamId);
-
-      // Reset the icon after 2 seconds
-      const timeout = setTimeout(() => {
-        this.store.copiedTeamIds.delete(teamId);
+    this.copyTimeouts.set(
+      teamId,
+      setTimeout(() => {
         this.copyTimeouts.delete(teamId);
+        this.store.copiedTeamIds = new Set([...this.store.copiedTeamIds].filter((id) => id !== teamId));
+      }, 2000)
+    );
 
-        this.store.copiedTeamIds = new Set(this.store.copiedTeamIds);
-      }, 2000);
+    // A new Set, so the snapshot sees the change.
+    this.store.copiedTeamIds = new Set(this.store.copiedTeamIds).add(teamId);
 
-      this.store.copiedTeamIds.add(teamId);
-      this.copyTimeouts.set(teamId, timeout);
-
-      this.store.copiedTeamIds = new Set(this.store.copiedTeamIds);
-    } catch (error) {
-      console.error('Failed to copy link to clipboard:', error);
-    }
+    return { ok: true };
   }
 
   cleanup() {

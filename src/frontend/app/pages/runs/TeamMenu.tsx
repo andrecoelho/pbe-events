@@ -5,6 +5,7 @@ import { useRunValt } from '@/frontend/app/pages/runs/runValt';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
+import { copyText } from '@/frontend/utils/clipboard';
 import { formatJoinCode, joinLink } from '@/joinCode';
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -25,11 +26,16 @@ export function TeamMenu({ team, children }: Props) {
   const handleCopyLink = async () => {
     close();
 
-    try {
-      await navigator.clipboard.writeText(joinLink(window.location.origin, team.joinCode));
+    const link = joinLink(window.location.origin, team.joinCode);
+
+    if (await copyText(link)) {
       toast.show({ type: 'success', message: `Copied ${label}’s join link.` });
-    } catch {
-      toast.show({ type: 'error', message: 'Could not copy the link.' });
+    } else {
+      toast.show({
+        type: 'error',
+        message: `Your browser didn’t allow copying. ${label}’s join link: ${link}`,
+        persist: true
+      });
     }
   };
 

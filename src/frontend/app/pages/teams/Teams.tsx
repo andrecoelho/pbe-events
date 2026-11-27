@@ -39,7 +39,15 @@ const init = () => {
   };
 
   const handleCopyTeamLink = async (team: Team) => {
-    await valt.copyTeamLink(team.id);
+    const result = await valt.copyTeamLink(team.id);
+
+    if (!result.ok) {
+      toast.show({
+        type: 'error',
+        message: `Your browser didn’t allow copying. ${team.name}’s join link: ${result.link}`,
+        persist: true
+      });
+    }
   };
 
   return { valt, handleAddTeam, handleEditTeam, handleRemoveTeam, handleCopyTeamLink };
@@ -95,7 +103,9 @@ export function Teams() {
                     <td className='col-number'>{team.number}</td>
                     <td className='col-name'>{team.name}</td>
                     <td className='col-language'>{team.languageName}</td>
-                    <td className='col-code font-mono tracking-widest'>{formatJoinCode(team.joinCode)}</td>
+                    <td className='col-code font-mono tracking-widest whitespace-nowrap'>
+                      {formatJoinCode(team.joinCode)}
+                    </td>
                     <td className='col-actions'>
                       <button
                         className='tooltip tooltip-neutral'
