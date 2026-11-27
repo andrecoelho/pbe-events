@@ -51,7 +51,7 @@ export function LanguageRow({ language, valt, isAddMode, onCancelAdd }: Props) {
       const result = await valt.deleteLanguage(language.id);
 
       if (!result.ok) {
-        toast.show({ message: result.error || 'Failed to delete language', type: 'error' });
+        toast.show({ message: result.error, type: 'error' });
       }
     }
   };
@@ -85,7 +85,7 @@ export function LanguageRow({ language, valt, isAddMode, onCancelAdd }: Props) {
       setNameError('');
       onCancelAdd?.();
     } else {
-      toast.show({ message: result.error || 'Failed to add language', type: 'error' });
+      toast.show({ message: result.error, type: 'error' });
     }
   };
 

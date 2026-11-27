@@ -22,7 +22,7 @@ export const NavBar = memo(() => {
     const result = await appValt.logout();
 
     if (!result.ok) {
-      alertModal.open('Logout failed');
+      alertModal.open(`Couldn’t log out. ${result.error}`);
     }
   };
 

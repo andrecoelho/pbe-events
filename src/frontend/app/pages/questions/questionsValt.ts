@@ -1,3 +1,4 @@
+import { api, NO_CONNECTION, type Outcome } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy, type Snapshot } from 'valtio';
 
@@ -46,7 +47,7 @@ export type ImportResult = { ok: true } | { ok: false; error?: string; conflict?
 export class QuestionsValt {
   store: QuestionsStore;
   // Translation creates in flight, by `${questionId}:${languageCode}`.
-  private pendingCreates = new Map<string, Promise<{ ok: boolean; error?: string }>>();
+  private pendingCreates = new Map<string, Promise<Outcome>>();
 
   constructor() {
     this.store = proxy<QuestionsStore>({
@@ -60,13 +61,13 @@ export class QuestionsValt {
   }
 
   async init(eventId: string) {
-    const result = await fetch(`/api/events/${eventId}/questions`);
+    const result = await api(`/api/events/${eventId}/questions`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load questions' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the questions. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as {
+    const response = result.data as {
       eventName: string;
       languages: { [code: string]: string };
       questions: Record<string, Question>;
@@ -155,15 +156,14 @@ export class QuestionsValt {
   /**
    * Create a new question (without translations)
    */
-  async addQuestion(type: QuestionType, maxPoints: number, seconds: number) {
-    const result = await fetch(`/api/events/${this.store.eventId}/questions`, {
+  async addQuestion(type: QuestionType, maxPoints: number, seconds: number): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/questions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, maxPoints, seconds })
+      json: { type, maxPoints, seconds }
     });
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { question: Question };
+    if (result.ok) {
+      const response = result.data as { question: Question };
 
       // Create translations record with empty translations for each language (indexed by language code)
       const translations: Record<string, IQuestionTranslation> = {};
@@ -194,23 +194,25 @@ export class QuestionsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
    * Insert a new question before a specific question number
    */
-  async insertQuestionBefore(beforeNumber: number, type: QuestionType, maxPoints: number, seconds: number) {
-    const result = await fetch(`/api/events/${this.store.eventId}/questions`, {
+  async insertQuestionBefore(
+    beforeNumber: number,
+    type: QuestionType,
+    maxPoints: number,
+    seconds: number
+  ): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/questions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, maxPoints, seconds, insertBefore: beforeNumber })
+      json: { type, maxPoints, seconds, insertBefore: beforeNumber }
     });
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { question: Question };
+    if (result.ok) {
+      const response = result.data as { question: Question };
 
       // Create translations record with empty translations for each language (indexed by language code)
       const translations: Record<string, IQuestionTranslation> = {};
@@ -245,9 +247,7 @@ export class QuestionsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
@@ -256,20 +256,16 @@ export class QuestionsValt {
   async updateQuestion(
     question: Snapshot<Question>,
     updates: Partial<Pick<Question, 'number' | 'type' | 'maxPoints' | 'seconds'>>
-  ) {
+  ): Promise<Outcome> {
     const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
       return { ok: false, error: 'Question not found in store' };
     }
 
-    const result = await fetch(`/api/questions/${question.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
-    });
+    const result = await api(`/api/questions/${question.id}`, { method: 'PATCH', json: updates });
 
-    if (result.status === 200) {
+    if (result.ok) {
       // If number changed, we need to reorder questions in the store
       if (updates.number !== undefined && updates.number !== question.number) {
         const oldNumber = question.number;
@@ -300,18 +296,16 @@ export class QuestionsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
    * Delete a question
    */
-  async deleteQuestion(question: Snapshot<Question>) {
-    const result = await fetch(`/api/questions/${question.id}`, { method: 'DELETE' });
+  async deleteQuestion(question: Snapshot<Question>): Promise<Outcome> {
+    const result = await api(`/api/questions/${question.id}`, { method: 'DELETE' });
 
-    if (result.status === 200) {
+    if (result.ok) {
       // Get sorted questions before deletion to find adjacent questions
       const sortedQuestions = Object.values(this.store.questions).sort((a, b) => a.number - b.number);
       const deletedIndex = sortedQuestions.findIndex((q) => q.id === question.id);
@@ -341,9 +335,7 @@ export class QuestionsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
@@ -354,7 +346,7 @@ export class QuestionsValt {
     question: Snapshot<Question>,
     translation: IQuestionTranslation,
     updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
-  ) {
+  ): Promise<Outcome> {
     const key = `${question.id}:${translation.languageCode}`;
 
     // An edit made while the translation is still being created waits for it, then updates it.
@@ -380,7 +372,7 @@ export class QuestionsValt {
   /**
    * Add a translation to a question
    */
-  async addTranslation(question: Snapshot<Question>, translation: Snapshot<IQuestionTranslation>) {
+  async addTranslation(question: Snapshot<Question>, translation: Snapshot<IQuestionTranslation>): Promise<Outcome> {
     const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
@@ -393,28 +385,25 @@ export class QuestionsValt {
       return { ok: false, error: 'Translation not found in store' };
     }
 
-    const result = await fetch(`/api/questions/${question.id}/translations`, {
+    const result = await api(`/api/questions/${question.id}/translations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      json: {
         languageCode: translationInStore.languageCode,
         prompt: translationInStore.prompt,
         answer: translationInStore.answer,
         clarification: translationInStore.clarification
-      })
+      }
     });
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { translation: IQuestionTranslation };
+    if (result.ok) {
+      const response = result.data as { translation: IQuestionTranslation };
 
       translationInStore.id = response.translation.id;
 
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
@@ -424,7 +413,7 @@ export class QuestionsValt {
     question: Snapshot<Question>,
     translation: Snapshot<IQuestionTranslation>,
     updates?: Partial<Pick<IQuestionTranslation, 'answer' | 'prompt' | 'clarification'>>
-  ) {
+  ): Promise<Outcome> {
     const questionInStore = this.store.questions[question.id];
 
     if (!questionInStore) {
@@ -441,19 +430,16 @@ export class QuestionsValt {
       return { ok: false, error: 'Translation not found in store' };
     }
 
-    const result = await fetch(`/api/questions/translations/${translation.id}`, {
+    const result = await api(`/api/questions/translations/${translation.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ languageCode: translation.languageCode, ...updates })
+      json: { languageCode: translation.languageCode, ...updates }
     });
 
-    if (result.status === 200) {
+    if (result.ok) {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
@@ -473,58 +459,55 @@ export class QuestionsValt {
       formData.append('deleteAnswers', 'true');
     }
 
-    const result = await fetch(`/api/events/${this.store.eventId}/questions/import`, {
-      method: 'POST',
-      body: formData
-    });
+    const result = await api(`/api/events/${this.store.eventId}/questions/import`, { method: 'POST', body: formData });
 
-    if (result.status === 200) {
+    if (result.ok) {
       // Reload questions after successful import
       await this.init(this.store.eventId);
       return { ok: true };
     }
 
     if (result.status === 409) {
-      return { ok: false, conflict: (await result.json()) as ImportConflict };
+      return { ok: false, conflict: result.body as ImportConflict };
     }
 
-    const response = (await result.json()) as { error: string };
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   /**
    * Export questions to a YAML file
    */
-  async exportQuestions() {
+  async exportQuestions(): Promise<Outcome> {
+    // A file download, so this reads the response itself rather than through api().
+    let response: Response;
+
     try {
-      const result = await fetch(`/api/events/${this.store.eventId}/questions/export`);
-
-      if (result.status === 200) {
-        // Create a blob from the response and trigger download
-        const blob = await result.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-
-        // Get filename from Content-Disposition header or use default
-        const contentDisposition = result.headers.get('Content-Disposition');
-        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-        const filename = filenameMatch?.[1] ?? 'questions-export.yaml';
-
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-
-        return { ok: true };
-      }
-
-      const response = (await result.json()) as { error: string };
-      return { ok: false, error: response.error };
+      response = await fetch(`/api/events/${this.store.eventId}/questions/export`);
     } catch {
-      return { ok: false, error: 'Failed to export questions' };
+      return { ok: false, error: NO_CONNECTION };
     }
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      return { ok: false, error: `Couldn’t export the questions. ${body?.error ?? `Error ${response.status}.`}` };
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    // Get filename from Content-Disposition header or use default
+    const filenameMatch = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/);
+
+    a.download = filenameMatch?.[1] ?? 'questions-export.yaml';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    return { ok: true };
   }
 }
 

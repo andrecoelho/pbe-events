@@ -1,3 +1,4 @@
+import { api, type Outcome } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -39,13 +40,13 @@ export class LanguagesValt {
   }
 
   async init(eventId: string) {
-    const result = await fetch(`/api/events/${eventId}/languages`);
+    const result = await api(`/api/events/${eventId}/languages`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load languages' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the languages. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as { eventName: string; languages: Language[] };
+    const response = result.data as { eventName: string; languages: Language[] };
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
@@ -91,22 +92,21 @@ export class LanguagesValt {
     return Object.keys(errors).length === 0;
   }
 
-  async saveEdit(): Promise<{ ok: boolean; error?: string }> {
+  async saveEdit(): Promise<Outcome> {
     if (!this.validate()) {
       return { ok: false, error: 'Please fix validation errors' };
     }
 
-    const result = await fetch(`/api/events/${this.store.eventId}/languages`, {
+    const result = await api(`/api/events/${this.store.eventId}/languages`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      json: {
         id: this.store.editingId,
         code: this.store.editForm.code.trim(),
         name: this.store.editForm.name.trim()
-      })
+      }
     });
 
-    if (result.status === 200) {
+    if (result.ok) {
       const language = this.store.languages.find((l) => l.id === this.store.editingId);
 
       if (language) {
@@ -119,20 +119,17 @@ export class LanguagesValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
-  async addLanguage(code: string, name: string): Promise<{ ok: boolean; error?: string }> {
-    const result = await fetch(`/api/events/${this.store.eventId}/languages`, {
+  async addLanguage(code: string, name: string): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/languages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.trim(), name: name.trim() })
+      json: { code: code.trim(), name: name.trim() }
     });
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { id: string };
+    if (result.ok) {
+      const response = result.data as { id: string };
       this.store.languages.push({ id: response.id, code: code.trim(), name: name.trim() });
       // Sort by code
       this.store.languages.sort((a, b) => a.code.localeCompare(b.code));
@@ -140,27 +137,19 @@ export class LanguagesValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
-  async deleteLanguage(id: string): Promise<{ ok: boolean; error?: string }> {
-    const result = await fetch(`/api/events/${this.store.eventId}/languages`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    });
+  async deleteLanguage(id: string): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/languages`, { method: 'DELETE', json: { id } });
 
-    if (result.status === 200) {
+    if (result.ok) {
       this.store.languages = this.store.languages.filter((l) => l.id !== id);
 
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 }
 

@@ -1,3 +1,4 @@
+import { reportFailure } from '@/frontend/utils/api';
 import { memo } from 'react';
 import { useSnapshot } from 'valtio';
 import { useQuestionsValt, type QuestionType } from './questionsValt';
@@ -19,15 +20,15 @@ export const QuestionMetadata = memo(() => {
   }
 
   const handleQuestionTypeChange = async (type: QuestionType) => {
-    await questionsValt.updateQuestion(question, { type });
+    reportFailure(await questionsValt.updateQuestion(question, { type }));
   };
 
   const handleMaxPointsChange = async (maxPoints: number) => {
-    await questionsValt.updateQuestion(question, { maxPoints });
+    reportFailure(await questionsValt.updateQuestion(question, { maxPoints }));
   };
 
   const handleSecondsChange = async (seconds: number) => {
-    await questionsValt.updateQuestion(question, { seconds });
+    reportFailure(await questionsValt.updateQuestion(question, { seconds }));
   };
 
   return (

@@ -13,7 +13,7 @@ const init = () => {
 
   valt.init().then((result) => {
     if (!result.ok) {
-      toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+      toast.show({ message: result.error, type: 'error', persist: true });
     }
   });
 
@@ -31,7 +31,7 @@ export const Events = memo(() => {
       try {
         await valt.createEvent(name);
       } catch (error: unknown) {
-        alertModal.open(`An error occurred: ${(error as Error).message}`);
+        alertModal.open((error as Error).message);
       }
     }
   };

@@ -1,31 +1,14 @@
 // Where a team joins its event (#44): typing the team's code at /join, or opening the link /join/K7P4QX.
 // The server remembers this device in a cookie, then the team screen opens.
 import { Icon } from '@/frontend/components/Icon';
+import { api } from '@/frontend/utils/api';
 import { formatJoinCode, normalizeJoinCode } from '@/joinCode';
 import logo from '@/assets/PBE-logo_600px.png';
 import { useEffect, useRef, useState } from 'react';
 import '../base.css';
 
-type JoinResult = { ok: true } | { ok: false; error: string };
-
-async function join(code: string): Promise<JoinResult> {
-  try {
-    const response = await fetch('/api/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-
-    if (response.ok) {
-      return { ok: true };
-    }
-
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-
-    return { ok: false, error: body.error ?? 'Could not join. Try again.' };
-  } catch {
-    return { ok: false, error: 'Could not reach the server. Check your internet connection and try again.' };
-  }
+async function join(code: string) {
+  return await api('/api/join', { method: 'POST', json: { code } });
 }
 
 // The code in a /join/K7P4QX link, as the person would type it.

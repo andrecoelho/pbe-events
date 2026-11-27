@@ -5,7 +5,7 @@ import type { Routes } from '@/server/types';
 import { z } from 'zod';
 
 const EventName = z.object({
-  name: z.string({ error: 'Invalid event name' }).trim().min(1, 'Invalid event name')
+  name: z.string({ error: 'Enter a name for the event.' }).trim().min(1, 'Enter a name for the event.')
 });
 
 export const eventsRoutes: Routes = {

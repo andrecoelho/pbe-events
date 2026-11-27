@@ -29,9 +29,9 @@ export const EventCard = memo((props: Props) => {
 
     if (newName && newName !== props.event.name) {
       try {
-        valt.renameEvent(props.event.id, newName);
+        await valt.renameEvent(props.event.id, newName);
       } catch (error: unknown) {
-        alertModal.open(`An error occurred: ${(error as Error).message}`);
+        alertModal.open((error as Error).message);
       }
     }
   };
@@ -43,7 +43,7 @@ export const EventCard = memo((props: Props) => {
       try {
         await valt.duplicateEvent(props.event.id, newName);
       } catch (error: unknown) {
-        alertModal.open(`An error occurred: ${(error as Error).message}`);
+        alertModal.open((error as Error).message);
       }
     }
   };
@@ -57,7 +57,7 @@ export const EventCard = memo((props: Props) => {
       try {
         await valt.deleteEvent(props.event.id);
       } catch (error: unknown) {
-        alertModal.open(`An error occurred: ${(error as Error).message}`);
+        alertModal.open((error as Error).message);
       }
     }
   };

@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -22,26 +23,23 @@ export class AppValt {
   }
 
   async init() {
-    const result = await fetch('/api/session');
+    const result = await api<{ user: User }>('/api/session');
 
-    if (result.status === 200) {
-      const response = (await result.json()) as { user: User };
-      this.store.user = response.user;
+    if (result.ok) {
+      this.store.user = result.data.user;
       this.store.init = true;
     }
   }
 
   async logout() {
-    const result = await fetch('/api/logout', { method: 'POST' });
+    const result = await api('/api/logout', { method: 'POST' });
 
-    if (result.status === 200) {
+    if (result.ok) {
       window.location.href = '/';
       window.location.reload();
-
-      return { ok: true };
     }
 
-    return { ok: false };
+    return result;
   }
 }
 

@@ -1,3 +1,4 @@
+import { reportFailure } from '@/frontend/utils/api';
 import { debounce } from '@/frontend/utils/debounce';
 import { memo, useMemo, useRef } from 'react';
 import { useQuestionsValt, type IQuestionTranslation, type Question } from './questionsValt';
@@ -29,7 +30,7 @@ export const QuestionTranslation = memo(({ languageCode }: Props) => {
           field: 'prompt' | 'answer' | 'clarification',
           value: string
         ) => {
-          await questionsValt.upsertTranslation(changedQuestion, changedTranslation, { [field]: value });
+          reportFailure(await questionsValt.upsertTranslation(changedQuestion, changedTranslation, { [field]: value }));
         },
         500
       ),

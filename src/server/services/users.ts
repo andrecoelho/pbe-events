@@ -45,11 +45,11 @@ export async function isEmailTaken(email: string, exceptUserId = '') {
 // Checks the file is an image we accept. Throws a 400 HttpError otherwise.
 export function checkAvatar(file: File) {
   if (!AVATAR_TYPES[file.type]) {
-    throw badRequest('Invalid file type. Allowed: JPEG, PNG, WebP, GIF');
+    throw badRequest('The picture must be a JPEG, PNG, WebP or GIF.');
   }
 
   if (file.size > AVATAR_MAX_BYTES) {
-    throw badRequest('File size must be less than 500KB');
+    throw badRequest('The picture must be smaller than 500 KB.');
   }
 }
 

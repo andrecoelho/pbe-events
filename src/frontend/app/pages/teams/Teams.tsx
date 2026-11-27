@@ -17,7 +17,7 @@ const init = () => {
   if (eventId) {
     valt.init(eventId).then((result) => {
       if (!result.ok) {
-        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+        toast.show({ message: result.error, type: 'error', persist: true });
       }
     });
   }

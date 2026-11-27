@@ -16,7 +16,7 @@ export function createRunsRoutes(_wsServer: WebSocketServer): Routes {
         const run = await getRun(event.id);
 
         if (!run) {
-          throw notFound();
+          throw notFound('This event has no run record, so it can’t be run. Ask an administrator to check it.');
         }
 
         const [questions, slides, languages] = await Promise.all([

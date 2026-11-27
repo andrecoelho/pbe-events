@@ -15,7 +15,7 @@ export const authRoutes: Routes = {
       const { email, password } = (await req.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
 
       // One message for every failure, so it doesn't reveal which emails have accounts.
-      const invalid = () => unauthorized('Invalid credentials');
+      const invalid = () => unauthorized('That email and password don’t match an account. Check them and try again.');
 
       if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
         throw invalid();

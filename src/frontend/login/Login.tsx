@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import '../base.css';
 
 import logo from '@/assets/PBE-logo_600px.png';
@@ -17,24 +18,12 @@ export function Login() {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
-    const result = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password })
-    });
+    const result = await api('/api/login', { method: 'POST', json: { email, password } });
 
-    try {
-      if (result.status === 200) {
-        location.reload();
-      } else {
-        const response = await result.json();
-
-        alertModal.open(response.error || 'Login failed');
-      }
-    } catch {
-      alertModal.open('Login failed');
+    if (result.ok) {
+      location.reload();
+    } else {
+      alertModal.open(result.error);
     }
   };
 

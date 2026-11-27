@@ -1,3 +1,4 @@
+import { api, type Outcome } from '@/frontend/utils/api';
 import { toast } from '@/frontend/components/Toast';
 import {
   NOT_CONNECTED,
@@ -100,8 +101,12 @@ export class RunValt {
     });
   }
 
-  init = async (eventId: string) => {
-    await this.loadEventData(eventId);
+  init = async (eventId: string): Promise<Outcome> => {
+    const loaded = await this.loadEventData(eventId);
+
+    if (!loaded.ok) {
+      return loaded;
+    }
 
     this.store.initialized = true;
 
@@ -112,14 +117,14 @@ export class RunValt {
     return { ok: true } as const;
   };
 
-  loadEventData = async (eventId: string) => {
-    const result = await fetch(`/api/events/${eventId}/run`);
+  loadEventData = async (eventId: string): Promise<Outcome> => {
+    const result = await api(`/api/events/${eventId}/run`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load run data' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the run. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as {
+    const response = result.data as {
       eventName: string;
       titleRemarks: string | null;
       run: Run;
@@ -229,6 +234,8 @@ export class RunValt {
     } else {
       this.store.currentIndex = 0;
     }
+
+    return { ok: true } as const;
   };
 
   connect = () => {

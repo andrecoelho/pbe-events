@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { Avatar } from '@/frontend/components/Avatar';
 import { Icon } from '@/frontend/components/Icon';
 import { modal } from '@/frontend/components/Modal';
@@ -36,12 +37,12 @@ const init = (permissionsValt: PermissionsValt, user?: User) => {
   const searchUserByEmail = async (email: string) => {
     store.searchStatus = 'searching';
 
-    const result = await fetch(`/api/users?email=${encodeURIComponent(email)}`);
+    const result = await api(`/api/users?email=${encodeURIComponent(email)}`);
 
     store.searchStatus = 'done';
 
-    if (result.status === 200) {
-      const response = (await result.json()) as {
+    if (result.ok) {
+      const response = result.data as {
         user: { id: string; firstName: string; lastName: string; avatarUrl?: string };
       };
 

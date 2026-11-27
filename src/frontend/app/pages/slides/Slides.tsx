@@ -16,7 +16,7 @@ const init = () => {
   if (eventId) {
     valt.init(eventId).then((result) => {
       if (!result.ok) {
-        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+        toast.show({ message: result.error, type: 'error', persist: true });
       }
     });
   }
@@ -24,7 +24,7 @@ const init = () => {
   const debouncedUpdateTitleRemarks = debounce(async (value: string) => {
     const result = await valt.updateTitleRemarks(value);
     if (!result.ok) {
-      toast.show({ message: result.error || 'Failed to save title remarks', type: 'error' });
+      toast.show({ message: result.error, type: 'error' });
     }
   }, 500);
 
@@ -38,7 +38,7 @@ const init = () => {
       save = debounce(async (latest: string) => {
         const result = await valt.updateSlide(slideId, latest);
         if (!result.ok) {
-          toast.show({ message: result.error || 'Failed to save slide', type: 'error' });
+          toast.show({ message: result.error, type: 'error' });
         }
       }, 500);
       slideSavers.set(slideId, save);
@@ -60,7 +60,7 @@ const init = () => {
   const handleAddSlide = async () => {
     const result = await valt.addSlide();
     if (!result.ok) {
-      toast.show({ message: result.error || 'Failed to add slide', type: 'error' });
+      toast.show({ message: result.error, type: 'error' });
     }
   };
 
@@ -70,7 +70,7 @@ const init = () => {
     if (confirmation) {
       const result = await valt.deleteSlide(slide.id);
       if (!result.ok) {
-        toast.show({ message: result.error || 'Failed to delete slide', type: 'error' });
+        toast.show({ message: result.error, type: 'error' });
       }
     }
   };

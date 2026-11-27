@@ -1,3 +1,4 @@
+import { api, type Outcome } from '@/frontend/utils/api';
 import { proxy } from 'valtio';
 
 interface Slide {
@@ -28,13 +29,13 @@ export class SlidesValt {
   }
 
   async init(eventId: string) {
-    const result = await fetch(`/api/events/${eventId}/slides`);
+    const result = await api(`/api/events/${eventId}/slides`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load slides' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the slides. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as {
+    const response = result.data as {
       eventName: string;
       titleRemarks: string;
       slides: Slide[];
@@ -53,16 +54,14 @@ export class SlidesValt {
     this.store.titleRemarks = value;
   }
 
-  async updateTitleRemarks(value: string) {
-    const result = await fetch(`/api/events/${this.store.eventId}/title-remarks`, {
+  async updateTitleRemarks(value: string): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/title-remarks`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titleRemarks: value })
+      json: { titleRemarks: value }
     });
 
-    if (result.status !== 200) {
-      const response = (await result.json()) as { error: string };
-      return { ok: false, error: response.error };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
     return { ok: true };
@@ -75,34 +74,24 @@ export class SlidesValt {
     }
   }
 
-  async updateSlide(slideId: string, content: string) {
-    const result = await fetch(`/api/slides/${slideId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    });
+  async updateSlide(slideId: string, content: string): Promise<Outcome> {
+    const result = await api(`/api/slides/${slideId}`, { method: 'PATCH', json: { content } });
 
-    if (result.status !== 200) {
-      const response = (await result.json()) as { error: string };
-      return { ok: false, error: response.error };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
     return { ok: true };
   }
 
-  async addSlide() {
-    const result = await fetch(`/api/events/${this.store.eventId}/slides`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: '' })
-    });
+  async addSlide(): Promise<Outcome> {
+    const result = await api(`/api/events/${this.store.eventId}/slides`, { method: 'POST', json: { content: '' } });
 
-    if (result.status !== 200) {
-      const response = (await result.json()) as { error: string };
-      return { ok: false, error: response.error };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
-    const response = (await result.json()) as { slideId: string; number: number };
+    const response = result.data as { slideId: string; number: number };
     this.store.slides.push({
       id: response.slideId,
       number: response.number,
@@ -112,20 +101,17 @@ export class SlidesValt {
     return { ok: true };
   }
 
-  async deleteSlide(slideId: string) {
+  async deleteSlide(slideId: string): Promise<Outcome> {
     const slideToDelete = this.store.slides.find((s) => s.id === slideId);
 
     if (!slideToDelete) {
       return { ok: false, error: 'Slide not found' };
     }
 
-    const result = await fetch(`/api/slides/${slideId}`, {
-      method: 'DELETE'
-    });
+    const result = await api(`/api/slides/${slideId}`, { method: 'DELETE' });
 
-    if (result.status !== 200) {
-      const response = (await result.json()) as { error: string };
-      return { ok: false, error: response.error };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
     // Remove the deleted slide

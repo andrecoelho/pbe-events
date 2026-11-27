@@ -23,7 +23,7 @@ async function checkTeam(eventId: string, team: { name: string; languageId: stri
   const language = await getLanguage(eventId, team.languageId);
 
   if (!language) {
-    throw badRequest('Invalid language selected');
+    throw badRequest('Choose one of the event’s languages for the team.');
   }
 
   if (!team.name) {

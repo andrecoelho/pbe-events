@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { copyText } from '@/frontend/utils/clipboard';
 import { joinLink } from '@/joinCode';
 import { proxy } from 'valtio';
@@ -43,13 +44,13 @@ export class TeamsValt {
   }
 
   async init(eventId: string) {
-    const result = await fetch(`/api/events/${eventId}/teams`);
+    const result = await api(`/api/events/${eventId}/teams`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load teams' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the teams. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as {
+    const response = result.data as {
       eventName: string;
       teams: TeamsStore['teams'];
       languages: TeamsStore['languages'];
@@ -65,14 +66,10 @@ export class TeamsValt {
   }
 
   async addTeam(name: string, languageId: string) {
-    const result = await fetch(`/api/events/${this.store.eventId}/teams`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, languageId })
-    });
+    const result = await api(`/api/events/${this.store.eventId}/teams`, { method: 'POST', json: { name, languageId } });
 
-    if (result.status === 200) {
-      const response = (await result.json()) as {
+    if (result.ok) {
+      const response = result.data as {
         id: string;
         number: number;
         joinCode: string;
@@ -90,9 +87,7 @@ export class TeamsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   async updateTeam(id: string, name: string, number: number, languageId: string) {
@@ -102,13 +97,12 @@ export class TeamsValt {
       return { ok: false, error: 'Team not found' };
     }
 
-    const result = await fetch(`/api/events/${this.store.eventId}/teams`, {
+    const result = await api(`/api/events/${this.store.eventId}/teams`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name, number, languageId })
+      json: { id, name, number, languageId }
     });
 
-    if (result.status === 200) {
+    if (result.ok) {
       team.name = name;
       team.number = number;
       team.languageId = languageId;
@@ -123,9 +117,7 @@ export class TeamsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   async deleteTeam(id: string) {
@@ -135,13 +127,9 @@ export class TeamsValt {
       return { ok: false, error: 'Team not found' };
     }
 
-    const result = await fetch(`/api/events/${this.store.eventId}/teams`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    });
+    const result = await api(`/api/events/${this.store.eventId}/teams`, { method: 'DELETE', json: { id } });
 
-    if (result.status === 200) {
+    if (result.ok) {
       // Remove the deleted team
       this.store.teams = this.store.teams.filter((t) => t.id !== id);
 
@@ -155,9 +143,7 @@ export class TeamsValt {
       return { ok: true };
     }
 
-    const response = (await result.json()) as { error: string };
-
-    return { ok: false, error: response.error };
+    return { ok: false, error: result.error };
   }
 
   // Copies the link the team joins with (/join/K7P4QX); the copy button shows a checkmark for 2 seconds.

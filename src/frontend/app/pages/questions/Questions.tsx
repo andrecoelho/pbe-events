@@ -1,3 +1,4 @@
+import { reportFailure } from '@/frontend/utils/api';
 import { alertModal } from '@/frontend/components/AlertModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
@@ -19,7 +20,7 @@ const init = () => {
   if (eventId) {
     valt.init(eventId).then((result) => {
       if (!result.ok) {
-        toast.show({ message: `Error: ${result.error}`, type: 'error', persist: true });
+        toast.show({ message: result.error, type: 'error', persist: true });
       }
     });
   }
@@ -33,7 +34,7 @@ export const Questions = memo(() => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddQuestion = async () => {
-    await valt.addQuestion('PG', 1, 30);
+    reportFailure(await valt.addQuestion('PG', 1, 30));
   };
 
   const handleImportClick = () => {
@@ -82,7 +83,7 @@ export const Questions = memo(() => {
   };
 
   const handleExport = async () => {
-    await valt.exportQuestions();
+    reportFailure(await valt.exportQuestions());
   };
 
   return (

@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { useRef, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { modal } from '../components/Modal';
@@ -42,7 +43,7 @@ export function CreateAccountModal() {
     // Validate file size (max 500KB)
     const maxSize = 500 * 1024;
     if (file.size > maxSize) {
-      setAvatarError('File size must be less than 500KB');
+      setAvatarError('The picture must be smaller than 500 KB.');
       return;
     }
 
@@ -122,25 +123,16 @@ export function CreateAccountModal() {
         formData.append('avatar', avatarFile);
       }
 
-      const response = await fetch('/api/signup', {
-        method: 'POST',
-        body: formData
-      });
+      const result = await api('/api/signup', { method: 'POST', body: formData });
 
-      const result = await response.json();
-
-      if (response.ok) {
+      if (result.ok) {
         modal.close();
+      } else if (result.error.toLowerCase().includes('email')) {
+        // Server-side validation errors go next to the field they're about.
+        setEmailError(result.error);
       } else {
-        // Handle server-side validation errors
-        if (result.error?.toLowerCase().includes('email')) {
-          setEmailError(result.error);
-        } else {
-          setPasswordError(result.error || 'Failed to create account');
-        }
+        setPasswordError(result.error);
       }
-    } catch {
-      setPasswordError('Failed to create account');
     } finally {
       setSaving(false);
     }

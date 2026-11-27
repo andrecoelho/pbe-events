@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -23,89 +24,59 @@ export class EventsValt {
   }
 
   async init() {
-    const result = await fetch('/api/events');
+    const result = await api<{ events: PBEEvent[] }>('/api/events');
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load events' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load your events. ${result.error}` } as const;
     }
 
-    const response = (await result.json()) as { events: PBEEvent[] };
-
-    this.store.events = response.events;
+    this.store.events = result.data.events;
     this.store.initialized = true;
 
     return { ok: true } as const;
   }
 
+  // These throw an Error with a message to show when the server refuses or can't be reached.
+
   async createEvent(name: string) {
-    const result = await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
+    const event = await this.request<PBEEvent>('/api/events', { method: 'POST', json: { name } });
 
-    const response = await result.json();
-
-    if (response.error) {
-      throw new Error(response.error || 'Failed to create event');
-    }
-
-    this.store.events.push({ id: response.id, name: response.name, roleId: response.roleId });
+    this.store.events.push({ id: event.id, name: event.name, roleId: event.roleId });
     this.store.events.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async renameEvent(id: string, newName: string) {
-    const result = await fetch(`/api/events/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName })
-    });
-
-    const response = await result.json();
-
-    if (response.error) {
-      throw new Error(response.error || 'Failed to rename event');
-    }
+    await this.request(`/api/events/${id}`, { method: 'PATCH', json: { name: newName } });
 
     const event = this.store.events.find((e) => e.id === id);
 
-    if (!event) {
-      throw new Error('Event not found');
+    if (event) {
+      event.name = newName;
+      this.store.events.sort((a, b) => a.name.localeCompare(b.name));
     }
-
-    event.name = newName;
-    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async deleteEvent(id: string) {
-    const result = await fetch(`/api/events/${id}`, {
-      method: 'DELETE'
-    });
-
-    const response = await result.json();
-
-    if (response.error) {
-      throw new Error(response.error || 'Failed to delete event');
-    }
+    await this.request(`/api/events/${id}`, { method: 'DELETE' });
 
     this.store.events = this.store.events.filter((e) => e.id !== id);
   }
 
   async duplicateEvent(id: string, name: string) {
-    const result = await fetch(`/api/events/${id}/duplicate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
+    const event = await this.request<PBEEvent>(`/api/events/${id}/duplicate`, { method: 'POST', json: { name } });
 
-    const response = await result.json();
+    this.store.events.push({ id: event.id, name: event.name, roleId: event.roleId });
+    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
-    if (response.error) {
-      throw new Error(response.error || 'Failed to duplicate event');
+  private async request<T>(path: string, options: Parameters<typeof api>[1]) {
+    const result = await api<T>(path, options);
+
+    if (!result.ok) {
+      throw new Error(result.error);
     }
 
-    this.store.events.push({ id: response.id, name: response.name, roleId: response.roleId });
-    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
+    return result.data;
   }
 }
 

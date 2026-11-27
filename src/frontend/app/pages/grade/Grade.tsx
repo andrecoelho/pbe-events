@@ -12,7 +12,11 @@ const init = () => {
   const gradeValt = new GradeValt();
 
   if (eventId) {
-    gradeValt.init(eventId);
+    gradeValt.init(eventId).then((result) => {
+      if (!result.ok) {
+        toast.show({ message: result.error, type: 'error', persist: true });
+      }
+    });
   }
 
   const handleSelectQuestion = (event: React.MouseEvent<HTMLDivElement>) => {

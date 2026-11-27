@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import {
   NOT_CONNECTED,
   WebSocketManager,
@@ -71,12 +72,13 @@ export class GradeValt {
     this.store.eventId = eventId;
 
     // Fetch questions and answers from the API
-    const response = await fetch(`/api/events/${eventId}/answers`);
+    const result = await api<{ eventName?: string; questions: Question[] }>(`/api/events/${eventId}/answers`);
 
-    const data = (await response.json()) as {
-      eventName?: string;
-      questions: Question[];
-    };
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the answers to grade. ${result.error}` } as const;
+    }
+
+    const data = result.data;
 
     if (data.eventName) {
       this.store.eventName = data.eventName;
@@ -92,6 +94,8 @@ export class GradeValt {
     if (this.store.questions.length > 0) {
       this.connect();
     }
+
+    return { ok: true } as const;
   };
 
   connect = () => {

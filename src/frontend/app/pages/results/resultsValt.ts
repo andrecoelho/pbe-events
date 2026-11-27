@@ -1,3 +1,4 @@
+import { api } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -40,13 +41,13 @@ export class ResultsValt {
   async init(eventId: string) {
     this.store.initialized = false;
 
-    const result = await fetch(`/api/events/${eventId}/results`);
+    const result = await api<any>(`/api/events/${eventId}/results`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load results' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t load the results. ${result.error}` } as const;
     }
 
-    const response = await result.json();
+    const response = result.data;
 
     this.store.eventId = eventId;
     this.store.eventName = response.eventName;
@@ -129,13 +130,13 @@ export class ResultsValt {
   }
 
   async downloadRawAnswersCSV() {
-    const result = await fetch(`/api/events/${this.store.eventId}/results/raw`);
+    const result = await api<any>(`/api/events/${this.store.eventId}/results/raw`);
 
-    if (result.status !== 200) {
-      return { ok: false, error: 'Failed to load raw answers' } as const;
+    if (!result.ok) {
+      return { ok: false, error: `Couldn’t download the answers. ${result.error}` } as const;
     }
 
-    const response = await result.json();
+    const response = result.data;
 
     const rows = [
       ['Question Number', 'Team Number', 'Team Name', 'Language', 'Answer', 'Points', 'Highest Points', 'Max Points'],

@@ -1,3 +1,4 @@
+import { reportFailure } from '@/frontend/utils/api';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
 import { Icon } from '@/frontend/components/Icon';
 import { memo } from 'react';
@@ -23,7 +24,7 @@ export const QuestionListItem = memo(({ question, isSelected, isFirst }: Questio
     );
 
     if (confirmed) {
-      await questionsValt.deleteQuestion(question);
+      reportFailure(await questionsValt.deleteQuestion(question));
     }
   };
 

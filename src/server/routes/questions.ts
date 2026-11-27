@@ -121,11 +121,11 @@ export const questionsRoutes: Routes = {
       const deleteAnswers = form.get('deleteAnswers');
 
       if (!file || !(file instanceof File)) {
-        throw badRequest('No file provided');
+        throw badRequest('Choose a questions file to import.');
       }
 
       if (!file.name.endsWith('.yaml') && !file.name.endsWith('.yml')) {
-        throw badRequest('File must be a YAML file (.yaml or .yml)');
+        throw badRequest('Choose a questions file ending in .yaml or .yml.');
       }
 
       let data: unknown;
@@ -133,13 +133,15 @@ export const questionsRoutes: Routes = {
       try {
         data = Bun.YAML.parse(await file.text());
       } catch (error) {
-        throw badRequest(`Invalid YAML format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw badRequest(
+          `The file isn’t valid YAML (${error instanceof Error ? error.message : 'unreadable'}). Check that line, or start from the exported or example file.`
+        );
       }
 
       const validation = validateQuestionsData(data);
 
       if (!validation.valid) {
-        throw badRequest(validation.error || 'Invalid data');
+        throw badRequest(validation.error || 'The questions file has a problem.');
       }
 
       await replaceQuestions(event.id, validation.languages!, validation.questions!, {
@@ -160,7 +162,7 @@ export const questionsRoutes: Routes = {
       const exportData: QuestionsFileFormat = await getQuestionsForExport(event.id);
 
       if (exportData.languages.length === 0 || exportData.questions.length === 0) {
-        throw badRequest('Nothing to export - event has no languages or questions configured');
+        throw badRequest('There’s nothing to export yet: add languages and questions first.');
       }
 
       return new Response(Bun.YAML.stringify(exportData, null, 2), {
