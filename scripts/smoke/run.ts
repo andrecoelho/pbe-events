@@ -124,7 +124,22 @@ send(host, { type: 'SET_ACTIVE_ITEM', activeItem: prompt });
 await sleep(300);
 send(team, { type: 'SUBMIT_ANSWER', answer: 'Smoke answer' });
 await sleep(300);
-send(host, { type: 'SET_ACTIVE_ITEM', activeItem: { ...prompt, phase: 'answer' } });
+// The answer phase as the run page builds it (src/frontend/app/pages/runs/runValt.ts).
+const answerPhase = {
+  type: 'question',
+  id: q.id,
+  number: q.number,
+  phase: 'answer',
+  locked: false,
+  graded: false,
+  translations: q.translations.map((t: any) => ({
+    languageCode: t.languageCode,
+    answer: t.answer,
+    clarification: t.clarification
+  })),
+  answers: q.answers
+};
+send(host, { type: 'SET_ACTIVE_ITEM', activeItem: answerPhase });
 await sleep(200);
 send(team, { type: 'SUBMIT_CHALLENGE', questionId: q.id, challenged: true });
 await sleep(200);

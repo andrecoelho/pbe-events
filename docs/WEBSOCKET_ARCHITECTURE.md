@@ -515,6 +515,7 @@ All validation errors are sent back to the client as `ERROR` messages with speci
 3. **Team Isolation**: Teams can only submit answers for their own team
 4. **Event Isolation**: Every write is scoped to the socket's event: `UPDATE_POINTS`, `SET_QUESTION_LOCKED`, `SET_QUESTION_GRADED` and `SUBMIT_CHALLENGE` change nothing when the answer or question belongs to another event
 5. **SQL Injection Prevention**: All queries use parameterized statements via Bun SQL
+6. **Message Validation**: Every frame is parsed with its role's Zod schema in `src/server/webSocketMessages.ts`. A frame that isn't JSON or doesn't match gets `{ type: 'ERROR', code: 'INVALID_MESSAGE', message }` (plus its `ACK` when it had an `__ACK__` id) and changes nothing. Frames over 1 MB (`MAX_MESSAGE_BYTES`) close the socket with code 1009. A handler that throws sends `{ type: 'ERROR', code: 'SERVER_ERROR' }` and is logged instead of taking the server down
 
 ---
 

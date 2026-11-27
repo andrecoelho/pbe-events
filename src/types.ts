@@ -49,7 +49,7 @@ export type ActiveItem =
       phase: 'answer';
       locked: boolean;
       graded: boolean;
-      translations: Array<{ languageCode: string; answer: string; clarification?: string }>;
+      translations: Array<{ languageCode: string; answer: string; clarification?: string | null }>;
       answers: Record<
         string, // teamId
         {

@@ -10,7 +10,16 @@ import { getRun, saveActiveItem, setGracePeriod, setRunStatus, type RunStatus } 
 import { getTeam, listTeams } from '@/server/services/teams';
 import { getLiveSessionIds, onSessionEnded } from '@/server/session';
 import { SESSION_ENDED_CLOSE_CODE } from '@/types';
+import {
+  HostMessage,
+  JudgeMessage,
+  MAX_MESSAGE_BYTES,
+  parseMessage,
+  PresenterMessage,
+  TeamMessage
+} from '@/server/webSocketMessages';
 import type { ServerWebSocket } from 'bun';
+import type { z } from 'zod';
 
 export type TeamWebsocketData = {
   role: 'team';
@@ -147,7 +156,8 @@ export class WebSocketServer {
       open: this.handleOpen,
       close: this.handleClose,
       message: this.handleMessage,
-      idleTimeout: 10
+      idleTimeout: 10,
+      maxPayloadLength: MAX_MESSAGE_BYTES
     };
   }
 
@@ -482,90 +492,104 @@ export class WebSocketServer {
       return;
     }
 
-    // Handle team messages
-    if (this.isTeamWebSocket(ws)) {
-      const msg = JSON.parse(message as string) as
-        | { type: 'SUBMIT_ANSWER'; answer: string; __ACK__: string }
-        | { type: 'SUBMIT_CHALLENGE'; questionId: string; challenged: boolean; __ACK__: string };
+    try {
+      if (this.isTeamWebSocket(ws)) {
+        const msg = this.parse(ws, TeamMessage, message);
 
-      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
+        if (!msg) {
+          return;
+        }
 
-      switch (msg.type) {
-        case 'SUBMIT_ANSWER':
-          await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
-          break;
-        case 'SUBMIT_CHALLENGE':
-          await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
-          break;
+        this.sendAck(ws, msg.__ACK__);
+
+        switch (msg.type) {
+          case 'SUBMIT_ANSWER':
+            await this.handleSUBMIT_ANSWER(ws, connection, msg.answer);
+            break;
+          case 'SUBMIT_CHALLENGE':
+            await this.handleSUBMIT_CHALLENGE(ws, connection, msg.questionId, msg.challenged);
+            break;
+        }
+      } else if (this.isHostWebSocket(ws)) {
+        const msg = this.parse(ws, HostMessage, message);
+
+        if (!msg) {
+          return;
+        }
+
+        switch (msg.type) {
+          case 'UPDATE_RUN_STATUS':
+            await this.handleUPDATE_RUN_STATUS(connection, msg.status);
+            break;
+          case 'UPDATE_GRACE_PERIOD':
+            await this.handleUPDATE_GRACE_PERIOD(connection, msg.gracePeriod);
+            break;
+          case 'SET_ACTIVE_ITEM':
+            await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
+            break;
+          case 'SET_QUESTION_LOCKED':
+            await this.handleSET_QUESTION_LOCKED(connection, msg.questionId, msg.locked);
+            break;
+          case 'START_TIMER':
+            this.handleSTART_TIMER(connection);
+            break;
+          case 'REMOVE_TIMER':
+            this.handleREMOVE_TIMER(connection);
+            break;
+        }
+
+        this.sendAck(ws, msg.__ACK__);
+      } else if (this.isPresenterWebSocket(ws)) {
+        const msg = this.parse(ws, PresenterMessage, message);
+
+        if (msg) {
+          this.sendAck(ws, msg.__ACK__);
+        }
+      } else if (this.isJudgeWebSocket(ws)) {
+        const msg = this.parse(ws, JudgeMessage, message);
+
+        if (!msg) {
+          return;
+        }
+
+        this.sendAck(ws, msg.__ACK__);
+
+        switch (msg.type) {
+          case 'UPDATE_POINTS':
+            await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
+            break;
+          case 'SET_QUESTION_GRADED':
+            await this.handleSET_QUESTION_GRADED(connection, msg.questionId, msg.graded);
+            break;
+        }
       }
-    }
-
-    // Handle host messages
-    if (this.isHostWebSocket(ws)) {
-      const msg = JSON.parse(message as string) as
-        | {
-            type: 'UPDATE_RUN_STATUS';
-            status: RunStatus;
-            __ACK__: string;
-          }
-        | { type: 'UPDATE_GRACE_PERIOD'; gracePeriod: number; __ACK__: string }
-        | { type: 'SET_ACTIVE_ITEM'; activeItem: ActiveItem | null; __ACK__: string }
-        | { type: 'SET_QUESTION_LOCKED'; questionId: string; locked: boolean; __ACK__: string }
-        | { type: 'START_TIMER'; __ACK__: string }
-        | { type: 'REMOVE_TIMER'; __ACK__: string };
-
-      switch (msg.type) {
-        case 'UPDATE_RUN_STATUS':
-          await this.handleUPDATE_RUN_STATUS(connection, msg.status);
-          break;
-        case 'UPDATE_GRACE_PERIOD':
-          await this.handleUPDATE_GRACE_PERIOD(connection, msg.gracePeriod);
-          break;
-        case 'SET_ACTIVE_ITEM':
-          await this.handleSET_ACTIVE_ITEM(connection, msg.activeItem);
-          break;
-        case 'SET_QUESTION_LOCKED':
-          await this.handleSET_QUESTION_LOCKED(connection, msg.questionId, msg.locked);
-          break;
-        case 'START_TIMER':
-          this.handleSTART_TIMER(connection);
-          break;
-        case 'REMOVE_TIMER':
-          this.handleREMOVE_TIMER(connection);
-          break;
-      }
-
-      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
-    }
-
-    if (this.isPresenterWebSocket(ws)) {
-      const msg = JSON.parse(message as string) as { type: string; __ACK__: string };
-
-      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
-    }
-
-    if (this.isJudgeWebSocket(ws)) {
-      const msg = JSON.parse(message as string) as
-        | {
-            type: 'UPDATE_POINTS';
-            answerId: string;
-            points: number | null;
-            __ACK__: string;
-          }
-        | { type: 'SET_QUESTION_GRADED'; questionId: string; graded: boolean; __ACK__: string };
-
-      ws.send(JSON.stringify({ type: 'ACK', id: msg['__ACK__'] }));
-
-      switch (msg.type) {
-        case 'UPDATE_POINTS':
-          await this.handleUPDATE_POINTS(connection, msg.answerId, msg.points);
-          break;
-        case 'SET_QUESTION_GRADED':
-          await this.handleSET_QUESTION_GRADED(connection, msg.questionId, msg.graded);
-          break;
-      }
+    } catch (error) {
+      console.error(`WebSocket ${role} message failed for event`, ws.data.eventId, error);
+      ws.send(JSON.stringify({ type: 'ERROR', code: 'SERVER_ERROR', message: 'Something went wrong' }));
     }
   };
+
+  private sendAck(ws: ServerWebSocket<WebsocketData>, ackId: string | undefined) {
+    if (ackId !== undefined) {
+      ws.send(JSON.stringify({ type: 'ACK', id: ackId }));
+    }
+  }
+
+  // Parses a frame with the role's schema. An invalid one gets an INVALID_MESSAGE error (and its ACK, so the
+  // client doesn't take it for a lost connection) and returns null.
+  private parse<T extends z.ZodType>(ws: ServerWebSocket<WebsocketData>, schema: T, raw: string | Buffer) {
+    const result = parseMessage(schema, raw);
+
+    if (result.ok) {
+      return result.message;
+    }
+
+    console.warn(`Invalid WebSocket message from ${ws.data.role}:`, result.error);
+    ws.send(JSON.stringify({ type: 'ERROR', code: 'INVALID_MESSAGE', message: result.error }));
+    this.sendAck(ws, result.ack);
+
+    return null;
+  }
 
   private async cleanUpEventConnection(eventId: string): Promise<void> {
     const connection = this.eventConnections.get(eventId);
