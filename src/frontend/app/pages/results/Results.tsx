@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
 import { ResultsValt, ResultsValtContext, useResultsValt } from './resultsValt';
 import { Loading } from '@/frontend/components/Loading';
+import { toast } from '@/frontend/components/Toast';
 import './Results.css';
 
 const FIRST_THRESHOLD = 90;
@@ -17,9 +18,15 @@ const ResultsContent = () => {
     const eventId = match ? match[1] : undefined;
 
     if (eventId && !snap.initialized) {
-      valt.init(eventId);
+      valt.init(eventId).then((result) => {
+        if (!result.ok) {
+          toast.show({ type: 'error', message: result.error, persist: true });
+        }
+      });
     }
   }, [valt, snap.initialized]);
+
+  useEffect(() => valt.cleanup, [valt]);
 
   const handleExcludeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const teamId = e.currentTarget.dataset.teamId;
@@ -56,6 +63,14 @@ const ResultsContent = () => {
     <div className='flex-1 overflow-auto p-8 pt-4 place-items-center'>
       <h1 className='text-3xl font-bold mb-4 text-center'>
         Results <span className='text-neutral brightness-75'>{snap.eventName}</span>
+        {snap.live && (
+          <span
+            className='badge badge-success badge-sm ml-3 align-middle tooltip tooltip-bottom'
+            data-tip='Updates as judges grade'
+          >
+            Live
+          </span>
+        )}
       </h1>
 
       {/* Chart container */}

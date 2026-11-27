@@ -115,7 +115,9 @@ export type ServerMessage =
   | { type: 'TEAM_STATUS'; teams: TeamStatusUpdate[] }
   | { type: 'QUESTION_LOCKED'; questionId: string; locked: boolean }
   | { type: 'QUESTION_GRADED'; questionId: string; graded: boolean }
-  | { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null };
+  | { type: 'POINTS_UPDATED'; questionId: string; answerId: string; points: number | null }
+  // Results screens only (#27): team totals may have changed, so reload them.
+  | { type: 'RESULTS_CHANGED' };
 
 // The server's answer to every page message that carried an `__ACK__` id (#53), with its clock (#47).
 export type AckMessage = { type: 'ACK'; id: string; serverTime: number } & (
@@ -150,3 +152,5 @@ export type JudgeClientMessage =
   | { type: 'SET_QUESTION_GRADED'; questionId: string; graded: boolean };
 
 export type PresenterClientMessage = Ping;
+
+export type ResultsClientMessage = Ping;

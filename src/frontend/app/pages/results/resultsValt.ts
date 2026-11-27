@@ -1,4 +1,8 @@
-import { api } from '@/frontend/utils/api';
+import { toast } from '@/frontend/components/Toast';
+import { WebSocketManager } from '@/frontend/components/WebSocketManager';
+import { api, type Outcome } from '@/frontend/utils/api';
+import { debounce } from '@/frontend/utils/debounce';
+import type { ResultsClientMessage, ServerMessage } from '@/types';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
@@ -21,10 +25,13 @@ export type ResultsStore = {
   highestPoints: number;
   teams: TeamResult[];
   excludedTeamIds: Set<string>;
+  // Connected for live updates.
+  live: boolean;
 };
 
 export class ResultsValt {
   store: ResultsStore;
+  private ws: WebSocketManager<ResultsClientMessage> | null = null;
 
   constructor() {
     this.store = proxy<ResultsStore>({
@@ -34,41 +41,89 @@ export class ResultsValt {
       maxPoints: 0,
       highestPoints: 0,
       teams: [],
-      excludedTeamIds: new Set()
+      excludedTeamIds: new Set(),
+      live: false
     });
   }
 
   async init(eventId: string) {
     this.store.initialized = false;
+    this.store.eventId = eventId;
 
-    const result = await api<any>(`/api/events/${eventId}/results`);
+    const loaded = await this.load();
+
+    if (!loaded.ok) {
+      return loaded;
+    }
+
+    this.store.initialized = true;
+    this.connect();
+
+    return { ok: true } as const;
+  }
+
+  // Loads the totals; a reload keeps the excluded teams and doesn't show the loading state.
+  private async load(): Promise<Outcome> {
+    const result = await api<{
+      eventName: string;
+      maxPoints: number | string;
+      teams: (Omit<TeamResult, 'totalPoints' | 'percentage' | 'absPercentage'> & { totalPoints: number | string })[];
+    }>(`/api/events/${this.store.eventId}/results`);
 
     if (!result.ok) {
-      return { ok: false, error: `Couldn’t load the results. ${result.error}` } as const;
+      return { ok: false, error: `Couldn’t load the results. ${result.error}` };
     }
 
     const response = result.data;
 
-    this.store.eventId = eventId;
     this.store.eventName = response.eventName;
     this.store.maxPoints = Number(response.maxPoints);
-
-    this.store.highestPoints = response.teams.reduce(
-      (highestPoints: number, team: any) => Math.max(highestPoints, Number(team.totalPoints)),
-      0
-    );
-
-    this.store.teams = response.teams.map((team: any) => ({
+    this.store.teams = response.teams.map((team) => ({
       ...team,
       totalPoints: Number(team.totalPoints),
-      absPercentage: this.store.maxPoints > 0 ? (Number(team.totalPoints) / Number(this.store.maxPoints)) * 100 : 0,
-      percentage: this.store.highestPoints > 0 ? (Number(team.totalPoints) / this.store.highestPoints) * 100 : 0
+      absPercentage: this.store.maxPoints > 0 ? (Number(team.totalPoints) / this.store.maxPoints) * 100 : 0,
+      percentage: 0
     }));
+    this.applyHighest();
 
-    this.store.initialized = true;
-
-    return { ok: true } as const;
+    return { ok: true };
   }
+
+  // Live updates (#27): the server says when totals may have changed (points given, a new answer, a run
+  // started over); a burst of those reloads once.
+  private connect() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = new URL('/event-run/ws', `${protocol}//${window.location.host}`);
+
+    wsUrl.search = new URLSearchParams({ role: 'results', eventId: this.store.eventId }).toString();
+
+    this.ws = new WebSocketManager<ResultsClientMessage>(
+      wsUrl.toString(),
+      (status) => {
+        this.store.live = status === 'connected';
+      },
+      (message: ServerMessage) => {
+        if (message.type === 'RESULTS_CHANGED') {
+          this.reloadSoon();
+        }
+      }
+    );
+
+    this.ws.connect();
+  }
+
+  private reloadSoon = debounce(async () => {
+    const loaded = await this.load();
+
+    if (!loaded.ok) {
+      toast.show({ type: 'error', message: loaded.error });
+    }
+  }, 500);
+
+  cleanup = () => {
+    this.ws?.destroy();
+    this.ws = null;
+  };
 
   excludeTeam(teamId: string) {
     if (this.store.excludedTeamIds.has(teamId)) {
@@ -78,14 +133,15 @@ export class ResultsValt {
     }
 
     this.store.excludedTeamIds = new Set(this.store.excludedTeamIds);
+    this.applyHighest();
+  }
 
-    this.store.highestPoints = this.store.teams.reduce((highestPoints: number, team) => {
-      if (this.store.excludedTeamIds.has(team.id)) {
-        return highestPoints;
-      }
-
-      return Math.max(highestPoints, team.totalPoints);
-    }, 0);
+  // The highest total among the included teams, and each team's percentage of it.
+  private applyHighest() {
+    this.store.highestPoints = this.store.teams.reduce(
+      (highest, team) => (this.store.excludedTeamIds.has(team.id) ? highest : Math.max(highest, team.totalPoints)),
+      0
+    );
 
     this.store.teams = this.store.teams.map((team) => ({
       ...team,

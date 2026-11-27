@@ -10,12 +10,13 @@ How an event is run live: the host steps through the event on the Run screen, th
 
 Every role connects to `/event-run/ws` with a `role` query parameter.
 
-| Role                 | URL                         | Who may connect                            | Topics it's subscribed to                    |
-| -------------------- | --------------------------- | ------------------------------------------ | -------------------------------------------- |
-| host (Run screen)    | `?role=host&eventId=…`      | signed in, `owner` or `admin` of the event | `{eventId}:hosts`                            |
-| presenter            | `?role=presenter&eventId=…` | signed in, `owner` or `admin`              | `{eventId}:presenters`                       |
-| judge (Grade screen) | `?role=judge&eventId=…`     | signed in, any role on the event           | `{eventId}:judges`                           |
-| team                 | `?role=team`                | the device that joined the team (#44)      | `{eventId}:teams`, `{eventId}:team:{teamId}` |
+| Role                     | URL                         | Who may connect                            | Topics it's subscribed to                    |
+| ------------------------ | --------------------------- | ------------------------------------------ | -------------------------------------------- |
+| host (Run screen)        | `?role=host&eventId=…`      | signed in, `owner` or `admin` of the event | `{eventId}:hosts`                            |
+| presenter                | `?role=presenter&eventId=…` | signed in, `owner` or `admin`              | `{eventId}:presenters`                       |
+| judge (Grade screen)     | `?role=judge&eventId=…`     | signed in, any role on the event           | `{eventId}:judges`                           |
+| results (Results screen) | `?role=results&eventId=…`   | signed in, `owner` or `admin`              | `{eventId}:results`                          |
+| team                     | `?role=team`                | the device that joined the team (#44)      | `{eventId}:teams`, `{eventId}:team:{teamId}` |
 
 - Hosts, presenters and judges are checked against their session cookie. Several of each may be connected at once.
 - Teams are identified by the `teamToken` cookie the device got when it joined with the team's code (`/join/K7P4QX` or typing it at `/join`, which posts to `POST /api/join`). The server finds the team, and so the event, from that token; the database keeps only its SHA-256. A second device trying the same code gets 409 "Team N is already connected on another device. Ask the host to release it."
@@ -25,6 +26,7 @@ What each role gets when it connects:
 
 - host: `ACTIVE_ITEM`, `TEAM_STATUS` (every team)
 - presenter and judge: `LANGUAGES`, `RUN_STATUS`, `ACTIVE_ITEM`
+- results: nothing until totals may change
 - team: `EVENT_INFO`, `TEAM_INFO`, `LANGUAGES`, `RUN_STATUS`, `ACTIVE_ITEM`, `GRACE_PERIOD`; hosts get a `TEAM_STATUS` for the team
 
 The event's live state (`EventConnection`: run status, grace period, the active item, languages, connected teams) is set up from the database by the first connection, shared by connections that arrive together (#52), and dropped when nobody is connected. An event without languages connects (it can't have teams); one missing its run record is refused with that reason.
@@ -35,7 +37,7 @@ Each page message carries `__ACK__` (added by `WebSocketManager`). Each role's m
 
 | Role  | Message                                       | What happens                                                                                                                                                                                                                                                                                                                                                    |
 | ----- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| all   | `PING`                                        | Nothing; used for clock sync.                                                                                                                                                                                                                                                                                                                                   |
+| all   | `PING`                                        | Nothing; used for clock sync. The results role sends nothing else.                                                                                                                                                                                                                                                                                              |
 | team  | `SUBMIT_ANSWER { answer, questionId? }`       | Saves the team's answer to the open question (an upsert, so a newer answer replaces the older one and clears its grading). Refused unless the question is in the prompt phase, not locked, within its time and grace period, and (when `questionId` is given) still the open question. True/false answers may be booleans; they're saved as `'true'`/`'false'`. |
 | team  | `SUBMIT_CHALLENGE { questionId, challenged }` | Sets or clears the team's challenge while the question's answer is shown.                                                                                                                                                                                                                                                                                       |
 | host  | `UPDATE_RUN_STATUS { status }`                | `not_started`, `in_progress`, `paused`, `completed`. Back to `not_started` erases every answer and unlocks every question. Pausing and resuming pause and resume the timer.                                                                                                                                                                                     |
@@ -52,18 +54,19 @@ Every write is scoped to the socket's event: an answer or question id from anoth
 
 ## Messages from the server
 
-| Message                                                | Sent to                   | When                                                                                                            |
-| ------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `ACK { id, serverTime, ok, error? }`                   | the sender                | after each message is handled (see Order and ACKs)                                                              |
-| `CONNECTION_ERROR { message, code? }`                  | the socket                | a refused connection; a team device released by the host                                                        |
-| `ERROR { code: 'INVALID_MESSAGE', message }`           | the sender                | a frame that isn't JSON or doesn't match its schema                                                             |
-| `EVENT_INFO`, `TEAM_INFO`                              | the team                  | when it connects                                                                                                |
-| `RUN_STATUS { status }`                                | everyone                  | on connect (not hosts) and when the host changes it                                                             |
-| `GRACE_PERIOD { gracePeriod }`                         | everyone                  | on connect (teams) and when the host changes it                                                                 |
-| `LANGUAGES { languages }`                              | presenters, judges, teams | on connect                                                                                                      |
-| `ACTIVE_ITEM { activeItem }`                           | everyone                  | on connect and whenever it changes; every 5 s while a timer runs. Teams get only their own answer in `answers`. |
-| `TEAM_STATUS { teams }`                                | hosts                     | on connect (every team) and on changes (only the changed fields): connection status, join code, device          |
-| `QUESTION_LOCKED`, `QUESTION_GRADED`, `POINTS_UPDATED` | hosts, presenters, judges | after the change                                                                                                |
+| Message                                                | Sent to                   | When                                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACK { id, serverTime, ok, error? }`                   | the sender                | after each message is handled (see Order and ACKs)                                                                                                                        |
+| `CONNECTION_ERROR { message, code? }`                  | the socket                | a refused connection; a team device released by the host                                                                                                                  |
+| `ERROR { code: 'INVALID_MESSAGE', message }`           | the sender                | a frame that isn't JSON or doesn't match its schema                                                                                                                       |
+| `EVENT_INFO`, `TEAM_INFO`                              | the team                  | when it connects                                                                                                                                                          |
+| `RUN_STATUS { status }`                                | everyone                  | on connect (not hosts) and when the host changes it                                                                                                                       |
+| `GRACE_PERIOD { gracePeriod }`                         | everyone                  | on connect (teams) and when the host changes it                                                                                                                           |
+| `LANGUAGES { languages }`                              | presenters, judges, teams | on connect                                                                                                                                                                |
+| `ACTIVE_ITEM { activeItem }`                           | everyone                  | on connect and whenever it changes; every 5 s while a timer runs. Teams get only their own answer in `answers`.                                                           |
+| `TEAM_STATUS { teams }`                                | hosts                     | on connect (every team) and on changes (only the changed fields): connection status, join code, device                                                                    |
+| `QUESTION_LOCKED`, `QUESTION_GRADED`, `POINTS_UPDATED` | hosts, presenters, judges | after the change                                                                                                                                                          |
+| `RESULTS_CHANGED`                                      | results screens           | team totals may have changed: points given, a new answer (which clears its points), a run started over; the screen reloads `GET /api/events/:id/results`, debounced (#27) |
 
 ## Order and ACKs (#53)
 

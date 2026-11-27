@@ -61,6 +61,13 @@ export type PresenterWebsocketData = {
   eventId: string;
 };
 
+// The Results screen (#27): told when scores may have changed, so it reloads them.
+export type ResultsWebsocketData = {
+  role: 'results';
+  session: Session;
+  eventId: string;
+};
+
 export type ErrorWebsocketData = {
   role: 'error';
   message: string;
@@ -68,7 +75,7 @@ export type ErrorWebsocketData = {
   code?: 'NOT_JOINED';
 };
 
-type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterWebsocketData;
+type SignedInWebsocketData = HostWebsocketData | JudgeWebsocketData | PresenterWebsocketData | ResultsWebsocketData;
 
 // How often signed-in sockets are checked for sessions that expired or were deleted.
 const SESSION_CHECK_MS = 60_000;
@@ -76,6 +83,7 @@ const SESSION_CHECK_MS = 60_000;
 export type WebsocketData =
   | HostWebsocketData
   | PresenterWebsocketData
+  | ResultsWebsocketData
   | TeamWebsocketData
   | JudgeWebsocketData
   | ErrorWebsocketData;
@@ -139,7 +147,9 @@ export class WebSocketServer {
   }
 
   private isSignedInWebSocket(ws: ServerWebSocket<WebsocketData>): ws is ServerWebSocket<SignedInWebsocketData> {
-    return ws.data.role === 'host' || ws.data.role === 'judge' || ws.data.role === 'presenter';
+    return (
+      ws.data.role === 'host' || ws.data.role === 'judge' || ws.data.role === 'presenter' || ws.data.role === 'results'
+    );
   }
 
   private trackSession(ws: ServerWebSocket<SignedInWebsocketData>) {
@@ -229,7 +239,7 @@ export class WebSocketServer {
       return refuse('Missing role in URL');
     }
 
-    if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge') {
+    if (role !== 'host' && role !== 'team' && role !== 'presenter' && role !== 'judge' && role !== 'results') {
       return refuse('Invalid URL role');
     }
 
@@ -298,6 +308,19 @@ export class WebSocketServer {
       }
 
       if (this.server?.upgrade(req, { data: { role: 'presenter', session, eventId } })) {
+        return;
+      }
+    } else if (role === 'results') {
+      if (!session) {
+        return refuse('Unauthorized');
+      }
+
+      // The same people who can open the results (GET /api/events/:id/results).
+      if (!(await getEventForRoles(eventId, session.user_id, MANAGER_ROLES))) {
+        return refuse('Results permission denied');
+      }
+
+      if (this.server?.upgrade(req, { data: { role: 'results', session, eventId } })) {
         return;
       }
     } else if (team) {
@@ -380,6 +403,8 @@ export class WebSocketServer {
       this.sendActiveItem(ws, connection);
       ws.subscribe(`${eventId}:presenters`);
       console.log('Presenter connected for event', eventId);
+    } else if (ws.data.role === 'results') {
+      ws.subscribe(`${eventId}:results`);
     } else if (this.isTeamWebSocket(ws)) {
       const { id } = ws.data;
 
@@ -603,8 +628,16 @@ export class WebSocketServer {
     const presenterCount = this.server?.subscriberCount(`${eventId}:presenters`);
     const judgeCount = this.server?.subscriberCount(`${eventId}:judges`);
     const teamCount = this.server?.subscriberCount(`${eventId}:teams`);
+    const resultsCount = this.server?.subscriberCount(`${eventId}:results`);
 
-    if (connection && hostCount === 0 && presenterCount === 0 && judgeCount === 0 && teamCount === 0) {
+    if (
+      connection &&
+      hostCount === 0 &&
+      presenterCount === 0 &&
+      judgeCount === 0 &&
+      teamCount === 0 &&
+      resultsCount === 0
+    ) {
       console.log('Cleaning up event connection:', eventId);
       this.clearTimer(connection);
       this.eventConnections.delete(eventId);
@@ -938,6 +971,13 @@ export class WebSocketServer {
 
     this.broadcastActiveItemToManagers(connection);
     this.sendActiveItem(ws, connection);
+    // A new answer clears its points.
+    this.notifyResults(connection);
+  }
+
+  // Tells Results screens that team totals may have changed (#27).
+  private notifyResults(connection: EventConnection) {
+    this.server?.publish(`${connection.eventId}:results`, encode({ type: 'RESULTS_CHANGED' }));
   }
 
   private async handleSUBMIT_CHALLENGE(
@@ -1026,9 +1066,10 @@ export class WebSocketServer {
 
     connection.run.status = status;
 
-    // Starting over erased every answer: the open question's copy must match (#54).
+    // Starting over erased every answer: the open question's copy must match (#54), and the totals are 0.
     if (status === 'not_started') {
       connection.activeItem = await withAnswers(connection.eventId, connection.activeItem);
+      this.notifyResults(connection);
     }
 
     const message = encode({ type: 'RUN_STATUS', status });
@@ -1170,6 +1211,8 @@ export class WebSocketServer {
     if (!answer) {
       return refused('That answer isn’t in this event.');
     }
+
+    this.notifyResults(connection);
 
     const message = encode({
       type: 'POINTS_UPDATED',
