@@ -7,11 +7,13 @@ export interface EventListItem {
   name: string;
   role_id: Role;
   created_at: Date;
+  tags: string[];
+  archived_at: Date | null;
 }
 
 export async function listEventsForUser(userId: string): Promise<EventListItem[]> {
   return await sql`
-    SELECT events.id, events.name, permissions.role_id, events.created_at
+    SELECT events.id, events.name, permissions.role_id, events.created_at, events.tags, events.archived_at
     FROM events
     JOIN permissions ON events.id = permissions.event_id
     WHERE permissions.user_id = ${userId}
@@ -49,6 +51,22 @@ export async function renameEvent(eventId: string, name: string) {
   await sql`UPDATE events SET name = ${name} WHERE id = ${eventId}`;
 }
 
+// Replaces the event's tags (#72); callers normalize them first.
+export async function setEventTags(eventId: string, tags: string[]) {
+  await sql`UPDATE events SET tags = ${tags}::text[] WHERE id = ${eventId}`;
+}
+
+// Archives the event (hidden from the event list unless the Archived filter is on) or brings it back (#72).
+export async function setEventArchived(eventId: string, archived: boolean): Promise<Date | null> {
+  const rows: { archived_at: Date | null }[] = await sql`
+    UPDATE events SET archived_at = CASE WHEN ${archived} THEN coalesce(archived_at, now()) ELSE NULL END
+    WHERE id = ${eventId}
+    RETURNING archived_at
+  `;
+
+  return rows[0]?.archived_at ?? null;
+}
+
 export async function deleteEvent(eventId: string) {
   await sql`DELETE FROM events WHERE id = ${eventId}`;
 }
@@ -59,8 +77,9 @@ export async function duplicateEvent(sourceEventId: string, userId: string, name
   return await sql.begin(async (tx) => {
     // 1. Create new event
     const newEventId = Bun.randomUUIDv7();
-    await tx`INSERT INTO events (id, name, title_remarks)
-        SELECT ${newEventId}, ${name}, title_remarks
+    // The copy keeps the tags but isn't archived.
+    await tx`INSERT INTO events (id, name, title_remarks, tags)
+        SELECT ${newEventId}, ${name}, title_remarks, tags
         FROM events WHERE id = ${sourceEventId}`;
 
     // 2. Create permission for current user as owner

@@ -342,6 +342,10 @@ export type EventListEntry = {
   name: string;
   roleId: 'owner' | 'admin' | 'judge';
   createdAt: string;
+  // Chosen by the event's owners and admins (#72).
+  tags: readonly string[];
+  // When it was archived; null when it isn't.
+  archivedAt: string | null;
   runStatus: RunStatus;
   counts: EventCounts | null;
 };

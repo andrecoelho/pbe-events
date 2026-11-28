@@ -1,11 +1,33 @@
 import { auth, eventRole, json } from '@/server/http/middleware';
 import { route } from '@/server/http/route';
-import { createEvent, deleteEvent, duplicateEvent, listEventsForUser, renameEvent } from '@/server/services/events';
+import { normalizeTags, tagsProblem } from '@/eventTags';
+import {
+  createEvent,
+  deleteEvent,
+  duplicateEvent,
+  listEventsForUser,
+  renameEvent,
+  setEventArchived,
+  setEventTags
+} from '@/server/services/events';
 import { getEventCountsFor } from '@/server/services/eventOverview';
 import { MANAGER_ROLES } from '@/server/services/permissions';
 import type { Routes } from '@/server/types';
 import type { EventListEntry } from '@/types';
 import { z } from 'zod';
+
+const Tags = z
+  .object({ tags: z.array(z.string(), { error: 'Send the tags as a list.' }) })
+  .transform(({ tags }) => normalizeTags(tags))
+  .superRefine((tags, ctx) => {
+    const problem = tagsProblem(tags);
+
+    if (problem) {
+      ctx.addIssue({ code: 'custom', message: problem });
+    }
+  });
+
+const Archived = z.object({ archived: z.boolean({ error: 'Say whether the event is archived.' }) });
 
 const EventName = z.object({
   name: z.string({ error: 'Enter a name for the event.' }).trim().min(1, 'Enter a name for the event.')
@@ -24,6 +46,8 @@ export const eventsRoutes: Routes = {
           name: event.name,
           roleId: event.role_id,
           createdAt: event.created_at.toISOString(),
+          tags: event.tags,
+          archivedAt: event.archived_at?.toISOString() ?? null,
           runStatus: counts.get(event.id)?.runStatus ?? 'not_started',
           counts: MANAGER_ROLES.includes(event.role_id) ? (counts.get(event.id)?.counts ?? null) : null
         }))
@@ -49,6 +73,21 @@ export const eventsRoutes: Routes = {
     DELETE: route(eventRole('owner'), async ({ event }) => {
       await deleteEvent(event.id);
       return {};
+    })
+  },
+
+  // Tags and archiving (#72), for the event list's filters.
+  '/api/events/:id/tags': {
+    PUT: route(eventRole('owner', 'admin'), json(Tags), async ({ event, body }) => {
+      await setEventTags(event.id, body);
+      return { tags: body };
+    })
+  },
+
+  '/api/events/:id/archive': {
+    PUT: route(eventRole('owner', 'admin'), json(Archived), async ({ event, body }) => {
+      const archivedAt = await setEventArchived(event.id, body.archived);
+      return { archivedAt: archivedAt?.toISOString() ?? null };
     })
   },
 

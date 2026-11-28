@@ -1,4 +1,5 @@
 import { RUN_STATUS_LABEL, setupProblems } from '@/eventReadiness';
+import { allTags } from '@/eventTags';
 import { eventUrl } from '@/eventUrls';
 import { alertModal } from '@/frontend/components/AlertModal';
 import { confirmModal } from '@/frontend/components/ConfirmModal';
@@ -6,6 +7,8 @@ import { Icon } from '@/frontend/components/Icon';
 import { roleBadgeColors, roleGradients } from '@/frontend/utils/roleColors';
 import { memo, useRef, type CSSProperties } from 'react';
 import { eventNameModal } from './EventNameModal';
+import { eventTagsModal } from './EventTagsModal';
+import type { Snapshot } from 'valtio';
 import { useEventsValt, type PBEEvent } from './eventValt';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
@@ -18,7 +21,12 @@ const sentence = (parts: string[]) => {
 };
 
 // Under the name: whether the event is running or done, else what it still needs (owners and admins only).
-function Hint({ event }: { event: PBEEvent }) {
+// Nothing for archived events.
+function Hint({ event }: { event: Snapshot<PBEEvent> }) {
+  if (event.archivedAt) {
+    return null;
+  }
+
   if (event.runStatus !== 'not_started') {
     return (
       <span className={`badge badge-sm ${event.runStatus === 'completed' ? 'badge-ghost' : 'badge-success'}`}>
@@ -44,7 +52,7 @@ function Hint({ event }: { event: PBEEvent }) {
 }
 
 // One event in the list (#71): name (opens the event), role, creation date and, for owners and admins, a menu.
-export const EventRow = memo(({ event }: { event: PBEEvent }) => {
+export const EventRow = memo(({ event }: { event: Snapshot<PBEEvent> }) => {
   const valt = useEventsValt();
   const menuRef = useRef<HTMLUListElement>(null);
   const canEdit = event.roleId === 'owner' || event.roleId === 'admin';
@@ -80,6 +88,21 @@ export const EventRow = memo(({ event }: { event: PBEEvent }) => {
       }
     });
 
+  const handleTags = () =>
+    run(async () => {
+      const tags = await eventTagsModal.open({
+        eventName: event.name,
+        tags: event.tags,
+        suggestions: allTags(valt.store.events)
+      });
+
+      if (tags) {
+        await valt.setTags(event.id, tags);
+      }
+    });
+
+  const handleArchive = () => run(() => valt.setArchived(event.id, !event.archivedAt));
+
   const handleDelete = () =>
     run(async () => {
       const confirmed = await confirmModal.open(
@@ -95,10 +118,33 @@ export const EventRow = memo(({ event }: { event: PBEEvent }) => {
     <li className='list-row items-center [&:not(:last-child)]:after:border-base-300'>
       <div className={`w-1.5 self-stretch rounded-full ${roleGradients[event.roleId]}`} aria-hidden='true' />
       <div className='min-w-0'>
-        <a href={eventUrl(event.id)} className='font-semibold text-lg link link-hover block truncate'>
-          {event.name}
-        </a>
-        <Hint event={event} />
+        <div className='flex items-center gap-2 min-w-0'>
+          <a
+            href={eventUrl(event.id)}
+            className={`font-semibold text-lg link link-hover truncate ${event.archivedAt ? 'text-base-content/60' : ''}`}
+          >
+            {event.name}
+          </a>
+          {event.archivedAt && <span className='badge badge-sm badge-ghost flex-none'>Archived</span>}
+        </div>
+        <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+          <Hint event={event} />
+          {event.tags.length > 0 && (
+            <ul className='flex flex-wrap gap-1' aria-label='Tags'>
+              {event.tags.map((tag) => (
+                <li key={tag}>
+                  <button
+                    className='badge badge-sm badge-outline cursor-pointer hover:badge-neutral'
+                    title={`Show only events tagged “${tag}”`}
+                    onClick={() => valt.setTagFilter(tag)}
+                  >
+                    {tag}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       <span className={`badge badge-sm capitalize w-16 ${roleBadgeColors[event.roleId]}`}>{event.roleId}</span>
       <span className='text-sm text-base-content/60 whitespace-nowrap hidden sm:inline w-36 text-right'>
@@ -127,6 +173,12 @@ export const EventRow = memo(({ event }: { event: PBEEvent }) => {
             </li>
             <li>
               <button onClick={handleDuplicate}>Duplicate</button>
+            </li>
+            <li>
+              <button onClick={handleTags}>Edit tags</button>
+            </li>
+            <li>
+              <button onClick={handleArchive}>{event.archivedAt ? 'Unarchive' : 'Archive'}</button>
             </li>
             {canDelete && (
               <li>
