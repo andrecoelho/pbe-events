@@ -1,7 +1,10 @@
 import { auth, eventRole, json } from '@/server/http/middleware';
 import { route } from '@/server/http/route';
 import { createEvent, deleteEvent, duplicateEvent, listEventsForUser, renameEvent } from '@/server/services/events';
+import { getEventCountsFor } from '@/server/services/eventOverview';
+import { MANAGER_ROLES } from '@/server/services/permissions';
 import type { Routes } from '@/server/types';
+import type { EventListEntry } from '@/types';
 import { z } from 'zod';
 
 const EventName = z.object({
@@ -10,7 +13,22 @@ const EventName = z.object({
 
 export const eventsRoutes: Routes = {
   '/api/events': {
-    GET: route(auth(), async ({ user }) => ({ events: await listEventsForUser(user.id) })),
+    // The user's events (#71), with what each still needs before it can run for the ones they manage.
+    GET: route(auth(), async ({ user }): Promise<{ events: EventListEntry[] }> => {
+      const events = await listEventsForUser(user.id);
+      const counts = await getEventCountsFor(events.map((event) => event.id));
+
+      return {
+        events: events.map((event) => ({
+          id: event.id,
+          name: event.name,
+          roleId: event.role_id,
+          createdAt: event.created_at.toISOString(),
+          runStatus: counts.get(event.id)?.runStatus ?? 'not_started',
+          counts: MANAGER_ROLES.includes(event.role_id) ? (counts.get(event.id)?.counts ?? null) : null
+        }))
+      };
+    }),
 
     POST: route(auth(), json(EventName), async ({ user, body }) => await createEvent(user.id, body.name))
   },

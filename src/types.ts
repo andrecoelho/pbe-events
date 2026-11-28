@@ -313,22 +313,35 @@ export type Announcement = {
   updatedAt: string;
 };
 
+// What an event has so far (#69, #71): the home page's checklist and the event list's hint.
+export type EventCounts = {
+  languages: number;
+  questions: number;
+  // Questions without a translation in at least one of the event's languages.
+  questionsMissingTranslations: number;
+  teams: number;
+  // Teams whose device joined with the join code.
+  teamsJoined: number;
+  slides: number;
+  judges: number;
+};
+
 // An event's home page (#69): what's ready and what's missing, and whether it's live.
 export type EventOverviewResponse = {
-  counts: {
-    languages: number;
-    questions: number;
-    // Questions without a translation in at least one of the event's languages.
-    questionsMissingTranslations: number;
-    teams: number;
-    // Teams whose device joined with the join code.
-    teamsJoined: number;
-    slides: number;
-    judges: number;
-  };
+  counts: EventCounts;
   runStatus: RunStatus;
   // Teams connected right now (0 when the event isn't open in the server's memory).
   teamsConnected: number;
   // Every team's join code, for "Copy join codes".
   teams: { number: number; name: string; joinCode: string }[];
+};
+
+// A row of the event list (#71). `counts` is only there for owners and admins.
+export type EventListEntry = {
+  id: string;
+  name: string;
+  roleId: 'owner' | 'admin' | 'judge';
+  createdAt: string;
+  runStatus: RunStatus;
+  counts: EventCounts | null;
 };

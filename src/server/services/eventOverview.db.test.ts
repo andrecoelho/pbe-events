@@ -1,6 +1,6 @@
 // The event home page's counts (#69) against a real database. Runs only when POSTGRES_URL is a local dev
 // database (`mise run db`); CI has none, so it skips there.
-import { getEventCounts } from '@/server/services/eventOverview';
+import { getEventCounts, getEventCountsFor } from '@/server/services/eventOverview';
 import { addTeam, claimTeamDevice, newDeviceToken } from '@/server/services/teams';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'bun';
@@ -57,14 +57,16 @@ describe.skipIf(!isLocalDatabase())('getEventCounts', () => {
     const eventId = await makeEvent();
 
     expect(await getEventCounts(eventId)).toEqual({
-      languages: 0,
-      questions: 0,
-      questions_missing_translations: 0,
-      teams: 0,
-      teams_joined: 0,
-      slides: 0,
-      judges: 0,
-      run_status: 'not_started'
+      counts: {
+        languages: 0,
+        questions: 0,
+        questionsMissingTranslations: 0,
+        teams: 0,
+        teamsJoined: 0,
+        slides: 0,
+        judges: 0
+      },
+      runStatus: 'not_started'
     });
   });
 
@@ -81,12 +83,24 @@ describe.skipIf(!isLocalDatabase())('getEventCounts', () => {
     await addTeam(eventId, 'Lions', es);
     await claimTeamDevice(eagles.id, newDeviceToken());
 
-    const counts = await getEventCounts(eventId);
+    const { counts } = await getEventCounts(eventId);
 
     expect(counts.languages).toBe(2);
     expect(counts.questions).toBe(3);
-    expect(counts.questions_missing_translations).toBe(2);
+    expect(counts.questionsMissingTranslations).toBe(2);
     expect(counts.teams).toBe(2);
-    expect(counts.teams_joined).toBe(1);
+    expect(counts.teamsJoined).toBe(1);
+  });
+
+  test('counts several events at once and leaves out unknown ids', async () => {
+    const a = await makeEvent();
+    const b = await makeEvent();
+    await addLanguage(b, 'en');
+
+    const all = await getEventCountsFor([a, b, 'no-such-event']);
+
+    expect([...all.keys()].sort()).toEqual([a, b].sort());
+    expect(all.get(a)?.counts.languages).toBe(0);
+    expect(all.get(b)?.counts.languages).toBe(1);
   });
 });

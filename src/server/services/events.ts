@@ -6,11 +6,12 @@ export interface EventListItem {
   id: string;
   name: string;
   role_id: Role;
+  created_at: Date;
 }
 
 export async function listEventsForUser(userId: string): Promise<EventListItem[]> {
   return await sql`
-    SELECT events.id, events.name, permissions.role_id
+    SELECT events.id, events.name, permissions.role_id, events.created_at
     FROM events
     JOIN permissions ON events.id = permissions.event_id
     WHERE permissions.user_id = ${userId}

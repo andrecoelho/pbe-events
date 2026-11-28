@@ -4,8 +4,9 @@ import { EventHomeValt, REFRESH_MS } from '@/frontend/app/pages/event/eventHomeV
 import { alertModal } from '@/frontend/components/AlertModal';
 import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
+import { RUN_STATUS_LABEL, setupProblems } from '@/eventReadiness';
 import { eventUrl } from '@/eventUrls';
-import type { EventOverviewResponse, RunStatus } from '@/types';
+import type { EventCounts, RunStatus } from '@/types';
 import { memo, useEffect, useMemo, type ReactNode } from 'react';
 import { useSnapshot } from 'valtio';
 
@@ -21,7 +22,7 @@ interface Item {
 }
 
 // The setup checklist, from what the event has so far. Required items come first.
-function checklist(eventId: string, counts: EventOverviewResponse['counts']): Item[] {
+function checklist(eventId: string, counts: EventCounts): Item[] {
   const languages: Item =
     counts.languages > 0
       ? { label: 'Languages', state: 'ready', detail: String(counts.languages), action: null }
@@ -88,13 +89,6 @@ const STATE_ICON: Record<ItemState, ReactNode> = {
   optional: <Icon name='information-circle' className='size-5 text-base-content/40' aria-label='Optional' />
 };
 
-const RUN_STATUS_LABEL: Record<RunStatus, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  paused: 'Paused',
-  completed: 'Completed'
-};
-
 const RunBadge = ({ runStatus, teamsConnected }: { runStatus: RunStatus; teamsConnected: number }) => {
   if (teamsConnected > 0) {
     return (
@@ -148,7 +142,7 @@ const ManagerHome = memo(({ event }: { event: CurrentEvent }) => {
 
   const { counts, runStatus, teamsConnected } = snap.overview;
   const items = checklist(event.id, counts);
-  const missing = items.filter((item) => item.state === 'missing' || item.state === 'warning').length;
+  const missing = setupProblems(counts).length;
 
   return (
     <>

@@ -2,15 +2,15 @@ import { api } from '@/frontend/utils/api';
 import { createContext, useContext } from 'react';
 import { proxy } from 'valtio';
 
-export interface PBEEvent {
-  id: string;
-  name: string;
-  roleId: 'owner' | 'admin' | 'judge';
-}
+import type { EventListEntry } from '@/types';
+
+export type PBEEvent = EventListEntry;
 
 export interface EventsStore {
   initialized: boolean;
   events: PBEEvent[];
+  // The search box's text (#71).
+  query: string;
 }
 
 export class EventsValt {
@@ -19,10 +19,12 @@ export class EventsValt {
   constructor() {
     this.store = proxy<EventsStore>({
       initialized: false,
-      events: []
+      events: [],
+      query: ''
     });
   }
 
+  // Loads the list, or reloads it after a change (a new or duplicated event comes back with its counts).
   async init() {
     const result = await api<{ events: PBEEvent[] }>('/api/events');
 
@@ -39,10 +41,8 @@ export class EventsValt {
   // These throw an Error with a message to show when the server refuses or can't be reached.
 
   async createEvent(name: string) {
-    const event = await this.request<PBEEvent>('/api/events', { method: 'POST', json: { name } });
-
-    this.store.events.push({ id: event.id, name: event.name, roleId: event.roleId });
-    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
+    await this.request('/api/events', { method: 'POST', json: { name } });
+    await this.init();
   }
 
   async renameEvent(id: string, newName: string) {
@@ -63,10 +63,12 @@ export class EventsValt {
   }
 
   async duplicateEvent(id: string, name: string) {
-    const event = await this.request<PBEEvent>(`/api/events/${id}/duplicate`, { method: 'POST', json: { name } });
+    await this.request(`/api/events/${id}/duplicate`, { method: 'POST', json: { name } });
+    await this.init();
+  }
 
-    this.store.events.push({ id: event.id, name: event.name, roleId: event.roleId });
-    this.store.events.sort((a, b) => a.name.localeCompare(b.name));
+  setQuery(query: string) {
+    this.store.query = query;
   }
 
   private async request<T>(path: string, options: Parameters<typeof api>[1]) {

@@ -3,9 +3,8 @@ import { Icon } from '@/frontend/components/Icon';
 import { toast } from '@/frontend/components/Toast';
 import { memo, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
-import { EventCard } from './EventCard';
+import { EventRow } from './EventRow';
 import { eventNameModal } from './EventNameModal';
-import './Events.css';
 import { EventsValt, EventsValtContext } from './eventValt';
 
 const init = () => {
@@ -20,9 +19,12 @@ const init = () => {
   return valt;
 };
 
+// The user's events as one list with search (#71). Each row opens the event's home page.
 export const Events = memo(() => {
   const valt = useMemo(init, []);
   const snap = useSnapshot(valt.store);
+  const query = snap.query.trim().toLocaleLowerCase();
+  const events = query ? snap.events.filter((e) => e.name.toLocaleLowerCase().includes(query)) : snap.events;
 
   const handleCreateEvent = async () => {
     const name = await eventNameModal.open();
@@ -38,10 +40,31 @@ export const Events = memo(() => {
 
   return (
     <EventsValtContext.Provider value={valt}>
-      <div className='Events'>
-        <div className='Events__content'>
+      <div className='bg-base-100/95 flex-1 overflow-auto p-8'>
+        <div className='max-w-4xl mx-auto'>
+          <div className='flex flex-wrap items-center gap-4 mb-6'>
+            <h1 className='text-3xl font-bold flex-1'>Events</h1>
+            {snap.events.length > 0 && (
+              <label className='input w-64'>
+                <Icon name='magnifying-glass' className='size-4 opacity-50' />
+                <input
+                  type='search'
+                  placeholder='Search events'
+                  aria-label='Search events'
+                  value={snap.query}
+                  onChange={(e) => valt.setQuery(e.currentTarget.value)}
+                />
+              </label>
+            )}
+            <button className='btn btn-secondary' onClick={handleCreateEvent}>
+              <Icon name='plus' className='size-4' />
+              Add Event
+            </button>
+          </div>
+
           {snap.initialized && snap.events.length === 0 && (
-            <div className='absolute inset-0 flex flex-col items-center justify-center'>
+            <div className='text-center py-24'>
+              <p className='text-base-content/70 mb-4'>You don’t have any events yet.</p>
               <button className='btn btn-secondary btn-lg' onClick={handleCreateEvent}>
                 <Icon name='plus' className='size-4' />
                 Add your first event
@@ -49,25 +72,20 @@ export const Events = memo(() => {
             </div>
           )}
 
-          {snap.initialized && snap.events.length > 0 && (
-            <div className='Events__grid'>
-              {snap.events.map((event) => (
-                <div key={event.id} className='relative'>
-                  <EventCard event={event} />
-                </div>
+          {snap.events.length > 0 && events.length === 0 && (
+            <p role='status' className='text-base-content/70 py-8 text-center'>
+              No events match “{snap.query.trim()}”.
+            </p>
+          )}
+
+          {events.length > 0 && (
+            <ul className='list bg-base-100 rounded-box shadow-sm'>
+              {events.map((event) => (
+                <EventRow key={event.id} event={event} />
               ))}
-            </div>
+            </ul>
           )}
         </div>
-
-        {/* {snap.initialized && snap.events.length > 0 && ( */}
-        <footer className='bg-base-200 text-base-content p-4 flex flex-none justify-end shadow-md-top'>
-          <button className='btn btn-secondary' onClick={handleCreateEvent}>
-            <Icon name='plus' className='size-4' />
-            Add Event
-          </button>
-        </footer>
-        {/* )} */}
       </div>
     </EventsValtContext.Provider>
   );
